@@ -47,5 +47,35 @@ export class TelegramController {
   async stopMonitoring(@Param('channel') channel: string) {
     return this.telegramService.stopMonitoring(channel);
   }
+
+  @Get('maddingstock/messages')
+  async getMaddingStockMessages(
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.telegramService.getMaddingStockMessages(
+      limit ? Number(limit) : 20,
+      offset ? Number(offset) : 0,
+    );
+  }
+
+  @Get('maddingstock/search')
+  async searchMaddingStockMessages(
+    @Query('keyword') keyword: string,
+    @Query('limit') limit?: number,
+  ) {
+    if (!keyword) {
+      return { error: 'keyword is required' };
+    }
+    return this.telegramService.searchMaddingStockMessages(
+      keyword,
+      limit ? Number(limit) : 20,
+    );
+  }
+
+  @Get('maddingstock/stats')
+  async getMaddingStockStats() {
+    return this.telegramService.getMaddingStockStats();
+  }
 }
 

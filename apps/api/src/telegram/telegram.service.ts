@@ -5,6 +5,7 @@ import { StringSession } from 'telegram/sessions';
 import { Api } from 'telegram/tl';
 import { NewMessage, NewMessageEvent } from 'telegram/events';
 import { TelegramGateway } from './telegram.gateway';
+import { PrismaService } from '../persistence/prisma/prisma.service';
 
 @Injectable()
 export class TelegramService implements OnModuleInit {
@@ -16,6 +17,7 @@ export class TelegramService implements OnModuleInit {
   constructor(
     private configService: ConfigService,
     private telegramGateway: TelegramGateway,
+    private prisma: PrismaService,
   ) {}
 
   async onModuleInit() {
@@ -249,12 +251,17 @@ export class TelegramService implements OnModuleInit {
         channelUsername,
       };
 
-      // Log to console
-      this.logger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      this.logger.log(`📬 NEW MESSAGE from @${channelUsername}`);
-      this.logger.log(`📝 ${messageData.text}`);
-      this.logger.log(`🕐 ${new Date(message.date * 1000).toLocaleString()}`);
-      this.logger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      // maddingStock 채널 특별 처리
+      if (channelUsername.toLowerCase().includes('maddingstock')) {
+        await this.handleMaddingStockMessage(messageData, message);
+      } else {
+        // 일반 채널 로그
+        this.logger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        this.logger.log(`📬 NEW MESSAGE from @${channelUsername}`);
+        this.logger.log(`📝 ${messageData.text}`);
+        this.logger.log(`🕐 ${new Date(message.date * 1000).toLocaleString()}`);
+        this.logger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      }
 
       // Broadcast via WebSocket
       this.telegramGateway.broadcastMessage(channelUsername, messageData);
@@ -293,6 +300,271 @@ export class TelegramService implements OnModuleInit {
 
   getMonitoredChannels() {
     return this.monitoredChannels;
+  }
+
+  /**
+   * maddingStock 채널 메시지 전용 처리 함수
+   */
+  private async handleMaddingStockMessage(messageData: any, originalMessage: any) {
+    try {
+      const text = messageData.text || '';
+      const timestamp = new Date(messageData.date * 1000);
+
+      // 메시지 파싱
+      const parsedData = this.parseMaddingStockMessage(text);
+
+      // 데이터베이스에 저장 (중복 체크)
+      const savedMessage = await this.prisma.maddingStockMessage.upsert({
+        where: { messageId: BigInt(messageData.id) },
+        update: {
+          rawText: text,
+          stockName: parsedData.stockName,
+          price: parsedData.price,
+          changePercent: parsedData.changePercent,
+          keywords: parsedData.keywords,
+          symbols: parsedData.symbols,
+          urls: parsedData.urls,
+          messageDate: timestamp,
+          channelUsername: messageData.channelUsername,
+        },
+        create: {
+          messageId: BigInt(messageData.id),
+          rawText: text,
+          stockName: parsedData.stockName,
+          price: parsedData.price,
+          changePercent: parsedData.changePercent,
+          keywords: parsedData.keywords,
+          symbols: parsedData.symbols,
+          urls: parsedData.urls,
+          messageDate: timestamp,
+          channelUsername: messageData.channelUsername,
+        },
+      });
+
+      // 처리된 메시지 데이터
+      const processedMessage = {
+        id: savedMessage.id,
+        messageId: Number(savedMessage.messageId),
+        rawText: savedMessage.rawText,
+        parsed: {
+          stockName: savedMessage.stockName,
+          price: savedMessage.price,
+          changePercent: savedMessage.changePercent,
+          keywords: savedMessage.keywords,
+          symbols: savedMessage.symbols,
+          urls: savedMessage.urls,
+        },
+        timestamp: savedMessage.messageDate,
+        channelUsername: savedMessage.channelUsername,
+        processed: true,
+      };
+
+      // 특별한 로그 형식으로 출력
+      this.logger.log('╔════════════════════════════════════════════════╗');
+      this.logger.log('║  📈 MADDINGSTOCK MESSAGE (💾 SAVED TO DB)      ║');
+      this.logger.log('╚════════════════════════════════════════════════╝');
+      this.logger.log(`🆔 Message ID: ${messageData.id}`);
+      this.logger.log(`💾 DB ID: ${savedMessage.id}`);
+      this.logger.log(`📅 Time: ${timestamp.toLocaleString('ko-KR')}`);
+      this.logger.log(`📝 Raw Text:\n${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`);
+      
+      if (parsedData.stockName) {
+        this.logger.log(`\n📊 Parsed Data:`);
+        this.logger.log(`   주식명: ${parsedData.stockName}`);
+        if (parsedData.price) this.logger.log(`   가격: ${parsedData.price}`);
+        if (parsedData.changePercent) this.logger.log(`   변동률: ${parsedData.changePercent}`);
+        if (parsedData.keywords.length > 0) {
+          this.logger.log(`   키워드: ${parsedData.keywords.join(', ')}`);
+        }
+      }
+      
+      this.logger.log('═══════════════════════════════════════════════════\n');
+
+      // WebSocket으로 특별한 이벤트 전송
+      this.telegramGateway.server.emit('maddingstock:message', processedMessage);
+
+    } catch (error) {
+      this.logger.error('Error processing MaddingStock message:', error);
+    }
+  }
+
+  /**
+   * maddingStock 메시지 파싱 함수
+   */
+  private parseMaddingStockMessage(text: string) {
+    const parsed: any = {
+      stockName: null,
+      price: null,
+      changePercent: null,
+      keywords: [],
+      symbols: [],
+      urls: [],
+    };
+
+    if (!text) return parsed;
+
+    // 주식명 추출 (예: "삼성전자", "카카오" 등)
+    const stockNameMatch = text.match(/[가-힣]+전자|[가-힣]+바이오|[가-힣]+제약|[가-힣]{2,}/);
+    if (stockNameMatch) {
+      parsed.stockName = stockNameMatch[0];
+    }
+
+    // 가격 추출 (예: "50,000원", "5만원", "$100")
+    const priceMatch = text.match(/(\d{1,3}(,\d{3})*|\d+)원?|\$\d+/g);
+    if (priceMatch) {
+      parsed.price = priceMatch[0];
+    }
+
+    // 변동률 추출 (예: "+5%", "-3.2%", "▲2.5%")
+    const changeMatch = text.match(/[▲▼+-]?\s*\d+\.?\d*%/g);
+    if (changeMatch) {
+      parsed.changePercent = changeMatch[0];
+    }
+
+    // 키워드 추출
+    const keywords = ['매수', '매도', '상승', '하락', '급등', '급락', '추천', '주목', 
+                      '목표가', '저가매수', '고가매도', '신고가', '신저가', '반등', '조정'];
+    keywords.forEach(keyword => {
+      if (text.includes(keyword)) {
+        parsed.keywords.push(keyword);
+      }
+    });
+
+    // 심볼 추출 (예: #주식, #매수 등)
+    const hashtagMatch = text.match(/#[가-힣A-Za-z0-9_]+/g);
+    if (hashtagMatch) {
+      parsed.symbols = hashtagMatch;
+    }
+
+    // URL 추출
+    const urlMatch = text.match(/https?:\/\/[^\s]+/g);
+    if (urlMatch) {
+      parsed.urls = urlMatch;
+    }
+
+    return parsed;
+  }
+
+  /**
+   * maddingStock 채널의 저장된 메시지 조회 (데이터베이스에서)
+   */
+  async getMaddingStockMessages(limit: number = 20, offset: number = 0) {
+    const [messages, total] = await Promise.all([
+      this.prisma.maddingStockMessage.findMany({
+        orderBy: { messageDate: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.maddingStockMessage.count(),
+    ]);
+
+    return {
+      total,
+      limit,
+      offset,
+      messages: messages.map(msg => ({
+        id: msg.id,
+        messageId: Number(msg.messageId),
+        rawText: msg.rawText,
+        parsed: {
+          stockName: msg.stockName,
+          price: msg.price,
+          changePercent: msg.changePercent,
+          keywords: msg.keywords,
+          symbols: msg.symbols,
+          urls: msg.urls,
+        },
+        timestamp: msg.messageDate,
+        channelUsername: msg.channelUsername,
+        createdAt: msg.createdAt,
+      })),
+    };
+  }
+
+  /**
+   * maddingStock 메시지 검색 (데이터베이스에서)
+   */
+  async searchMaddingStockMessages(keyword: string, limit: number = 20) {
+    const messages = await this.prisma.maddingStockMessage.findMany({
+      where: {
+        OR: [
+          { rawText: { contains: keyword, mode: 'insensitive' } },
+          { stockName: { contains: keyword, mode: 'insensitive' } },
+          { keywords: { has: keyword } },
+        ],
+      },
+      orderBy: { messageDate: 'desc' },
+      take: limit,
+    });
+
+    return {
+      total: messages.length,
+      keyword,
+      messages: messages.map(msg => ({
+        id: msg.id,
+        messageId: Number(msg.messageId),
+        rawText: msg.rawText,
+        parsed: {
+          stockName: msg.stockName,
+          price: msg.price,
+          changePercent: msg.changePercent,
+          keywords: msg.keywords,
+          symbols: msg.symbols,
+          urls: msg.urls,
+        },
+        timestamp: msg.messageDate,
+        channelUsername: msg.channelUsername,
+      })),
+    };
+  }
+
+  /**
+   * maddingStock 통계 (데이터베이스에서)
+   */
+  async getMaddingStockStats() {
+    const [total, recentMessages, allMessages] = await Promise.all([
+      this.prisma.maddingStockMessage.count(),
+      this.prisma.maddingStockMessage.findMany({
+        orderBy: { messageDate: 'desc' },
+        take: 5,
+      }),
+      this.prisma.maddingStockMessage.findMany({
+        select: {
+          stockName: true,
+          keywords: true,
+        },
+      }),
+    ]);
+
+    // 주식명 수집
+    const stocksMentioned = new Set<string>();
+    const keywordFrequency: Record<string, number> = {};
+
+    allMessages.forEach(msg => {
+      if (msg.stockName) {
+        stocksMentioned.add(msg.stockName);
+      }
+
+      msg.keywords.forEach(keyword => {
+        keywordFrequency[keyword] = (keywordFrequency[keyword] || 0) + 1;
+      });
+    });
+
+    return {
+      totalMessages: total,
+      stocksMentioned: Array.from(stocksMentioned),
+      topKeywords: Object.entries(keywordFrequency)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+        .map(([keyword, count]) => ({ keyword, count })),
+      recentMessages: recentMessages.map(msg => ({
+        id: msg.id,
+        messageId: Number(msg.messageId),
+        rawText: msg.rawText.substring(0, 100),
+        stockName: msg.stockName,
+        timestamp: msg.messageDate,
+      })),
+    };
   }
 }
 

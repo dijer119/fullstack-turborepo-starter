@@ -31,3 +31,24 @@ model Company {
 
   @@map("companies")
 }
+
+model MaddingStockMessage {
+  id              Int      @id @default(autoincrement())
+  messageId       BigInt   @unique @map("message_id")
+  rawText         String   @map("raw_text") @db.Text
+  stockName       String?  @map("stock_name")
+  price           String?
+  changePercent   String?  @map("change_percent")
+  keywords        String[] @default([])
+  symbols         String[] @default([])
+  urls            String[] @default([])
+  messageDate     DateTime @map("message_date")
+  channelUsername String   @map("channel_username")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([messageDate])
+  @@index([stockName])
+  @@index([channelUsername])
+  @@map("maddingstock_messages")
+}
