@@ -20,3 +20,14 @@ model User {
 
   @@map("users")
 }
+
+model Company {
+  id        Int      @id @default(autoincrement())
+  name      String
+  description String?
+  code String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("companies")
+}

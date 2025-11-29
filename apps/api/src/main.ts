@@ -25,6 +25,7 @@ async function bootstrap() {
     .setDescription('API documentation for Fullstack Turborepo Starter')
     .setVersion('1.0')
     .addTag('users')
+    .addTag('companies')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { validationSchemaForEnv } from './config/environment-variables';
 import { PersistenceModule } from './persistence/persistence.module';
 import { UsersModule } from './users/users.module';
+import { CompaniesModule } from './companies/companies.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { UsersModule } from './users/users.module';
     }),
     PersistenceModule,
     UsersModule,
+    CompaniesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
