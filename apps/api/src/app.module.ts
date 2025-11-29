@@ -6,6 +6,7 @@ import { validationSchemaForEnv } from './config/environment-variables';
 import { PersistenceModule } from './persistence/persistence.module';
 import { UsersModule } from './users/users.module';
 import { CompaniesModule } from './companies/companies.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { CompaniesModule } from './companies/companies.module';
     PersistenceModule,
     UsersModule,
     CompaniesModule,
+    TelegramModule,
   ],
   controllers: [AppController],
   providers: [AppService],

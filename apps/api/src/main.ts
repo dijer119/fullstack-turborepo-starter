@@ -26,6 +26,7 @@ async function bootstrap() {
     .setVersion('1.0')
     .addTag('users')
     .addTag('companies')
+    .addTag('telegram')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
