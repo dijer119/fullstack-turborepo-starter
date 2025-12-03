@@ -7,13 +7,6 @@ import { useGetTopSafetyMarginsQuery, useGetAllSafetyMarginsQuery } from '../src
 type SortField = 'safety_margin' | 'treasury_ratio' | 'dividend_yield';
 type SortDirection = 'asc' | 'desc';
 
-const quotes = [
-  { text: "안전마진은 투자의 핵심이다.", author: "벤저민 그레이엄", book: "현명한 투자자" },
-  { text: "투자에서 가장 위험한 네 단어는 '이번엔 다르다'이다.", author: "존 템플턴", book: "" },
-  { text: "주식시장은 인내심 없는 사람에서 인내심 있는 사람에게로 돈을 옮기는 장치다.", author: "워렌 버핏", book: "" },
-  { text: "좋은 기업을 적정 가격에 사는 것이 적정 기업을 좋은 가격에 사는 것보다 낫다.", author: "워렌 버핏", book: "" },
-];
-
 export default function TopStocksPage() {
   const [displayCount, setDisplayCount] = useState<number>(30);
   const [dividendFilter, setDividendFilter] = useState<number>(0);
@@ -21,9 +14,6 @@ export default function TopStocksPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   
   const { data: allData, isLoading, error } = useGetAllSafetyMarginsQuery();
-  
-  // 랜덤 명언 선택
-  const randomQuote = useMemo(() => quotes[Math.floor(Math.random() * quotes.length)], []);
 
   // 정렬 토글 함수
   const handleSort = (field: SortField) => {
@@ -92,21 +82,8 @@ export default function TopStocksPage() {
         {/* 공통 헤더 */}
         <Header />
 
-        {/* 명언 섹션 */}
-        <section className="py-12 px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <blockquote className="text-xl md:text-2xl text-slate-300 italic">
-              "{randomQuote.text}"
-            </blockquote>
-            <p className="mt-4 text-slate-500">
-              — {randomQuote.author}
-              {randomQuote.book && <span className="text-slate-600"> ({randomQuote.book})</span>}
-            </p>
-          </div>
-        </section>
-
         {/* 메인 컨텐츠 */}
-        <main className="max-w-7xl mx-auto px-4 pb-12">
+        <main className="max-w-7xl mx-auto px-4 py-8 pb-12">
           {/* 타이틀 & 필터 */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
             <h1 className="text-3xl font-bold text-white">
