@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Header from "../src/components/Header";
 import {
   useGetMaddingStockMessagesQuery,
   useGetMaddingStockStatsQuery,
@@ -36,14 +37,17 @@ export default function MaddingStockPage() {
   const isLoading = searchKeyword ? searchLoading : messagesLoading;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* 공통 헤더 */}
+      <Header />
+      
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
+        {/* 페이지 타이틀 */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-4xl font-bold text-white mb-2">
             📈 MaddingStock 메시지
           </h1>
-          <p className="text-gray-600">
+          <p className="text-slate-400">
             텔레그램 @maddingStock 채널의 메시지를 실시간으로 수집하고 분석합니다
           </p>
         </div>
@@ -51,25 +55,25 @@ export default function MaddingStockPage() {
         {/* Stats Section */}
         {!statsLoading && statsData && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
-              <div className="text-sm text-gray-600 mb-1">전체 메시지</div>
-              <div className="text-3xl font-bold text-blue-600">
+            <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50">
+              <div className="text-sm text-slate-400 mb-1">전체 메시지</div>
+              <div className="text-3xl font-bold text-cyan-400">
                 {statsData.totalMessages.toLocaleString()}
               </div>
             </div>
-            <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
-              <div className="text-sm text-gray-600 mb-1">언급된 주식</div>
-              <div className="text-3xl font-bold text-green-600">
+            <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50">
+              <div className="text-sm text-slate-400 mb-1">언급된 주식</div>
+              <div className="text-3xl font-bold text-emerald-400">
                 {statsData.stocksMentioned.length}
               </div>
             </div>
-            <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
-              <div className="text-sm text-gray-600 mb-1">인기 키워드</div>
+            <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50">
+              <div className="text-sm text-slate-400 mb-1">인기 키워드</div>
               <div className="flex flex-wrap gap-2 mt-2">
                 {statsData.topKeywords.slice(0, 5).map((kw) => (
                   <span
                     key={kw.keyword}
-                    className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium"
+                    className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-sm font-medium"
                   >
                     {kw.keyword} ({kw.count})
                   </span>
@@ -80,7 +84,7 @@ export default function MaddingStockPage() {
         )}
 
         {/* Search Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className="bg-slate-800/50 rounded-lg p-6 mb-6 border border-slate-700/50">
           <div className="flex gap-2">
             <input
               type="text"
@@ -88,25 +92,25 @@ export default function MaddingStockPage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="flex-1 px-4 py-2 bg-slate-900/80 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
             <button
               onClick={handleSearch}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              className="px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors font-medium"
             >
               검색
             </button>
             {searchKeyword && (
               <button
                 onClick={clearSearch}
-                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                className="px-6 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors font-medium"
               >
                 초기화
               </button>
             )}
           </div>
           {searchKeyword && (
-            <div className="mt-3 text-sm text-gray-600">
+            <div className="mt-3 text-sm text-slate-400">
               &apos;{searchKeyword}&apos; 검색 결과: {searchData?.total || 0}개
             </div>
           )}
@@ -114,15 +118,15 @@ export default function MaddingStockPage() {
 
         {/* Messages List */}
         {messagesError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          <div className="bg-red-900/30 border border-red-700/50 text-red-400 px-4 py-3 rounded-lg mb-6">
             ⚠️ 메시지를 불러오는 중 오류가 발생했습니다. 백엔드 서버가 실행 중인지 확인해주세요.
           </div>
         )}
 
         {isLoading ? (
           <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-            <p className="mt-4 text-gray-600">메시지를 불러오는 중...</p>
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-cyan-500 border-t-transparent"></div>
+            <p className="mt-4 text-slate-400">메시지를 불러오는 중...</p>
           </div>
         ) : displayMessages && displayMessages.length > 0 ? (
           <>
@@ -130,19 +134,50 @@ export default function MaddingStockPage() {
               {displayMessages.map((msg) => (
                 <div
                   key={msg.id}
-                  className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+                  className="bg-slate-800/50 rounded-lg p-6 border border-slate-700/50 hover:border-slate-600/50 transition"
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
-                      {msg.parsed.stockName && (
-                        <div className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold mb-2">
-                          🏢 {msg.parsed.stockName}
-                        </div>
-                      )}
+                      {/* 전략 + 주식명 + 매매유형 */}
+                      <div className="flex gap-2 mb-2 flex-wrap">
+                        {msg.parsed.strategy && (
+                          <span className="inline-flex items-center px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-bold">
+                            {msg.parsed.strategy}
+                          </span>
+                        )}
+                        {msg.parsed.stockName && (
+                          <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                            🏢 {msg.parsed.stockName}
+                          </span>
+                        )}
+                        {msg.parsed.tradeType && (
+                          <span
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${
+                              msg.parsed.tradeType === '매수'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            {msg.parsed.tradeType === '매수' ? '📈' : '📉'} {msg.parsed.tradeType}
+                          </span>
+                        )}
+                        {msg.parsed.status && (
+                          <span className="inline-flex items-center px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">
+                            {msg.parsed.status}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* 가격 + 손익율 + 변동률 */}
                       <div className="flex gap-2 flex-wrap">
                         {msg.parsed.price && (
-                          <span className="text-sm px-2 py-1 bg-green-100 text-green-800 rounded">
+                          <span className="text-sm px-2 py-1 bg-green-100 text-green-800 rounded font-semibold">
                             💰 {msg.parsed.price}
+                          </span>
+                        )}
+                        {msg.parsed.profitRate && (
+                          <span className="text-sm px-2 py-1 bg-pink-100 text-pink-800 rounded font-bold">
+                            💵 손익율: {msg.parsed.profitRate}
                           </span>
                         )}
                         {msg.parsed.changePercent && (
@@ -154,6 +189,11 @@ export default function MaddingStockPage() {
                             }`}
                           >
                             📊 {msg.parsed.changePercent}
+                          </span>
+                        )}
+                        {msg.parsed.additionalInfo && (
+                          <span className="text-sm px-2 py-1 bg-gray-100 text-gray-800 rounded">
+                            ℹ️ {msg.parsed.additionalInfo}
                           </span>
                         )}
                       </div>

@@ -36,8 +36,13 @@ model MaddingStockMessage {
   id              Int      @id @default(autoincrement())
   messageId       BigInt   @unique @map("message_id")
   rawText         String   @map("raw_text") @db.Text
+  strategy        String?  // 전략 (예: 전략A, 전략C)
   stockName       String?  @map("stock_name")
+  tradeType       String?  @map("trade_type") // 매매유형 (매수, 매도)
+  status          String?  // 상태 (도달 등)
   price           String?
+  additionalInfo  String?  @map("additional_info") // 추가정보 (예: 강화 반등)
+  profitRate      String?  @map("profit_rate") // 손익율
   changePercent   String?  @map("change_percent")
   keywords        String[] @default([])
   symbols         String[] @default([])
@@ -50,5 +55,6 @@ model MaddingStockMessage {
   @@index([messageDate])
   @@index([stockName])
   @@index([channelUsername])
+  @@index([tradeType])
   @@map("maddingstock_messages")
 }

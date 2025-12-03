@@ -5,9 +5,14 @@ export interface MaddingStockMessage {
   messageId: number;
   rawText: string;
   parsed: {
-    stockName: string | null;
-    price: string | null;
-    changePercent: string | null;
+    strategy?: string | null;        // 전략
+    stockName: string | null;        // 주식명
+    tradeType?: string | null;       // 매매유형
+    status?: string | null;          // 상태
+    price: string | null;            // 가격
+    additionalInfo?: string | null;  // 추가정보
+    profitRate?: string | null;      // 손익율
+    changePercent: string | null;    // 변동률
     keywords: string[];
     symbols: string[];
     urls: string[];
@@ -46,7 +51,11 @@ export interface StatsResponse {
 export const maddingstockApi = createApi({
   reducerPath: "maddingstockApi",
   baseQuery: fetchBaseQuery({
-    baseUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001",
+    // 브라우저에서는 상대 경로 사용 (Next.js 프록시 통해 연결)
+    // SSR에서는 절대 경로 사용
+    baseUrl: typeof window === 'undefined' 
+      ? (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001")
+      : "/api",
   }),
   tagTypes: ["MaddingStockMessages", "MaddingStockStats"],
   endpoints: (builder) => ({

@@ -3,16 +3,25 @@ import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
 
 import { api } from "./services/api";
 import { maddingstockApi } from "./services/maddingstock-api";
+import { intrinsicValueApi } from "./services/intrinsic-value-api";
+import { krxApi } from "./services/krx-api";
 
 export function makeStore() {
   return configureStore({
     reducer: {
       [api.reducerPath]: api.reducer,
       [maddingstockApi.reducerPath]: maddingstockApi.reducer,
+      [intrinsicValueApi.reducerPath]: intrinsicValueApi.reducer,
+      [krxApi.reducerPath]: krxApi.reducer,
     },
 
     middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware().concat(api.middleware, maddingstockApi.middleware),
+      getDefaultMiddleware().concat(
+        api.middleware, 
+        maddingstockApi.middleware,
+        intrinsicValueApi.middleware,
+        krxApi.middleware
+      ),
   });
 }
 

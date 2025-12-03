@@ -17,8 +17,13 @@ async function bootstrap() {
     }),
   );
 
-  // Enable CORS
-  app.enableCors();
+  // Enable CORS - 모든 출처 허용 (다른 컴퓨터에서 접속 가능)
+  app.enableCors({
+    origin: true, // 모든 출처 허용
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Fullstack Turborepo API')
@@ -34,7 +39,8 @@ async function bootstrap() {
 
   const PORT = process.env.PORT || 3001;
 
-  await app.listen(PORT);
+  // 0.0.0.0으로 바인딩하여 외부 접속 허용
+  await app.listen(PORT, '0.0.0.0');
 
   if (module.hot) {
     module.hot.accept();
@@ -42,5 +48,6 @@ async function bootstrap() {
   }
   logger.log(`Server running on http://localhost:${PORT}`);
   logger.log(`API Documentation: http://localhost:${PORT}/docs`);
+  logger.log(`Network access enabled - Server listening on 0.0.0.0:${PORT}`);
 }
 bootstrap();

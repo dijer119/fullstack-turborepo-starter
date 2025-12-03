@@ -318,8 +318,13 @@ export class TelegramService implements OnModuleInit {
         where: { messageId: BigInt(messageData.id) },
         update: {
           rawText: text,
+          strategy: parsedData.strategy,
           stockName: parsedData.stockName,
+          tradeType: parsedData.tradeType,
+          status: parsedData.status,
           price: parsedData.price,
+          additionalInfo: parsedData.additionalInfo,
+          profitRate: parsedData.profitRate,
           changePercent: parsedData.changePercent,
           keywords: parsedData.keywords,
           symbols: parsedData.symbols,
@@ -330,8 +335,13 @@ export class TelegramService implements OnModuleInit {
         create: {
           messageId: BigInt(messageData.id),
           rawText: text,
+          strategy: parsedData.strategy,
           stockName: parsedData.stockName,
+          tradeType: parsedData.tradeType,
+          status: parsedData.status,
           price: parsedData.price,
+          additionalInfo: parsedData.additionalInfo,
+          profitRate: parsedData.profitRate,
           changePercent: parsedData.changePercent,
           keywords: parsedData.keywords,
           symbols: parsedData.symbols,
@@ -347,8 +357,13 @@ export class TelegramService implements OnModuleInit {
         messageId: Number(savedMessage.messageId),
         rawText: savedMessage.rawText,
         parsed: {
+          strategy: savedMessage.strategy,
           stockName: savedMessage.stockName,
+          tradeType: savedMessage.tradeType,
+          status: savedMessage.status,
           price: savedMessage.price,
+          additionalInfo: savedMessage.additionalInfo,
+          profitRate: savedMessage.profitRate,
           changePercent: savedMessage.changePercent,
           keywords: savedMessage.keywords,
           symbols: savedMessage.symbols,
@@ -370,8 +385,13 @@ export class TelegramService implements OnModuleInit {
       
       if (parsedData.stockName) {
         this.logger.log(`\n📊 Parsed Data:`);
+        if (parsedData.strategy) this.logger.log(`   전략: ${parsedData.strategy}`);
         this.logger.log(`   주식명: ${parsedData.stockName}`);
+        if (parsedData.tradeType) this.logger.log(`   매매유형: ${parsedData.tradeType}`);
+        if (parsedData.status) this.logger.log(`   상태: ${parsedData.status}`);
         if (parsedData.price) this.logger.log(`   가격: ${parsedData.price}`);
+        if (parsedData.additionalInfo) this.logger.log(`   추가정보: ${parsedData.additionalInfo}`);
+        if (parsedData.profitRate) this.logger.log(`   손익율: ${parsedData.profitRate}`);
         if (parsedData.changePercent) this.logger.log(`   변동률: ${parsedData.changePercent}`);
         if (parsedData.keywords.length > 0) {
           this.logger.log(`   키워드: ${parsedData.keywords.join(', ')}`);
@@ -390,12 +410,22 @@ export class TelegramService implements OnModuleInit {
 
   /**
    * maddingStock 메시지 파싱 함수
+   * 
+   * 지원하는 포맷:
+   * 1. [전략A][삼성전자][매수][50000]
+   * 2. [전략A][일진전기][매수][접근][51000] : 1차(50400) 접근
+   * 3. [전략C][싸이닉솔루션][매도][도달][10280] : 강화 반등 - 손익율:8.98%
    */
   private parseMaddingStockMessage(text: string) {
     const parsed: any = {
-      stockName: null,
-      price: null,
-      changePercent: null,
+      strategy: null,        // 전략 (예: 전략A, 전략C)
+      stockName: null,       // 주식명
+      tradeType: null,       // 매매유형 (매수, 매도)
+      status: null,          // 상태 (도달, 접근 등)
+      price: null,           // 가격
+      additionalInfo: null,  // 추가정보 (예: 강화 반등, 1차(50400) 접근)
+      profitRate: null,      // 손익율
+      changePercent: null,   // 변동률
       keywords: [],
       symbols: [],
       urls: [],
@@ -403,32 +433,95 @@ export class TelegramService implements OnModuleInit {
 
     if (!text) return parsed;
 
-    // 주식명 추출 (예: "삼성전자", "카카오" 등)
-    const stockNameMatch = text.match(/[가-힣]+전자|[가-힣]+바이오|[가-힣]+제약|[가-힣]{2,}/);
-    if (stockNameMatch) {
-      parsed.stockName = stockNameMatch[0];
-    }
-
-    // 가격 추출 (예: "50,000원", "5만원", "$100")
-    const priceMatch = text.match(/(\d{1,3}(,\d{3})*|\d+)원?|\$\d+/g);
-    if (priceMatch) {
-      parsed.price = priceMatch[0];
-    }
-
-    // 변동률 추출 (예: "+5%", "-3.2%", "▲2.5%")
-    const changeMatch = text.match(/[▲▼+-]?\s*\d+\.?\d*%/g);
-    if (changeMatch) {
-      parsed.changePercent = changeMatch[0];
-    }
-
-    // 키워드 추출
-    const keywords = ['매수', '매도', '상승', '하락', '급등', '급락', '추천', '주목', 
-                      '목표가', '저가매수', '고가매도', '신고가', '신저가', '반등', '조정'];
-    keywords.forEach(keyword => {
-      if (text.includes(keyword)) {
-        parsed.keywords.push(keyword);
+    // 1단계: 기본 구조 파싱 [전략][주식명][매매유형][상태?][가격]
+    // 더 유연한 패턴: 대괄호 5개 또는 4개
+    const basicPattern = /\[([^\]]+)\]\[([^\]]+)\]\[([^\]]+)\](?:\[([^\]]+)\])?\[?(\d+)\]?/;
+    const basicMatch = text.match(basicPattern);
+    
+    if (basicMatch) {
+      parsed.strategy = basicMatch[1] || null;
+      parsed.stockName = basicMatch[2] || null;
+      parsed.tradeType = basicMatch[3] || null;
+      
+      // 4번째와 5번째 그룹 처리
+      // [상태][가격] 또는 [가격]만 있을 수 있음
+      if (basicMatch[5]) {
+        // 5개 대괄호: [전략][주식][매매][상태][가격]
+        parsed.status = basicMatch[4] || null;
+        parsed.price = basicMatch[5];
+      } else if (basicMatch[4]) {
+        // 4개 대괄호: [전략][주식][매매][가격]
+        parsed.price = basicMatch[4];
       }
-    });
+      
+      // 2단계: `:` 이후 내용 파싱
+      const colonIndex = text.indexOf(':');
+      if (colonIndex !== -1) {
+        const afterColon = text.substring(colonIndex + 1).trim();
+        
+        // 손익율 추출
+        const profitMatch = afterColon.match(/손익율:?\s*([\d.]+%)/);
+        if (profitMatch) {
+          parsed.profitRate = profitMatch[1];
+          // 손익율 제거하고 나머지를 additionalInfo로
+          const infoText = afterColon.replace(/\s*-?\s*손익율:?\s*[\d.]+%/, '').trim();
+          if (infoText) {
+            parsed.additionalInfo = infoText;
+          }
+        } else {
+          // 손익율이 없으면 전체를 additionalInfo로
+          parsed.additionalInfo = afterColon;
+        }
+      }
+      
+      // 키워드에 자동 추가
+      if (parsed.strategy) parsed.keywords.push(parsed.strategy);
+      if (parsed.tradeType) parsed.keywords.push(parsed.tradeType);
+      if (parsed.status) parsed.keywords.push(parsed.status);
+      if (parsed.additionalInfo) {
+        // 추가정보에서 키워드 추출
+        const infoKeywords = parsed.additionalInfo.match(/[가-힣]+/g);
+        if (infoKeywords) {
+          parsed.keywords.push(...infoKeywords);
+        }
+      }
+    } else {
+      // 기존 파싱 로직 (구조화되지 않은 메시지용)
+      
+      // 주식명 추출 (예: "삼성전자", "카카오" 등)
+      const stockNameMatch = text.match(/[가-힣]+전자|[가-힣]+바이오|[가-힣]+제약|[가-힣]+솔루션|[가-힣]{2,}/);
+      if (stockNameMatch) {
+        parsed.stockName = stockNameMatch[0];
+      }
+
+      // 가격 추출 (예: "50,000원", "5만원", "$100", "10280")
+      const priceMatch = text.match(/(\d{1,3}(,\d{3})*|\d+)원?|\$\d+/g);
+      if (priceMatch) {
+        parsed.price = priceMatch[0];
+      }
+
+      // 변동률 추출 (예: "+5%", "-3.2%", "▲2.5%")
+      const changeMatch = text.match(/[▲▼+-]?\s*\d+\.?\d*%/g);
+      if (changeMatch) {
+        parsed.changePercent = changeMatch[0];
+      }
+
+      // 손익율 추출
+      const profitMatch = text.match(/손익율:?\s*(\d+\.?\d*%)/);
+      if (profitMatch) {
+        parsed.profitRate = profitMatch[1];
+      }
+
+      // 키워드 추출
+      const keywords = ['매수', '매도', '상승', '하락', '급등', '급락', '추천', '주목', 
+                        '목표가', '저가매수', '고가매도', '신고가', '신저가', '반등', '조정',
+                        '도달', '강화', '전략A', '전략B', '전략C', '전략D'];
+      keywords.forEach(keyword => {
+        if (text.includes(keyword)) {
+          parsed.keywords.push(keyword);
+        }
+      });
+    }
 
     // 심볼 추출 (예: #주식, #매수 등)
     const hashtagMatch = text.match(/#[가-힣A-Za-z0-9_]+/g);
@@ -441,6 +534,9 @@ export class TelegramService implements OnModuleInit {
     if (urlMatch) {
       parsed.urls = urlMatch;
     }
+
+    // 중복 키워드 제거
+    parsed.keywords = [...new Set(parsed.keywords)];
 
     return parsed;
   }
@@ -467,8 +563,13 @@ export class TelegramService implements OnModuleInit {
         messageId: Number(msg.messageId),
         rawText: msg.rawText,
         parsed: {
+          strategy: msg.strategy,
           stockName: msg.stockName,
+          tradeType: msg.tradeType,
+          status: msg.status,
           price: msg.price,
+          additionalInfo: msg.additionalInfo,
+          profitRate: msg.profitRate,
           changePercent: msg.changePercent,
           keywords: msg.keywords,
           symbols: msg.symbols,
@@ -505,8 +606,13 @@ export class TelegramService implements OnModuleInit {
         messageId: Number(msg.messageId),
         rawText: msg.rawText,
         parsed: {
+          strategy: msg.strategy,
           stockName: msg.stockName,
+          tradeType: msg.tradeType,
+          status: msg.status,
           price: msg.price,
+          additionalInfo: msg.additionalInfo,
+          profitRate: msg.profitRate,
           changePercent: msg.changePercent,
           keywords: msg.keywords,
           symbols: msg.symbols,
