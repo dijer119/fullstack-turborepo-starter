@@ -204,13 +204,6 @@ export class IntrinsicValueService implements OnModuleInit {
    */
   async getFinancialData(stockCode: string): Promise<NaverFinancialRaw> {
     try {
-      // 네이버 금융 투자지표 페이지 (EUC-KR 인코딩)
-      const url = `https://finance.naver.com/item/main.naver?code=${stockCode}`;
-      this.logger.log(`[getFinancialData] Fetching: ${url}`);
-      
-      const html = await this.fetchWithEucKr(url);
-      this.logger.log(`[getFinancialData] HTML length: ${html.length} bytes`);
-      
       // 투자지표 테이블에서 데이터 추출
       const result: NaverFinancialRaw = {
         eps: [],
@@ -221,55 +214,20 @@ export class IntrinsicValueService implements OnModuleInit {
         years: [],
       };
 
-      // 연도 추출 (최근 3~4년)
-      const currentYear = new Date().getFullYear();
-      result.years = [currentYear - 2, currentYear - 1, currentYear];
-
-      // 현재 EPS 추출 (id="_eps")
-      const epsMatch = html.match(/id="_eps"[^>]*>([^<]+)</);
-      if (epsMatch) {
-        const currentEps = this.parseNumber(epsMatch[1]);
-        this.logger.log(`[getFinancialData] Current EPS: ${currentEps}`);
-        // 현재 EPS를 배열에 추가 (최근 데이터로 사용)
-        result.eps = [currentEps, currentEps, currentEps];
-      }
-
-      // 추정 EPS 추출 (id="_cns_eps") - 더 정확한 미래 추정치
-      const cnsEpsMatch = html.match(/id="_cns_eps"[^>]*>([^<]+)</);
-      if (cnsEpsMatch) {
-        const cnsEps = this.parseNumber(cnsEpsMatch[1]);
-        this.logger.log(`[getFinancialData] Consensus EPS: ${cnsEps}`);
-        // 추정 EPS가 있으면 가장 최근 값으로 사용
-        if (result.eps.length > 0) {
-          result.eps[result.eps.length - 1] = cnsEps;
-        }
-      }
-
-      // 현재 BPS 추출 - PBR|BPS 행에서 마지막 em 태그
-      // HTML: PBR<span class="bar">l</span>BPS ... <em id="_pbr">1.71</em>배 ... <em>60,632</em>원
-      const pbrBpsRow = html.match(/PBR<span class="bar">[|l]<\/span>BPS[\s\S]*?<\/tr>/);
-      if (pbrBpsRow) {
-        const allEmTags = pbrBpsRow[0].match(/<em[^>]*>[\s\S]*?<\/em>/g);
-        if (allEmTags) {
-          // 마지막 em에서 숫자 추출 (BPS 값)
-          for (let i = allEmTags.length - 1; i >= 0; i--) {
-            const numMatch = allEmTags[i].match(/>([0-9,]+)</);
-            if (numMatch) {
-              const currentBps = this.parseNumber(numMatch[1]);
-              this.logger.log(`[getFinancialData] Current BPS: ${currentBps}`);
-              result.bps = [currentBps, currentBps, currentBps];
-              break;
-            }
-          }
-        }
-      }
-
-      // 연간 데이터 테이블에서 EPS/BPS 히스토리 추출 시도
+      // WiseReport에서 연간 재무 데이터 추출 시도
       await this.fetchAnnualFinancials(stockCode, result);
 
+      // 연간 데이터가 없으면 WiseReport에서 현재 값 추출
+      if (result.eps.length === 0 || result.eps.every(v => v === 0)) {
+        this.logger.warn(`[getFinancialData] 연간 데이터 없음, 현재 값으로 대체`);
+        await this.fetchCurrentFinancials(stockCode, result);
+      }
+
       // 데이터 검증 및 로깅
+      this.logger.log(`[getFinancialData] Final Years: [${result.years.join(', ')}]`);
       this.logger.log(`[getFinancialData] Final EPS: [${result.eps.join(', ')}]`);
       this.logger.log(`[getFinancialData] Final BPS: [${result.bps.join(', ')}]`);
+      this.logger.log(`[getFinancialData] Final ROE: [${result.roe.join(', ')}]`);
 
       return result;
     } catch (error) {
@@ -282,57 +240,198 @@ export class IntrinsicValueService implements OnModuleInit {
   }
 
   /**
-   * 연간 재무 데이터 조회 (FnGuide 데이터)
+   * 현재 재무 데이터 조회 (WiseReport c1010001.aspx)
+   * 연간 데이터가 없을 때 현재 값을 사용하고 과거 값은 역산
    */
-  private async fetchAnnualFinancials(stockCode: string, result: NaverFinancialRaw): Promise<void> {
+  private async fetchCurrentFinancials(stockCode: string, result: NaverFinancialRaw): Promise<void> {
     try {
-      // 네이버 금융 종목분석 페이지에서 연간 데이터 조회
       const url = `https://navercomp.wisereport.co.kr/v2/company/c1010001.aspx?cmp_cd=${stockCode}`;
       const response = await fetch(url, { headers: this.defaultHeaders });
       
-      if (!response.ok) return;
+      if (!response.ok) {
+        this.logger.warn(`[fetchCurrentFinancials] HTTP error: ${response.status}`);
+        return;
+      }
       
       const html = await response.text();
       
-      // 연간 EPS 데이터 추출 (최근 3년)
-      const epsTableMatch = html.match(/EPS\(원\)[\s\S]*?<\/tr>/);
-      if (epsTableMatch) {
-        const epsValues = epsTableMatch[0].match(/<td[^>]*class="num"[^>]*>([\d,\-]+)<\/td>/g);
-        if (epsValues && epsValues.length >= 3) {
-          result.eps = epsValues.slice(0, 3).map(v => {
-            const num = v.match(/([\d,\-]+)/)?.[1] || '0';
-            return this.parseNumber(num);
-          });
-          this.logger.log(`[fetchAnnualFinancials] Annual EPS: [${result.eps.join(', ')}]`);
-        }
+      const currentYear = new Date().getFullYear();
+      result.years = [currentYear - 2, currentYear - 1, currentYear];
+      
+      // EPS 추출: EPS <b class="num">178</b>
+      const epsMatch = html.match(/EPS\s*<b class="num">([^<]+)<\/b>/);
+      let currentEps = 0;
+      if (epsMatch) {
+        currentEps = this.parseNumber(epsMatch[1]);
+        this.logger.log(`[fetchCurrentFinancials] Current EPS: ${currentEps}`);
       }
-
-      // 연간 BPS 데이터 추출
-      const bpsTableMatch = html.match(/BPS\(원\)[\s\S]*?<\/tr>/);
-      if (bpsTableMatch) {
-        const bpsValues = bpsTableMatch[0].match(/<td[^>]*class="num"[^>]*>([\d,\-]+)<\/td>/g);
-        if (bpsValues && bpsValues.length >= 3) {
-          result.bps = bpsValues.slice(0, 3).map(v => {
-            const num = v.match(/([\d,\-]+)/)?.[1] || '0';
-            return this.parseNumber(num);
-          });
-          this.logger.log(`[fetchAnnualFinancials] Annual BPS: [${result.bps.join(', ')}]`);
-        }
+      
+      // BPS 추출: BPS <b class="num">13,891</b>
+      const bpsMatch = html.match(/BPS\s*<b class="num">([^<]+)<\/b>/);
+      let currentBps = 0;
+      if (bpsMatch) {
+        currentBps = this.parseNumber(bpsMatch[1]);
+        this.logger.log(`[fetchCurrentFinancials] Current BPS: ${currentBps}`);
       }
-
-      // ROE 데이터 추출
-      const roeTableMatch = html.match(/ROE[\s\S]*?<\/tr>/);
-      if (roeTableMatch) {
-        const roeValues = roeTableMatch[0].match(/<td[^>]*class="num"[^>]*>([\d.,\-]+)<\/td>/g);
-        if (roeValues && roeValues.length >= 3) {
-          result.roe = roeValues.slice(0, 3).map(v => {
-            const num = v.match(/([\d.,\-]+)/)?.[1] || '0';
-            return this.parseFloat(num);
-          });
-        }
+      
+      // ROE 추출 (있으면)
+      let currentRoe = 0;
+      const roeMatch = html.match(/ROE\s*<b class="num">([^<]+)<\/b>/);
+      if (roeMatch) {
+        currentRoe = this.parseFloat(roeMatch[1]);
+        this.logger.log(`[fetchCurrentFinancials] Current ROE: ${currentRoe}`);
       }
+      
+      // 과거 데이터를 역산 (연평균 성장률 가정: 5%)
+      // 이는 추정치이며, 실제 과거 데이터가 아님을 명시
+      const growthRate = 1.05; // 5% 성장 가정
+      
+      if (currentEps > 0) {
+        result.eps = [
+          Math.round(currentEps / (growthRate * growthRate)), // 2년 전
+          Math.round(currentEps / growthRate), // 1년 전
+          currentEps, // 현재
+        ];
+        this.logger.log(`[fetchCurrentFinancials] Estimated EPS history: [${result.eps.join(', ')}]`);
+      } else {
+        result.eps = [0, 0, 0];
+      }
+      
+      if (currentBps > 0) {
+        result.bps = [
+          Math.round(currentBps / (growthRate * growthRate)),
+          Math.round(currentBps / growthRate),
+          currentBps,
+        ];
+        this.logger.log(`[fetchCurrentFinancials] Estimated BPS history: [${result.bps.join(', ')}]`);
+      } else {
+        result.bps = [0, 0, 0];
+      }
+      
+      if (currentRoe > 0) {
+        result.roe = [currentRoe, currentRoe, currentRoe];
+      } else {
+        result.roe = [0, 0, 0];
+      }
+      
+      // PER, PBR도 추출 (참고용)
+      const perMatch = html.match(/PER\s*<b class="num">([^<]+)<\/b>/);
+      if (perMatch) {
+        const per = this.parseFloat(perMatch[1]);
+        result.per = [per, per, per];
+      }
+      
+      const pbrMatch = html.match(/PBR\s*<b class="num">([^<]+)<\/b>/);
+      if (pbrMatch) {
+        const pbr = this.parseFloat(pbrMatch[1]);
+        result.pbr = [pbr, pbr, pbr];
+      }
+      
     } catch (error) {
-      this.logger.warn(`Annual financial fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.logger.error(`Current financial fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * 연간 재무 데이터 조회 (WiseReport)
+   * 연도와 함께 EPS, BPS, ROE 데이터를 추출
+   */
+  private async fetchAnnualFinancials(stockCode: string, result: NaverFinancialRaw): Promise<void> {
+    try {
+      // WiseReport 재무제표 페이지
+      const url = `https://navercomp.wisereport.co.kr/v2/company/c1010001.aspx?cmp_cd=${stockCode}`;
+      const response = await fetch(url, { headers: this.defaultHeaders });
+      
+      if (!response.ok) {
+        this.logger.warn(`[fetchAnnualFinancials] HTTP error: ${response.status}`);
+        return;
+      }
+      
+      const html = await response.text();
+      
+      // 1. 연도 추출 - thead의 연도 행에서 추출
+      // 패턴: <th>2022/12</th><th>2023/12</th><th>2024/12</th>
+      const yearMatches = html.match(/<th[^>]*>(\d{4})\/\d{2}<\/th>/g);
+      if (yearMatches && yearMatches.length >= 3) {
+        // 최근 3개년 데이터만 사용 (역순으로 slice하여 최근 3개 선택 후 정렬)
+        const allYears = yearMatches.map(match => {
+          const yearMatch = match.match(/(\d{4})/);
+          return yearMatch ? parseInt(yearMatch[1], 10) : 0;
+        }).filter(year => year > 0);
+        
+        // 최근 3개년 선택
+        result.years = allYears.slice(-3);
+        this.logger.log(`[fetchAnnualFinancials] Years: [${result.years.join(', ')}]`);
+      } else {
+        // 연도를 찾지 못하면 기본값 설정
+        const currentYear = new Date().getFullYear();
+        result.years = [currentYear - 2, currentYear - 1, currentYear];
+        this.logger.warn(`[fetchAnnualFinancials] Years not found, using default: [${result.years.join(', ')}]`);
+      }
+
+      // 2. EPS 데이터 추출
+      // 패턴: EPS(원) ... <td class="num">1,234</td><td class="num">2,345</td>...
+      const epsTableMatch = html.match(/EPS\(원\)[\s\S]{0,500}?<\/tr>/);
+      if (epsTableMatch) {
+        const epsValues = epsTableMatch[0].match(/<td[^>]*class="[^"]*num[^"]*"[^>]*>([\d,\-\s]+)<\/td>/g);
+        if (epsValues) {
+          // 최근 3개년 데이터만 추출 (역순으로 slice)
+          const allEps = epsValues.map(v => {
+            const numMatch = v.match(/([\d,\-]+)/);
+            return numMatch ? this.parseNumber(numMatch[1]) : 0;
+          });
+          result.eps = allEps.slice(-3);
+          this.logger.log(`[fetchAnnualFinancials] EPS: [${result.eps.join(', ')}]`);
+        }
+      }
+
+      // 3. BPS 데이터 추출
+      const bpsTableMatch = html.match(/BPS\(원\)[\s\S]{0,500}?<\/tr>/);
+      if (bpsTableMatch) {
+        const bpsValues = bpsTableMatch[0].match(/<td[^>]*class="[^"]*num[^"]*"[^>]*>([\d,\-\s]+)<\/td>/g);
+        if (bpsValues) {
+          const allBps = bpsValues.map(v => {
+            const numMatch = v.match(/([\d,\-]+)/);
+            return numMatch ? this.parseNumber(numMatch[1]) : 0;
+          });
+          result.bps = allBps.slice(-3);
+          this.logger.log(`[fetchAnnualFinancials] BPS: [${result.bps.join(', ')}]`);
+        }
+      }
+
+      // 4. ROE 데이터 추출
+      const roeTableMatch = html.match(/ROE\([\s\S]{0,500}?<\/tr>/);
+      if (roeTableMatch) {
+        const roeValues = roeTableMatch[0].match(/<td[^>]*class="[^"]*num[^"]*"[^>]*>([\d.,\-\s]+)<\/td>/g);
+        if (roeValues) {
+          const allRoe = roeValues.map(v => {
+            const numMatch = v.match(/([\d.,\-]+)/);
+            return numMatch ? this.parseFloat(numMatch[1]) : 0;
+          });
+          result.roe = allRoe.slice(-3);
+          this.logger.log(`[fetchAnnualFinancials] ROE: [${result.roe.join(', ')}]`);
+        }
+      }
+
+      // 데이터가 없으면 기본값 설정
+      if (result.eps.length === 0) {
+        result.eps = [0, 0, 0];
+      }
+      if (result.bps.length === 0) {
+        result.bps = [0, 0, 0];
+      }
+      if (result.roe.length === 0) {
+        result.roe = [0, 0, 0];
+      }
+
+    } catch (error) {
+      this.logger.error(`Annual financial fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // 오류 시 기본값 설정
+      const currentYear = new Date().getFullYear();
+      result.years = [currentYear - 2, currentYear - 1, currentYear];
+      result.eps = [0, 0, 0];
+      result.bps = [0, 0, 0];
+      result.roe = [0, 0, 0];
     }
   }
 
@@ -552,4 +651,5 @@ export class IntrinsicValueService implements OnModuleInit {
     ];
   }
 }
+
 
