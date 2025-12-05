@@ -61,4 +61,3 @@ export class UsersService {
     return this.prisma.user.count();
   }
 }
-

@@ -2,10 +2,57 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+input CreateUserInput {
+  email: String!
+  name: String
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type Mutation {
+  """새 사용자 생성"""
+  createUser(input: CreateUserInput!): User!
+
+  """사용자 삭제"""
+  deleteUser(id: Int!): User!
+
+  """사용자 정보 수정"""
+  updateUser(input: UpdateUserInput!): User!
+}
+
 type Query {
   """Health check query"""
   health: String!
 
+  """ID로 사용자 조회"""
+  user(id: Int!): User!
+
+  """이메일로 사용자 조회"""
+  userByEmail(email: String!): User
+
+  """모든 사용자 조회"""
+  users: [User!]!
+
+  """사용자 수 조회"""
+  usersCount: Int!
+
   """Returns server version"""
   version: String!
+}
+
+input UpdateUserInput {
+  email: String
+  id: Int!
+  name: String
+}
+
+type User {
+  createdAt: DateTime!
+  email: String!
+  id: Int!
+  name: String
+  updatedAt: DateTime!
 }
