@@ -1,0 +1,41 @@
+{
+    "tech_stack": [
+        "TypeScript",
+        "Next.js",
+        "Material UI",
+        "Redux Toolkit",
+        "Tailwind CSS"
+    ],
+    "features": [
+        {
+            "name": "User Management",
+            "description": "User listing, creation, and deletion functionality.",
+            "files": [
+                "pages/users.tsx",
+                "src/store/services/users-api.ts"
+            ]
+        },
+        {
+            "name": "Intrinsic Value Calculator",
+            "description": "Calculates intrinsic value of stocks using Graham's formula.",
+            "files": [
+                "pages/intrinsic-value.tsx",
+                "src/store/services/intrinsic-value-api.ts"
+            ]
+        },
+        {
+            "name": "Global Header",
+            "description": "Navigation header with responsive layout.",
+            "files": [
+                "src/components/Header.tsx"
+            ]
+        },
+        {
+            "name": "Home Page",
+            "description": "Landing page with random quotes.",
+            "files": [
+                "pages/index.tsx"
+            ]
+        }
+    ]
+}

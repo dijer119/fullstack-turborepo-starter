@@ -1,0 +1,330 @@
+[
+  {
+    "id": "TC001",
+    "title": "Home Page displays random motivational quotes",
+    "description": "Verify that the home page loads and displays a random motivational quote each time the page is visited or refreshed.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the home page"
+      },
+      {
+        "type": "assertion",
+        "description": "Check that a motivational quote is displayed"
+      },
+      {
+        "type": "action",
+        "description": "Refresh the home page"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate that a quote (possibly different) is displayed again"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Global Header renders responsively on different devices",
+    "description": "Ensure the global header displays and navigates correctly on desktop, tablet, and mobile viewport sizes.",
+    "category": "ui",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Load the application in desktop viewport"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify global header is visible, elements aligned, and navigation links clickable"
+      },
+      {
+        "type": "action",
+        "description": "Resize viewport to tablet size"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm header adjusts layout appropriately without clipping or overflow"
+      },
+      {
+        "type": "action",
+        "description": "Resize viewport to mobile size"
+      },
+      {
+        "type": "assertion",
+        "description": "Check header menu collapses to hamburger menu and navigation works correctly when expanded"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "User Management page shows loading indicator while fetching users",
+    "description": "Validate that while user data is being fetched via API on the User Management page, a loading indicator is visible to the user.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to User Management page"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm loading indicator is shown while user data is loading"
+      },
+      {
+        "type": "assertion",
+        "description": "After loading completes, loading indicator disappears"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "User Management page displays 'No users found' message when no users exist",
+    "description": "Ensure that if the API returns zero users, a clear message 'No users found' is displayed instead of an empty list.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Mock API to return empty user list"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to User Management page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that the message 'No users found' is displayed prominently"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Create new user with valid inputs successfully",
+    "description": "Test creating a new user by entering valid email and name, submitting the form, and verifying that the user is added and displayed in the list.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to User Management page"
+      },
+      {
+        "type": "action",
+        "description": "Input valid email in the email field"
+      },
+      {
+        "type": "action",
+        "description": "Input valid name in the name field"
+      },
+      {
+        "type": "action",
+        "description": "Click the 'Create User' button"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate API is called with correct payload"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm new user appears in the user list"
+      },
+      {
+        "type": "assertion",
+        "description": "Check form inputs are reset after successful creation"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Create new user fails with invalid email format",
+    "description": "Verify that entering an invalid email format prevents form submission and shows a validation error.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to User Management page"
+      },
+      {
+        "type": "action",
+        "description": "Enter invalid email format in the email field (e.g. 'useratexample')"
+      },
+      {
+        "type": "action",
+        "description": "Enter valid name in the name field"
+      },
+      {
+        "type": "action",
+        "description": "Click the 'Create User' button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify submission is blocked and validation error message for email is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm no API call is made"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "API error handling during user creation",
+    "description": "Simulate an API error when creating a user and verify that an appropriate error message is shown to the user.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Mock API to return an error during user creation"
+      },
+      {
+        "type": "action",
+        "description": "Fill in valid email and name"
+      },
+      {
+        "type": "action",
+        "description": "Click the 'Create User' button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify error message is displayed indicating creation failure"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm form remains editable for retry"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Delete user successfully",
+    "description": "Test that clicking delete on a user triggers API call and on success removes the user from the list with updated state.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to User Management page with existing users"
+      },
+      {
+        "type": "action",
+        "description": "Click delete button for a specific user"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify API delete request is sent with correct user id"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm user is removed from user list upon successful deletion"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Delete user API error handling",
+    "description": "Simulate an API error during user deletion and verify error message is shown with no change to user list.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Mock delete API to return error"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to delete a user"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that an error message is displayed for delete failure"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm user remains visible in the list"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Intrinsic Value Calculator accurate calculation",
+    "description": "Validate the intrinsic value calculator correctly computes the intrinsic value based on Graham's formula for various inputs.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to Intrinsic Value Calculator page"
+      },
+      {
+        "type": "action",
+        "description": "Input valid stock data required by Graham's formula (EPS, growth rate, etc.)"
+      },
+      {
+        "type": "action",
+        "description": "Submit form to calculate intrinsic value"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify output matches expected intrinsic value calculated externally using Graham's formula"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Intrinsic Value Calculator handles invalid inputs",
+    "description": "Ensure that invalid or missing inputs in the intrinsic value calculator form trigger validation errors and prevent calculation.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to Intrinsic Value Calculator page"
+      },
+      {
+        "type": "action",
+        "description": "Input invalid values such as negative EPS or missing required fields"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to submit the calculation form"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm validation error messages are displayed for invalid input fields"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify calculation is blocked until valid data is provided"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Application UI theme consistency across light and dark modes",
+    "description": "Validate that the combined Tailwind CSS and Material UI styling results in a visually consistent interface across light and dark themes on all major pages.",
+    "category": "ui",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Switch application to light theme"
+      },
+      {
+        "type": "assertion",
+        "description": "Check visual consistency on Home, Users, Intrinsic Value Calculator, and Header components"
+      },
+      {
+        "type": "action",
+        "description": "Switch application to dark theme"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify no visual glitches, color clashes, or readability issues in dark mode across same pages and components"
+      }
+    ]
+  }
+]

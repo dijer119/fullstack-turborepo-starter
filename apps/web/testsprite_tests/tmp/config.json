@@ -1,0 +1,18 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3000/users",
+  "executionArgs": {
+    "projectName": "web",
+    "projectPath": "/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/web",
+    "testIds": [
+      "TC005"
+    ],
+    "additionalInstruction": "Generate Playwright test for creating a user (TC005) only. Retrying after lock clean.",
+    "envs": {
+      "API_KEY": "sk-user-3jKLGR10YuCa4O_0EoBkVBg9Szp5_oIwUJjQS9T-m0yjW9wbH_sYszqpxVFx-y6wjty5nUg4oc3AbwhU7h27n7lxgt0_C-eSNPBfLR-Zp0XuvMcyDV_6XtCcL-k1EmBsCl4"
+    }
+  },
+  "proxy": "http://5d642e79-a073-4667-ab24-8f98ca6403ef:ZutoP4J7cg8oZLmKxcnrjvqm41UlAaUA@tun.testsprite.com:8080"
+}

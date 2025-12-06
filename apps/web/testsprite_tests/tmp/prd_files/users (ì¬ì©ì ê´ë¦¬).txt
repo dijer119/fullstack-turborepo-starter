@@ -1,0 +1,6 @@
+users (사용자 관리)
+Tailwind + MUI 혼용: UsersPage는 아직 Tailwind (className="bg-white", text-gray-900)를 많이 사용 중입니다. 다크 테마인 메인 레이아웃과 이질감이 없는지 확인하세요.
+Form 동작:
+email, name 입력 시 상태 업데이트 확인.
+Create User 버튼 클릭 시 API 요청 발생 및 에러 처리 (네트워크 탭 확인).
+데이터 로딩: users 데이터가 없을 때 "No users found"가 뜨는지, 로딩 중일 때 로딩 인디케이터가 보이는지.
