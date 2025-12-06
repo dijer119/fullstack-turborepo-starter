@@ -5,6 +5,7 @@ import { api } from "./services/api";
 import { maddingstockApi } from "./services/maddingstock-api";
 import { intrinsicValueApi } from "./services/intrinsic-value-api";
 import { krxApi } from "./services/krx-api";
+import { usersApi } from "./services/users-api";
 
 export function makeStore() {
   return configureStore({
@@ -13,14 +14,16 @@ export function makeStore() {
       [maddingstockApi.reducerPath]: maddingstockApi.reducer,
       [intrinsicValueApi.reducerPath]: intrinsicValueApi.reducer,
       [krxApi.reducerPath]: krxApi.reducer,
+      [usersApi.reducerPath]: usersApi.reducer,
     },
 
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware().concat(
-        api.middleware, 
+        api.middleware,
         maddingstockApi.middleware,
         intrinsicValueApi.middleware,
-        krxApi.middleware
+        krxApi.middleware,
+        usersApi.middleware
       ),
   });
 }
