@@ -7,10 +7,10 @@ export const roboto = Roboto({
     display: 'swap',
 });
 
-// Premium Dark Theme
+// Premium Light Theme
 const theme = createTheme({
     palette: {
-        mode: 'dark',
+        mode: 'light',
         primary: {
             main: '#06b6d4', // Cyan 500
             light: '#67e8f9', // Cyan 300
@@ -24,12 +24,12 @@ const theme = createTheme({
             contrastText: '#fff',
         },
         background: {
-            default: '#0f172a', // Slate 900
-            paper: '#1e293b', // Slate 800
+            default: '#f8fafc', // Slate 50
+            paper: '#ffffff', // White
         },
         text: {
-            primary: '#f1f5f9', // Slate 100
-            secondary: '#94a3b8', // Slate 400
+            primary: '#0f172a', // Slate 900
+            secondary: '#64748b', // Slate 500
         },
     },
     typography: {
@@ -38,11 +38,13 @@ const theme = createTheme({
             fontSize: '3rem',
             fontWeight: 700,
             letterSpacing: '-0.02em',
+            color: '#0f172a', // Explicit color for better contrast
         },
         h2: {
             fontSize: '2.25rem',
             fontWeight: 600,
             letterSpacing: '-0.01em',
+            color: '#0f172a',
         },
     },
     components: {
@@ -60,9 +62,19 @@ const theme = createTheme({
                 root: {
                     backgroundImage: 'none',
                     backdropFilter: 'blur(10px)',
+                    // Add subtle border for light mode depth
+                    border: '1px solid rgba(226, 232, 240, 0.8)',
                 },
             },
         },
+        MuiAppBar: {
+            styleOverrides: {
+                root: {
+                    // Ensure AppBar text is visible in light mode if transparent
+                    color: '#0f172a',
+                }
+            }
+        }
     },
 });
 

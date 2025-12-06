@@ -72,72 +72,70 @@ export default function Web() {
       <Head>
         <title>Value Investing - Insights & Tools</title>
       </Head>
-      <Box
-        sx={{
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          background: `radial-gradient(circle at 10% 20%, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
-        }}
-      >
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
         <Header />
 
-        <Box
-          component="section"
-          sx={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "100%",
-          }}
-        >
-          <Container maxWidth="lg">
-            <Paper
-              elevation={0}
+        <main className="max-w-7xl mx-auto px-4 py-8 pb-12 flex flex-col items-center justify-center min-h-[calc(100vh-64px)]">
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 4, md: 8 },
+              background: 'transparent',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center',
+              width: '100%',
+              maxWidth: 'lg'
+            }}
+          >
+            {/* Investors Image */}
+            <Box
               sx={{
-                p: { xs: 4, md: 8 },
-                background: 'transparent',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center',
+                width: '100%',
+                maxWidth: '600px',
+                mb: 6,
+                borderRadius: 4,
+                overflow: 'hidden',
+                boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
               }}
             >
-              <FormatQuoteIcon sx={{ fontSize: 80, color: 'secondary.main', mb: 2, opacity: 0.5 }} />
+              <img
+                src="/images/investors.png"
+                alt="Warren Buffett, Peter Lynch, and Charlie Munger"
+                style={{ width: '100%', height: 'auto', display: 'block' }}
+              />
+            </Box>
 
-              <Typography
-                variant="h2"
-                component="blockquote"
-                sx={{
-                  mb: 4,
-                  fontStyle: 'italic',
-                  fontWeight: 300,
-                  background: `linear-gradient(to right, #fff 0%, ${theme.palette.grey[400]} 100%)`,
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  // Fallback for contrast
-                  color: 'text.primary',
-                  fontSize: { xs: '1.5rem', md: '3rem' }
-                }}
-              >
-                &ldquo;{randomQuote.text}&rdquo;
+            <FormatQuoteIcon sx={{ fontSize: 80, color: 'secondary.main', mb: 2, opacity: 0.5 }} />
+
+            <Typography
+              variant="h2"
+              component="blockquote"
+              sx={{
+                mb: 4,
+                fontStyle: 'italic',
+                fontWeight: 300,
+                color: 'text.primary',
+                fontSize: { xs: '1.5rem', md: '3rem' }
+              }}
+            >
+              &ldquo;{randomQuote.text}&rdquo;
+            </Typography>
+
+            <Box>
+              <Typography variant="h5" color="secondary.light" gutterBottom fontWeight={600}>
+                {randomQuote.author}
               </Typography>
-
-              <Box>
-                <Typography variant="h5" color="secondary.light" gutterBottom fontWeight={600}>
-                  {randomQuote.author}
+              {randomQuote.book && (
+                <Typography variant="body1" color="text.secondary">
+                  {randomQuote.book}
                 </Typography>
-                {randomQuote.book && (
-                  <Typography variant="body1" color="text.secondary">
-                    {randomQuote.book}
-                  </Typography>
-                )}
-              </Box>
-            </Paper>
-          </Container>
-        </Box>
-      </Box>
+              )}
+            </Box>
+          </Paper>
+        </main>
+      </div>
     </>
   );
 }
