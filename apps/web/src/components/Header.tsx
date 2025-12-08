@@ -20,6 +20,7 @@ export default function Header() {
     { label: '홈', path: '/' },
     { label: '상위종목', path: '/top-stocks' },
     { label: '계산기', path: '/intrinsic-value' },
+    { label: '버핏분석', path: '/stock-analysis' },
     { label: 'MaddingStock', path: '/maddingstock' },
     { label: '사용자', path: '/users' },
   ];

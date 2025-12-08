@@ -11,6 +11,7 @@ export interface EnvironmentVariables {
   TELEGRAM_CHANNELS?: string;
   NODE_ENV?: string;
   PORT?: number;
+  GEMINI_API_KEY?: string;
 }
 
 export const validationSchemaForEnv = Joi.object<EnvironmentVariables, true>({
@@ -24,4 +25,5 @@ export const validationSchemaForEnv = Joi.object<EnvironmentVariables, true>({
   TELEGRAM_CHANNELS: Joi.string().optional(),
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
   PORT: Joi.number().default(3001),
+  GEMINI_API_KEY: Joi.string().optional(),
 });

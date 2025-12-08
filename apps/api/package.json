@@ -33,6 +33,7 @@
   "dependencies": {
     "@apollo/server": "4",
     "@as-integrations/express4": "^1.1.2",
+    "@google/genai": "^1.31.0",
     "@nestjs/apollo": "12",
     "@nestjs/common": "^10.4.7",
     "@nestjs/config": "^3.3.0",

@@ -14,6 +14,7 @@ import { CompaniesModule } from './companies/companies.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { IntrinsicValueModule } from './intrinsic-value/intrinsic-value.module';
 import { KrxModule } from './krx/krx.module';
+import { StockModule } from './stock/stock.module';
 
 @Module({
   imports: [
@@ -35,8 +36,9 @@ import { KrxModule } from './krx/krx.module';
     TelegramModule,
     IntrinsicValueModule,
     KrxModule,
+    StockModule,
   ],
   controllers: [AppController],
   providers: [AppService, AppResolver],
 })
-export class AppModule {}
+export class AppModule { }

@@ -12,7 +12,22 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+"""주요 재무 지표"""
+type KeyFinancials {
+  """영업이익"""
+  operatingIncome: String!
+
+  """매출"""
+  revenue: String!
+}
+
 type Mutation {
+  """주식 분석 (버핏 스타일)"""
+  analyzeStock(
+    """분석할 종목명"""
+    symbol: String!
+  ): StockAnalysis!
+
   """새 사용자 생성"""
   createUser(input: CreateUserInput!): User!
 
@@ -21,6 +36,18 @@ type Mutation {
 
   """사용자 정보 수정"""
   updateUser(input: UpdateUserInput!): User!
+}
+
+"""뉴스 항목"""
+type NewsItem {
+  """기사 URL"""
+  link: String!
+
+  """언론사명"""
+  source: String!
+
+  """뉴스 제목"""
+  title: String!
 }
 
 type Query {
@@ -41,6 +68,27 @@ type Query {
 
   """Returns server version"""
   version: String!
+}
+
+"""주식 분석 결과"""
+type StockAnalysis {
+  """버핏의 한줄 평"""
+  buffettOpinion: String!
+
+  """현재 주가"""
+  currentPrice: String!
+
+  """주요 재무 지표"""
+  keyFinancials: KeyFinancials!
+
+  """시장 상황"""
+  marketStatus: String!
+
+  """관련 뉴스"""
+  news: [NewsItem!]!
+
+  """종목명"""
+  symbol: String!
 }
 
 input UpdateUserInput {
