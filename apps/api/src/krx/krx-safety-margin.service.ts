@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { PrismaService } from '../persistence/prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -24,14 +25,15 @@ interface KrxStock {
 @Injectable()
 export class KrxSafetyMarginService {
   private readonly logger = new Logger(KrxSafetyMarginService.name);
-  private readonly krxDataPath = path.join(process.cwd(), 'data', 'krx_stocks.json');
   private readonly resultPath = path.join(process.cwd(), 'data', 'all_safety_margin_results.json');
-  
+
   private readonly defaultHeaders = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'ko-KR,ko;q=0.9',
   };
+
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * 매일 장 마감 후 (17:00) 전체 종목 안전마진 계산
@@ -53,9 +55,9 @@ export class KrxSafetyMarginService {
    */
   async calculateAllSafetyMargins(): Promise<SafetyMarginResult[]> {
     this.logger.log('🚀 전체 종목 안전마진 계산 시작');
-    
-    // KRX 종목 목록 로드
-    const stocks = this.loadKrxStocks();
+
+    // DB에서 KRX 종목 목록 로드
+    const stocks = await this.loadKrxStocks();
     if (stocks.length === 0) {
       this.logger.warn('KRX 종목 목록이 비어있습니다.');
       return [];
@@ -242,15 +244,25 @@ export class KrxSafetyMarginService {
     }
   }
 
-  private loadKrxStocks(): KrxStock[] {
+  private async loadKrxStocks(): Promise<KrxStock[]> {
     try {
-      if (!fs.existsSync(this.krxDataPath)) {
-        this.logger.warn(`KRX 데이터 파일이 없습니다: ${this.krxDataPath}`);
-        return [];
-      }
-      
-      const data = fs.readFileSync(this.krxDataPath, 'utf-8');
-      return JSON.parse(data);
+      // DB에서 전체 종목 조회
+      const stocks = await this.prisma.stock.findMany({
+        select: {
+          code: true,
+          name: true,
+          market: true,
+          close: true,
+        },
+      });
+
+      // KrxStock 인터페이스에 맞게 변환
+      return stocks.map(stock => ({
+        Code: stock.code,
+        Name: stock.name,
+        Market: stock.market,
+        Close: stock.close.toString(), // Decimal을 string으로 변환
+      }));
     } catch (error) {
       this.logger.error(`KRX 데이터 로드 실패: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return [];

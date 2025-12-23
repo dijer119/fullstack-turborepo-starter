@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI } from '@google/genai';
+import { PrismaService } from '../persistence/prisma/prisma.service';
 import { StockAnalysis } from './models/stock-analysis.model';
+import { Stock } from './entities/stock.entity';
+import { StockListResponse } from './dto/stock-list-response.dto';
 
 // Warren Buffett persona system instruction
 const BUFFETT_SYSTEM_INSTRUCTION = `당신은 전설적인 투자자 워렌 버핏입니다. 
@@ -38,8 +41,13 @@ const BUFFETT_SYSTEM_INSTRUCTION = `당신은 전설적인 투자자 워렌 버�
 @Injectable()
 export class StockService {
     private readonly logger = new Logger(StockService.name);
+    private tagsCache: { data: string[] | null; timestamp: number } = { data: null, timestamp: 0 };
+    private readonly TAGS_CACHE_TTL = 5 * 60 * 1000; // 5분 캐시
 
-    constructor(private readonly configService: ConfigService) { }
+    constructor(
+        private readonly configService: ConfigService,
+        private readonly prisma: PrismaService,
+    ) { }
 
     async analyzeStock(symbol: string): Promise<StockAnalysis> {
         const apiKey = this.configService.get<string>('GEMINI_API_KEY');
@@ -105,5 +113,203 @@ export class StockService {
                 responseText.substring(0, 500),
             );
         }
+    }
+
+    /**
+     * 전체 주식 목록 조회 (페이지네이션 + 정렬 + 필터링)
+     */
+    async findAll(
+        skip: number = 0,
+        take: number = 20,
+        market?: string,
+        includeExcluded: boolean = false,
+        sortBy: string = 'stockValue',
+        sortOrder: 'asc' | 'desc' = 'desc',
+        onlyFavorite: boolean = false,
+        minRoe?: number,
+        minDividendYield?: number,
+        tags?: string[]
+    ): Promise<StockListResponse> {
+        const where: any = {};
+        if (market) where.market = market;
+        if (!includeExcluded) where.exclude = false;
+        if (onlyFavorite) where.favorite = true;
+
+        // ROE 필터 (기본값: 0 초과)
+        if (minRoe !== undefined && minRoe !== null) {
+            where.roe = { gt: minRoe };
+        }
+
+        // 배당수익률 필터
+        if (minDividendYield !== undefined && minDividendYield !== null) {
+            where.dividendYield = { gte: minDividendYield };
+        }
+
+        // 태그 필터 - 선택한 모든 태그를 포함하는 주식만 조회
+        if (tags && tags.length > 0) {
+            where.tags = {
+                hasEvery: tags
+            };
+        }
+
+        // 정렬 필드 매핑
+        const orderByMap: any = {
+            stockValue: { stockValue: { sort: sortOrder, nulls: 'last' } },
+            dividendYield: { dividendYield: { sort: sortOrder, nulls: 'last' } },
+            name: { name: sortOrder },
+            close: { close: sortOrder },
+            chagesRatio: { chagesRatio: sortOrder },
+            marcap: { marcap: sortOrder },
+        };
+
+        const orderBy = orderByMap[sortBy] || { stockValue: { sort: 'desc', nulls: 'last' } };
+
+        const [stocks, total] = await Promise.all([
+            this.prisma.stock.findMany({
+                where,
+                skip,
+                take,
+                orderBy,
+            }),
+            this.prisma.stock.count({ where }),
+        ]);
+
+        return {
+            stocks: stocks.map(this.mapToStockEntity),
+            total,
+            skip,
+            take,
+        };
+    }
+
+    /**
+     * 종목 코드로 주식 조회
+     */
+    async findByCode(code: string): Promise<Stock | null> {
+        const stock = await this.prisma.stock.findUnique({
+            where: { code },
+        });
+
+        return stock ? this.mapToStockEntity(stock) : null;
+    }
+
+    /**
+     * 주식 검색 (종목명 또는 코드)
+     */
+    async search(keyword: string, limit: number = 10): Promise<Stock[]> {
+        const stocks = await this.prisma.stock.findMany({
+            where: {
+                OR: [
+                    { name: { contains: keyword, mode: 'insensitive' } },
+                    { code: { contains: keyword } },
+                ],
+            },
+            take: limit,
+            orderBy: [
+                { stockValue: { sort: 'desc', nulls: 'last' } },  // 검색 결과도 주식가치 높은 순, null은 마지막
+                { name: 'asc' }  // 주식가치가 같거나 null인 경우 이름순
+            ],
+        });
+
+        return stocks.map(this.mapToStockEntity);
+    }
+
+    /**
+     * 시장별 주식 개수 조회
+     */
+    async count(market?: string): Promise<number> {
+        const where = market ? { market } : {};
+        return this.prisma.stock.count({ where });
+    }
+
+    /**
+     * 모든 태그 목록 조회 (중복 제거, 5분 캐시)
+     */
+    async getAllTags(): Promise<string[]> {
+        const now = Date.now();
+
+        // 캐시가 유효한 경우 캐시된 데이터 반환
+        if (this.tagsCache.data && (now - this.tagsCache.timestamp) < this.TAGS_CACHE_TTL) {
+            this.logger.debug('Returning cached tags');
+            return this.tagsCache.data;
+        }
+
+        this.logger.debug('Fetching tags from database');
+        const stocks = await this.prisma.stock.findMany({
+            where: {
+                tags: {
+                    isEmpty: false
+                }
+            },
+            select: {
+                tags: true
+            }
+        });
+
+        // 모든 태그를 하나의 배열로 합치고 중복 제거
+        const allTags = new Set<string>();
+        stocks.forEach(stock => {
+            stock.tags.forEach(tag => allTags.add(tag));
+        });
+
+        const sortedTags = Array.from(allTags).sort();
+
+        // 캐시 업데이트
+        this.tagsCache = {
+            data: sortedTags,
+            timestamp: now
+        };
+
+        return sortedTags;
+    }
+
+    /**
+     * 태그 캐시 무효화 (태그 추가/삭제 시 호출)
+     */
+    invalidateTagsCache(): void {
+        this.tagsCache = { data: null, timestamp: 0 };
+    }
+
+    /**
+     * Prisma 모델을 GraphQL Entity로 변환
+     */
+    public mapToStockEntity(stock: any): Stock {
+        return {
+            id: stock.id,
+            code: stock.code,
+            isuCd: stock.isuCd,
+            name: stock.name,
+            market: stock.market,
+            marketId: stock.marketId,
+            dept: stock.dept,
+            close: parseFloat(stock.close.toString()),
+            changeCode: stock.changeCode,
+            changes: parseFloat(stock.changes.toString()),
+            chagesRatio: parseFloat(stock.chagesRatio.toString()),
+            open: parseFloat(stock.open.toString()),
+            high: parseFloat(stock.high.toString()),
+            low: parseFloat(stock.low.toString()),
+            volume: Number(stock.volume),
+            amount: Number(stock.amount),
+            marcap: Number(stock.marcap),
+            stocks: Number(stock.stocks),
+            treasuryStocks: Number(stock.treasuryStocks),
+            treasuryRatio: parseFloat(stock.treasuryRatio.toString()),
+            eps: stock.eps ? parseFloat(stock.eps.toString()) : undefined,
+            bps: stock.bps ? parseFloat(stock.bps.toString()) : undefined,
+            tenYearValue: stock.tenYearValue ? parseFloat(stock.tenYearValue.toString()) : undefined,
+            tenYearMultiple: stock.tenYearMultiple ? parseFloat(stock.tenYearMultiple.toString()) : undefined,
+            stockValue: stock.stockValue ? parseFloat(stock.stockValue.toString()) : undefined,
+            roe: stock.roe ? parseFloat(stock.roe.toString()) : undefined,
+            per: stock.per ? parseFloat(stock.per.toString()) : undefined,
+            pbr: stock.pbr ? parseFloat(stock.pbr.toString()) : undefined,
+            dividendYield: stock.dividendYield ? parseFloat(stock.dividendYield.toString()) : undefined,
+            exclude: stock.exclude || false,
+            favorite: stock.favorite || false,
+            tags: stock.tags || [],
+            dataDate: stock.dataDate,
+            createdAt: stock.createdAt,
+            updatedAt: stock.updatedAt,
+        };
     }
 }

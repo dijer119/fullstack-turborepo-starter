@@ -18,6 +18,7 @@ export default function Header() {
 
   const navItems = [
     { label: '홈', path: '/' },
+    { label: '종목조회', path: '/stocks' },
     { label: '상위종목', path: '/top-stocks' },
     { label: '계산기', path: '/intrinsic-value' },
     { label: '버핏분석', path: '/stock-analysis' },

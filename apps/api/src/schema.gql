@@ -22,6 +22,9 @@ type KeyFinancials {
 }
 
 type Mutation {
+  """주식에 태그 추가"""
+  addTagToStock(id: Int!, tag: String!): Stock!
+
   """주식 분석 (버핏 스타일)"""
   analyzeStock(
     """분석할 종목명"""
@@ -33,6 +36,15 @@ type Mutation {
 
   """사용자 삭제"""
   deleteUser(id: Int!): User!
+
+  """주식에서 태그 제거"""
+  removeTagFromStock(id: Int!, tag: String!): Stock!
+
+  """주식 제외 상태 토글"""
+  toggleStockExclude(id: Int!): Stock!
+
+  """주식 좋아요 상태 토글"""
+  toggleStockFavorite(id: Int!): Stock!
 
   """사용자 정보 수정"""
   updateUser(input: UpdateUserInput!): User!
@@ -51,8 +63,23 @@ type NewsItem {
 }
 
 type Query {
+  """모든 태그 목록"""
+  allTags: [String!]!
+
   """Health check query"""
   health: String!
+
+  """주식 검색 (종목명 또는 코드)"""
+  searchStocks(keyword: String!, limit: Int = 10): [Stock!]!
+
+  """종목 코드로 주식 조회"""
+  stock(code: String!): Stock
+
+  """시장별 주식 개수"""
+  stockCount(market: String): Int!
+
+  """주식 목록 조회"""
+  stocks(includeExcluded: Boolean = false, market: String, minDividendYield: Int, minRoe: Int, onlyFavorite: Boolean = false, skip: Int = 0, sortBy: String = "stockValue", sortOrder: String = "desc", tags: [String!], take: Int = 20): StockListResponse!
 
   """ID로 사용자 조회"""
   user(id: Int!): User!
@@ -68,6 +95,112 @@ type Query {
 
   """Returns server version"""
   version: String!
+}
+
+"""KRX 주식 정보"""
+type Stock {
+  """거래대금"""
+  amount: Float!
+
+  """BPS (주당순자산가치)"""
+  bps: Float
+
+  """등락률 (%)"""
+  chagesRatio: Float!
+
+  """변동 코드"""
+  changeCode: String!
+
+  """전일 대비"""
+  changes: Float!
+
+  """종가"""
+  close: Float!
+
+  """종목 코드"""
+  code: String!
+
+  """생성일"""
+  createdAt: DateTime!
+
+  """데이터 기준일"""
+  dataDate: DateTime!
+
+  """부서"""
+  dept: String
+
+  """배당수익률 (%)"""
+  dividendYield: Float
+
+  """EPS (주당순이익)"""
+  eps: Float
+
+  """목록 제외 여부"""
+  exclude: Boolean!
+
+  """좋아요 여부"""
+  favorite: Boolean!
+
+  """고가"""
+  high: Float!
+  id: Int!
+
+  """ISIN 코드"""
+  isuCd: String!
+
+  """저가"""
+  low: Float!
+
+  """시가총액"""
+  marcap: Float!
+
+  """시장 구분 (KOSPI/KOSDAQ)"""
+  market: String!
+
+  """시장 ID"""
+  marketId: String!
+
+  """종목명"""
+  name: String!
+
+  """시가"""
+  open: Float!
+
+  """PBR (주가순자산비율)"""
+  pbr: Float
+
+  """PER (주가수익비율)"""
+  per: Float
+
+  """ROE (자기자본이익률)"""
+  roe: Float
+
+  """주식가치"""
+  stockValue: Float
+
+  """상장주식수"""
+  stocks: Float!
+
+  """태그 목록"""
+  tags: [String!]!
+
+  """10년승수"""
+  tenYearMultiple: Float
+
+  """10년가치"""
+  tenYearValue: Float
+
+  """자기주식비율 (%)"""
+  treasuryRatio: Float!
+
+  """자기주식수"""
+  treasuryStocks: Float!
+
+  """수정일"""
+  updatedAt: DateTime!
+
+  """거래량"""
+  volume: Float!
 }
 
 """주식 분석 결과"""
@@ -89,6 +222,21 @@ type StockAnalysis {
 
   """종목명"""
   symbol: String!
+}
+
+"""주식 목록 응답"""
+type StockListResponse {
+  """스킵"""
+  skip: Int!
+
+  """주식 목록"""
+  stocks: [Stock!]!
+
+  """가져온 개수"""
+  take: Int!
+
+  """전체 개수"""
+  total: Int!
 }
 
 input UpdateUserInput {

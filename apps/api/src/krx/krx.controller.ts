@@ -18,6 +18,18 @@ export class KrxController {
     return { message: 'KRX 종목 데이터 업데이트 완료' };
   }
 
+  @Post('update-eps-bps')
+  @ApiOperation({ summary: 'EPS/BPS 데이터만 업데이트 (데이터베이스 종목 기준)' })
+  async updateEpsBps() {
+    const result = await this.krxSchedulerService.updateEpsAndBps();
+    return {
+      message: 'EPS/BPS 데이터 업데이트 완료',
+      success: result.success,
+      fail: result.fail,
+      failedStocks: result.failedStocks,
+    };
+  }
+
   @Post('calculate-safety-margins')
   @ApiOperation({ summary: '전체 종목 안전마진 계산 (시간 소요)' })
   async calculateSafetyMargins() {

@@ -1,13 +1,16 @@
 /**
  * KRX 종목 목록 생성 스크립트
- * 한국거래소에서 KOSPI/KOSDAQ 종목 목록을 가져와서 JSON 파일로 저장
- * 
+ * 한국거래소에서 KOSPI/KOSDAQ 종목 목록을 가져와서 DB에 저장
+ *
  * 실행: cd apps/api && npx ts-node scripts/generate-krx-stocks.ts
  */
 
+import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as iconv from 'iconv-lite';
+
+const prisma = new PrismaClient();
 
 const defaultHeaders = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -38,6 +41,7 @@ interface KrxStock {
   TreasuryStocks: number; // 자기주식수
   TreasuryRatio: number;  // 자기주식비율 (%)
   MarketId: string;       // 시장 ID (STK/KSQ)
+  EPS: number | null;     // 주당순이익 (Earnings Per Share)
 }
 
 /**
@@ -102,6 +106,7 @@ async function fetchKrxStocksByMarket(marketId: string, marketName: string): Pro
         TreasuryStocks: 0,  // 나중에 업데이트
         TreasuryRatio: 0,   // 나중에 업데이트
         MarketId: marketId,
+        EPS: null,          // 나중에 업데이트 (eps:fetch 사용)
       }));
     }
     return [];
@@ -292,6 +297,7 @@ async function fetchNaverStocks(): Promise<KrxStock[]> {
                   TreasuryStocks: 0,
                   TreasuryRatio: 0,
                   MarketId: marketId,
+                  EPS: null,
                 });
               }
             }
@@ -368,21 +374,89 @@ async function main() {
   console.log(`  - KOSPI: ${allStocks.filter(s => s.Market === 'KOSPI').length}개`);
   console.log(`  - KOSDAQ: ${allStocks.filter(s => s.Market === 'KOSDAQ').length}개`);
 
-  // JSON 파일로 저장
-  const outputPath = path.join(__dirname, '..', 'data', 'krx_stocks.json');
+  // 종목명 기준 정렬
+  allStocks.sort((a, b) => a.Name.localeCompare(b.Name, 'ko'));
+
+  // DB에 upsert (기존 데이터 업데이트 또는 신규 삽입)
+  console.log(`\n💾 DB에 저장 중...`);
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (const stock of allStocks) {
+    try {
+      await prisma.stock.upsert({
+        where: { code: stock.Code },
+        update: {
+          isuCd: stock.ISU_CD,
+          name: stock.Name,
+          market: stock.Market,
+          marketId: stock.MarketId,
+          dept: stock.Dept || null,
+          close: parseFloat(stock.Close.replace(/,/g, '')),
+          changeCode: stock.ChangeCode,
+          changes: stock.Changes,
+          chagesRatio: stock.ChagesRatio,
+          open: stock.Open,
+          high: stock.High,
+          low: stock.Low,
+          volume: BigInt(stock.Volume),
+          amount: BigInt(stock.Amount),
+          marcap: BigInt(stock.Marcap),
+          stocks: BigInt(stock.Stocks),
+          treasuryStocks: BigInt(stock.TreasuryStocks),
+          treasuryRatio: stock.TreasuryRatio,
+          eps: stock.EPS,
+          dataDate: new Date(),
+        },
+        create: {
+          code: stock.Code,
+          isuCd: stock.ISU_CD,
+          name: stock.Name,
+          market: stock.Market,
+          marketId: stock.MarketId,
+          dept: stock.Dept || null,
+          close: parseFloat(stock.Close.replace(/,/g, '')),
+          changeCode: stock.ChangeCode,
+          changes: stock.Changes,
+          chagesRatio: stock.ChagesRatio,
+          open: stock.Open,
+          high: stock.High,
+          low: stock.Low,
+          volume: BigInt(stock.Volume),
+          amount: BigInt(stock.Amount),
+          marcap: BigInt(stock.Marcap),
+          stocks: BigInt(stock.Stocks),
+          treasuryStocks: BigInt(stock.TreasuryStocks),
+          treasuryRatio: stock.TreasuryRatio,
+          eps: stock.EPS,
+        },
+      });
+      successCount++;
+
+      // 진행률 표시
+      if (successCount % 100 === 0) {
+        console.log(`  진행: ${successCount}/${allStocks.length} (${Math.round(successCount / allStocks.length * 100)}%)`);
+      }
+    } catch (error) {
+      errorCount++;
+      console.error(`  ❌ 오류 (${stock.Code} ${stock.Name}):`, error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  console.log(`\n✅ DB 저장 완료`);
+  console.log(`  - 성공: ${successCount}개`);
+  console.log(`  - 실패: ${errorCount}개`);
+
+  // 백업용 JSON 파일로도 저장
+  const outputPath = path.join(__dirname, '..', 'data', 'krx_stocks.backup.json');
   const outputDir = path.dirname(outputPath);
-  
-  // 디렉토리 생성
+
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  // 종목명 기준 정렬
-  allStocks.sort((a, b) => a.Name.localeCompare(b.Name, 'ko'));
-
-  // 배열 형태로 저장 (Python 코드와 동일)
   fs.writeFileSync(outputPath, JSON.stringify(allStocks, null, 2), 'utf-8');
-  console.log(`\n✅ 저장 완료: ${outputPath}`);
+  console.log(`\n💾 백업 파일 저장: ${outputPath}`);
 
   // 샘플 출력 (자기주식 있는 종목 포함)
   console.log('\n📋 샘플 종목 (처음 5개):');
@@ -407,5 +481,9 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+main()
+  .catch(console.error)
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
 

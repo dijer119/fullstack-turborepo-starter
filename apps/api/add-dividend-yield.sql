@@ -1,0 +1,1 @@
+ALTER TABLE stocks ADD COLUMN IF NOT EXISTS dividend_yield DECIMAL(10,2);

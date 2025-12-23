@@ -58,3 +58,71 @@ model MaddingStockMessage {
   @@index([tradeType])
   @@map("maddingstock_messages")
 }
+
+model Stock {
+  id             Int      @id @default(autoincrement())
+  code           String   @unique // 종목코드 (6-digit stock code)
+  isuCd          String   @map("isu_cd") // ISIN 코드
+  name           String   // 종목명 (stock name)
+  market         String   // 시장구분 (KOSPI/KOSDAQ)
+  marketId       String   @map("market_id") // 시장 ID (STK/KSQ)
+  dept           String?  // 부서
+
+  // Price data
+  close          Decimal  @db.Decimal(10, 2) // 종가
+  changeCode     String   @map("change_code") // 변동 코드 (1: 상승, 2: 하락, 3: 보합)
+  changes        Decimal  @db.Decimal(10, 2) // 전일대비
+  chagesRatio    Decimal  @map("chages_ratio") @db.Decimal(10, 4) // 등락률 (%)
+  open           Decimal  @db.Decimal(10, 2) // 시가
+  high           Decimal  @db.Decimal(10, 2) // 고가
+  low            Decimal  @db.Decimal(10, 2) // 저가
+
+  // Trading data
+  volume         BigInt   // 거래량
+  amount         BigInt   // 거래대금
+  marcap         BigInt   // 시가총액
+  stocks         BigInt   // 상장주식수
+
+  // Treasury stock data
+  treasuryStocks BigInt   @map("treasury_stocks") // 자기주식수
+  treasuryRatio  Decimal  @map("treasury_ratio") @db.Decimal(5, 2) // 자기주식비율 (%)
+
+  // Financial data
+  eps            Decimal? @db.Decimal(10, 2) // 주당순이익 (Earnings Per Share)
+  bps            Decimal? @db.Decimal(10, 2) // 주당순자산가치 (Book value Per Share)
+
+  // Calculated values
+  tenYearValue   Decimal? @map("ten_year_value") @db.Decimal(15, 2) // 10년가치: BPS*(1+(EPS/BPS)/100)^10
+  tenYearMultiple Decimal? @map("ten_year_multiple") @db.Decimal(10, 4) // 10년승수: ten_year_value / 현재가
+  stockValue     Decimal? @map("stock_value") @db.Decimal(10, 2) // 주식가치: (10^(LOG10(ten_year_multiple)/10)-1)*100
+  roe            Decimal? @db.Decimal(10, 2) // ROE: EPS/BPS (수익성 지표)
+  per            Decimal? @db.Decimal(10, 2) // PER: 현재가/EPS (주가수익비율)
+  pbr            Decimal? @db.Decimal(10, 2) // PBR: 현재가/BPS (주가순자산비율)
+  dividendYield  Decimal? @map("dividend_yield") @db.Decimal(10, 2) // 배당수익률 (%)
+
+  // Filter
+  exclude        Boolean  @default(false) // 목록에서 제외 여부
+  favorite       Boolean  @default(false) // 좋아요 여부
+  tags           String[] @default([])    // 태그 목록
+
+  // Timestamps
+  dataDate       DateTime @default(now()) @map("data_date") // 데이터 기준일
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([code])
+  @@index([name])
+  @@index([market])
+  @@index([dataDate])
+  @@index([stockValue(sort: Desc)])
+  @@index([dividendYield(sort: Desc)])
+  @@index([marcap(sort: Desc)])
+  @@index([chagesRatio(sort: Desc)])
+  @@index([close(sort: Desc)])
+  @@index([market, exclude])
+  @@index([favorite])
+  @@index([exclude])
+  @@index([roe])
+  @@index([tags])
+  @@map("stocks")
+}

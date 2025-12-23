@@ -4,31 +4,8 @@ import {
   IntrinsicValueResult,
   FinancialData,
 } from './dto/calculate-intrinsic-value.dto';
+import { PrismaService } from '../persistence/prisma/prisma.service';
 import * as iconv from 'iconv-lite';
-import * as fs from 'fs';
-import * as path from 'path';
-
-interface KrxStock {
-  Code: string;           // 종목코드
-  ISU_CD: string;         // ISIN 코드
-  Name: string;           // 종목명
-  Market: string;         // 시장구분 (KOSPI/KOSDAQ)
-  Dept: string;           // 부서
-  Close: string;          // 종가
-  ChangeCode: string;     // 변동 코드
-  Changes: number;        // 전일대비
-  ChagesRatio: number;    // 등락률
-  Open: number;           // 시가
-  High: number;           // 고가
-  Low: number;            // 저가
-  Volume: number;         // 거래량
-  Amount: number;         // 거래대금
-  Marcap: number;         // 시가총액
-  Stocks: number;         // 상장주식수
-  TreasuryStocks: number; // 자기주식수
-  TreasuryRatio: number;  // 자기주식비율 (%)
-  MarketId: string;       // 시장 ID
-}
 
 interface NaverFinancialRaw {
   eps: number[];
@@ -42,9 +19,6 @@ interface NaverFinancialRaw {
 @Injectable()
 export class IntrinsicValueService implements OnModuleInit {
   private readonly logger = new Logger(IntrinsicValueService.name);
-  
-  // KRX 종목 목록 캐시
-  private krxStocks: KrxStock[] = [];
 
   // 네이버 요청용 공통 헤더 (봇 차단 우회)
   private readonly defaultHeaders = {
@@ -54,33 +28,17 @@ export class IntrinsicValueService implements OnModuleInit {
     'Connection': 'keep-alive',
   };
 
-  /**
-   * 모듈 초기화 시 KRX 종목 목록 로드
-   */
-  onModuleInit() {
-    this.loadKrxStocks();
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * KRX 종목 목록 JSON 파일 로드
+   * 모듈 초기화 시 - DB 연결 확인
    */
-  private loadKrxStocks(): void {
+  async onModuleInit() {
     try {
-      // process.cwd()를 사용하여 프로젝트 루트 기준 경로 설정
-      const filePath = path.join(process.cwd(), 'data', 'krx_stocks.json');
-      
-      this.logger.log(`KRX 종목 목록 파일 경로: ${filePath}`);
-      
-      if (fs.existsSync(filePath)) {
-        const data = fs.readFileSync(filePath, 'utf-8');
-        this.krxStocks = JSON.parse(data) as KrxStock[];
-        this.logger.log(`KRX 종목 목록 로드 완료: ${this.krxStocks.length}개 종목`);
-      } else {
-        this.logger.warn(`KRX 종목 목록 파일이 없습니다: ${filePath}`);
-        this.logger.warn('yarn krx:update 를 실행하여 생성하세요.');
-      }
+      const count = await this.prisma.stock.count();
+      this.logger.log(`KRX 종목 DB 연결 완료: ${count}개 종목`);
     } catch (error) {
-      this.logger.error(`KRX 종목 목록 로드 실패: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.logger.error(`KRX 종목 DB 연결 실패: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -98,52 +56,65 @@ export class IntrinsicValueService implements OnModuleInit {
   }
 
   /**
-   * 종목명으로 주식 검색 (KRX 종목 목록에서 검색)
+   * 종목명으로 주식 검색 (DB에서 검색)
    */
   async searchStock(keyword: string): Promise<StockSearchResult[]> {
     try {
-      const searchKeyword = keyword.trim().toLowerCase();
-      
+      const searchKeyword = keyword.trim();
+
       if (!searchKeyword) {
         return [];
       }
 
-      // KRX 종목 목록에서 검색
-      if (this.krxStocks.length > 0) {
-        const results = this.krxStocks
-          .filter(stock => 
-            stock.Name.toLowerCase().includes(searchKeyword) ||
-            stock.Code.includes(searchKeyword)
-          )
-          .slice(0, 20) // 최대 20개
-          .map(stock => ({
-            code: stock.Code,
-            name: stock.Name,
-            market: stock.Market,
-          }));
+      // Prisma로 DB에서 검색 (대소문자 구분 없이)
+      const stocks = await this.prisma.stock.findMany({
+        where: {
+          OR: [
+            {
+              name: {
+                contains: searchKeyword,
+                mode: 'insensitive',
+              },
+            },
+            {
+              code: {
+                contains: searchKeyword,
+              },
+            },
+          ],
+        },
+        select: {
+          code: true,
+          name: true,
+          market: true,
+        },
+        take: 20, // 최대 20개
+      });
 
-        // 정확히 일치하는 종목을 먼저 정렬
-        results.sort((a, b) => {
-          const aExact = a.name.toLowerCase() === searchKeyword;
-          const bExact = b.name.toLowerCase() === searchKeyword;
+      // 정확히 일치하는 종목을 먼저 정렬
+      const results = stocks
+        .map(stock => ({
+          code: stock.code,
+          name: stock.name,
+          market: stock.market,
+        }))
+        .sort((a, b) => {
+          const lowerKeyword = searchKeyword.toLowerCase();
+          const aExact = a.name.toLowerCase() === lowerKeyword;
+          const bExact = b.name.toLowerCase() === lowerKeyword;
           if (aExact && !bExact) return -1;
           if (!aExact && bExact) return 1;
-          
-          const aStarts = a.name.toLowerCase().startsWith(searchKeyword);
-          const bStarts = b.name.toLowerCase().startsWith(searchKeyword);
+
+          const aStarts = a.name.toLowerCase().startsWith(lowerKeyword);
+          const bStarts = b.name.toLowerCase().startsWith(lowerKeyword);
           if (aStarts && !bStarts) return -1;
           if (!aStarts && bStarts) return 1;
-          
+
           return a.name.localeCompare(b.name, 'ko');
         });
 
-        this.logger.log(`[searchStock] "${keyword}" 검색 결과: ${results.length}개`);
-        return results.slice(0, 10);
-      }
-
-      // KRX 목록이 없으면 에러 반환
-      this.logger.warn('[searchStock] KRX 종목 목록이 비어있습니다.');
-      return [];
+      this.logger.log(`[searchStock] "${keyword}" 검색 결과: ${results.length}개`);
+      return results.slice(0, 10);
     } catch (error) {
       this.logger.error(`Stock search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw new HttpException(
