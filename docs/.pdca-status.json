@@ -1,9 +1,25 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-02-17T22:58:25.500Z",
-  "activeFeatures": [],
-  "primaryFeature": null,
-  "features": {},
+  "lastUpdated": "2026-02-17T23:24:17.680Z",
+  "activeFeatures": [
+    "blog-collection"
+  ],
+  "primaryFeature": "blog-collection",
+  "features": {
+    "blog-collection": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-02-17T23:08:20.426Z",
+        "lastUpdated": "2026-02-17T23:24:17.680Z"
+      },
+      "lastFile": "/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/blog-collection/src/proxy.ts"
+    }
+  },
   "pipeline": {
     "currentPhase": 1,
     "level": "Dynamic",
@@ -12,7 +28,44 @@
   "session": {
     "startedAt": "2026-02-17T22:58:25.500Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-02-17T22:58:25.500Z"
+    "lastActivity": "2026-02-17T23:24:17.680Z"
   },
-  "history": []
+  "history": [
+    {
+      "timestamp": "2026-02-17T23:08:20.426Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-17T23:22:57.010Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-17T23:23:00.699Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-17T23:23:04.516Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-17T23:23:07.673Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-17T23:24:17.680Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    }
+  ]
 }

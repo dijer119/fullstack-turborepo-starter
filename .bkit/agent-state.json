@@ -1,25 +1,14 @@
 {
   "version": "1.0",
-  "enabled": true,
+  "enabled": false,
   "teamName": "",
   "feature": "",
   "pdcaPhase": "plan",
   "orchestrationPattern": "leader",
   "ctoAgent": "opus",
   "startedAt": "2026-02-17T23:00:34.915Z",
-  "lastUpdated": "2026-02-17T23:00:34.915Z",
-  "teammates": [
-    {
-      "name": "abeabfb",
-      "role": "Explore",
-      "model": "sonnet",
-      "status": "spawning",
-      "currentTask": null,
-      "taskId": null,
-      "startedAt": "2026-02-17T23:00:34.915Z",
-      "lastActivityAt": "2026-02-17T23:00:34.915Z"
-    }
-  ],
+  "lastUpdated": "2026-02-17T23:09:10.715Z",
+  "teammates": [],
   "progress": {
     "totalTasks": 0,
     "completedTasks": 0,
