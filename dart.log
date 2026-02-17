@@ -1,0 +1,2 @@
+2026-02-15 02:22:59 | root | <module> | INFO | server started, usecase = light
+2026-02-15 02:22:59 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type ListToolsRequest
