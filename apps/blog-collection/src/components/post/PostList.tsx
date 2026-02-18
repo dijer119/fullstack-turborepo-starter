@@ -95,21 +95,88 @@ export async function PostList({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-8">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <a
-              key={p}
-              href={`?page=${p}${search ? `&search=${search}` : ""}${tag ? `&tag=${tag}` : ""}`}
-              className={`px-3 py-1 rounded-md text-sm ${
-                p === page
-                  ? "bg-blue-600 text-white"
-                  : "border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
-              }`}
-            >
-              {p}
-            </a>
-          ))}
-        </div>
+        <Pagination page={page} totalPages={totalPages} search={search} tag={tag} />
+      )}
+    </div>
+  );
+}
+
+function buildHref(p: number, search?: string, tag?: string) {
+  const params = new URLSearchParams();
+  params.set("page", String(p));
+  if (search) params.set("search", search);
+  if (tag) params.set("tag", tag);
+  return `?${params.toString()}`;
+}
+
+function getPageNumbers(page: number, totalPages: number): (number | "...")[] {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const pages: (number | "...")[] = [1];
+
+  if (page > 3) pages.push("...");
+
+  const start = Math.max(2, page - 1);
+  const end = Math.min(totalPages - 1, page + 1);
+  for (let i = start; i <= end; i++) pages.push(i);
+
+  if (page < totalPages - 2) pages.push("...");
+
+  pages.push(totalPages);
+  return pages;
+}
+
+function Pagination({
+  page,
+  totalPages,
+  search,
+  tag,
+}: {
+  page: number;
+  totalPages: number;
+  search?: string;
+  tag?: string;
+}) {
+  const pages = getPageNumbers(page, totalPages);
+
+  return (
+    <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-8">
+      {page > 1 && (
+        <a
+          href={buildHref(page - 1, search, tag)}
+          className="px-2 py-1 rounded-md text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
+        >
+          &lt;
+        </a>
+      )}
+      {pages.map((p, i) =>
+        p === "..." ? (
+          <span key={`ellipsis-${i}`} className="px-1 text-sm text-gray-400">
+            ...
+          </span>
+        ) : (
+          <a
+            key={p}
+            href={buildHref(p, search, tag)}
+            className={`min-w-[32px] px-2 py-1 rounded-md text-sm text-center ${
+              p === page
+                ? "bg-blue-600 text-white"
+                : "border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
+            }`}
+          >
+            {p}
+          </a>
+        )
+      )}
+      {page < totalPages && (
+        <a
+          href={buildHref(page + 1, search, tag)}
+          className="px-2 py-1 rounded-md text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
+        >
+          &gt;
+        </a>
       )}
     </div>
   );

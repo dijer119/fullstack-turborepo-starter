@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { SafeImage } from "@/components/ui/SafeImage";
 import type { Feed } from "@/types/feed";
 
 export async function Sidebar() {
@@ -24,8 +25,7 @@ export async function Sidebar() {
   });
 
   return (
-    <aside className="w-64 border-r border-gray-200 dark:border-gray-800 h-full overflow-y-auto bg-gray-50 dark:bg-gray-900 flex-shrink-0">
-      <nav className="p-4 space-y-1">
+    <nav className="p-4 space-y-1">
         <Link
           href="/"
           className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
@@ -47,10 +47,9 @@ export async function Sidebar() {
             title={feed.title}
           >
             {feed.image_url && (
-              <img
+              <SafeImage
                 src={feed.image_url}
                 alt=""
-                referrerPolicy="no-referrer"
                 className="w-5 h-5 rounded-full flex-shrink-0"
               />
             )}
@@ -73,7 +72,7 @@ export async function Sidebar() {
                 title={feed.title}
               >
                 {feed.image_url && (
-                  <img
+                  <SafeImage
                     src={feed.image_url}
                     alt=""
                     className="w-5 h-5 rounded-full flex-shrink-0"
@@ -93,7 +92,6 @@ export async function Sidebar() {
             Manage Feeds
           </Link>
         </div>
-      </nav>
-    </aside>
+    </nav>
   );
 }

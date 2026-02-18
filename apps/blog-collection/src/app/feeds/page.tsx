@@ -23,8 +23,8 @@ export default async function FeedsPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Manage Feeds</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold">Manage Feeds</h1>
         <Link
           href="/feeds/add"
           className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors"

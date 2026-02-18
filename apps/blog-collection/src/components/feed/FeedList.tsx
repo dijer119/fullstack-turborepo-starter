@@ -2,6 +2,7 @@
 
 import { deleteFeed } from "@/actions/feed";
 import { useRouter } from "next/navigation";
+import { SafeImage } from "@/components/ui/SafeImage";
 import type { Feed } from "@/types/feed";
 
 function formatDate(dateStr: string | null): string {
@@ -49,17 +50,16 @@ export function FeedList({
           className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 flex items-center gap-4"
         >
           {feed.image_url && (
-            <img
+            <SafeImage
               src={feed.image_url}
               alt=""
-              referrerPolicy="no-referrer"
               className="w-12 h-12 rounded-full flex-shrink-0"
             />
           )}
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold truncate">{feed.title}</h3>
             <p className="text-xs text-gray-500 truncate">{feed.rss_url}</p>
-            <div className="flex gap-4 mt-1 text-xs text-gray-500">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-gray-500">
               <span>{postCounts.get(feed.id) || 0} posts</span>
               <span>Last fetched: {formatDate(feed.last_fetched_at)}</span>
               {feed.category && (

@@ -1,7 +1,12 @@
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
 
 export async function proxy(request: NextRequest) {
+  // webpack-hmr fallback 요청을 빈 응답으로 처리 (Next.js 16은 WebSocket HMR 사용)
+  if (request.nextUrl.pathname === "/_next/webpack-hmr") {
+    return new NextResponse(null, { status: 200 });
+  }
+
   return await updateSession(request);
 }
 

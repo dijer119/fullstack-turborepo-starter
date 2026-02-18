@@ -1,6 +1,7 @@
 "use client";
 
 import { toggleFavorite, toggleRead } from "@/actions/post";
+import { SafeImage } from "@/components/ui/SafeImage";
 import type { PostWithFeed } from "@/types/post";
 
 function timeAgo(dateStr: string): string {
@@ -53,15 +54,14 @@ export function PostCard({
         target="_blank"
         rel="noopener noreferrer"
         onClick={handleClick}
-        className="flex gap-4"
+        className="flex flex-col sm:flex-row gap-3 sm:gap-4"
       >
         {post.thumbnail && (
           <div className="flex-shrink-0">
-            <img
+            <SafeImage
               src={post.thumbnail}
               alt=""
-              referrerPolicy="no-referrer"
-              className="w-24 h-24 object-cover rounded-md"
+              className="w-full h-40 sm:w-24 sm:h-24 object-cover rounded-md"
             />
           </div>
         )}

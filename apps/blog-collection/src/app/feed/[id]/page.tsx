@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PostList } from "@/components/post/PostList";
 import { RefreshButton } from "@/components/ui/RefreshButton";
+import { SafeImage } from "@/components/ui/SafeImage";
 import type { Feed } from "@/types/feed";
 
 export default async function FeedPage({
@@ -31,10 +32,9 @@ export default async function FeedPage({
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           {typedFeed.image_url && (
-            <img
+            <SafeImage
               src={typedFeed.image_url}
               alt=""
-              referrerPolicy="no-referrer"
               className="w-10 h-10 rounded-full"
             />
           )}
