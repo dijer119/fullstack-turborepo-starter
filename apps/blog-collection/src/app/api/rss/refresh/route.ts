@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { parseRssFeed } from "@/lib/rss/parser";
+import { sendNewPostsNotification } from "@/lib/telegram";
 
 export async function POST(request: Request) {
   try {
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
 
     let totalNewPosts = 0;
     const errors: string[] = [];
+    const newPostsList: { feedTitle: string; title: string; link: string }[] = [];
 
     for (const feed of feeds) {
       try {
@@ -47,8 +49,18 @@ export async function POST(request: Request) {
         const xmlString = await response.text();
         const { items } = parseRssFeed(xmlString);
 
-        // 새 글만 upsert (guid 기반 중복 방지)
+        // 기존 guid 목록 조회 (신규 글 판별용)
+        const guids = items.map((item) => item.guid);
+        const { data: existing } = await supabase
+          .from("posts")
+          .select("guid")
+          .eq("feed_id", feed.id)
+          .in("guid", guids.length > 0 ? guids : ["__none__"]);
+        const existingGuids = new Set((existing || []).map((r: { guid: string }) => r.guid));
+
         for (const item of items) {
+          const isNew = !existingGuids.has(item.guid);
+
           const { error: upsertError } = await supabase
             .from("posts")
             .upsert(
@@ -73,7 +85,6 @@ export async function POST(request: Request) {
 
           // 태그 저장
           if (item.tags.length > 0) {
-            // guid로 post_id 조회
             const { data: post } = await supabase
               .from("posts")
               .select("id")
@@ -92,10 +103,16 @@ export async function POST(request: Request) {
                   onConflict: "post_id,tag",
                   ignoreDuplicates: true,
                 });
-              totalNewPosts++;
             }
-          } else {
+          }
+
+          if (isNew) {
             totalNewPosts++;
+            newPostsList.push({
+              feedTitle: feed.title,
+              title: item.title,
+              link: item.link,
+            });
           }
         }
 
@@ -109,6 +126,11 @@ export async function POST(request: Request) {
           `Feed "${feed.title}": ${e instanceof Error ? e.message : "Unknown error"}`
         );
       }
+    }
+
+    // 신규 글이 있으면 Telegram 알림
+    if (newPostsList.length > 0) {
+      await sendNewPostsNotification(newPostsList);
     }
 
     return NextResponse.json({
