@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-02-18T01:07:39.063Z",
+  "lastUpdated": "2026-02-18T08:35:03.016Z",
   "activeFeatures": [
     "blog-collection"
   ],
@@ -30,9 +30,9 @@
       },
       "timestamps": {
         "started": "2026-02-17T23:08:20.426Z",
-        "lastUpdated": "2026-02-18T01:07:39.063Z"
+        "lastUpdated": "2026-02-18T08:35:03.016Z"
       },
-      "lastFile": "/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/blog-collection/src/app/layout.tsx"
+      "lastFile": "/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/blog-collection/src/components/layout/Header.tsx"
     }
   },
   "pipeline": {
@@ -43,7 +43,7 @@
   "session": {
     "startedAt": "2026-02-17T22:58:25.500Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-02-18T01:07:39.063Z"
+    "lastActivity": "2026-02-18T08:35:03.016Z"
   },
   "history": [
     {
@@ -252,6 +252,162 @@
     },
     {
       "timestamp": "2026-02-18T01:07:39.063Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:04:40.020Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:07:16.617Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:11:58.505Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:12:12.195Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:12:18.770Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:12:24.256Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:12:29.789Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:12:36.408Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:12:42.768Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:12:48.473Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:12:53.972Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:16:51.946Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:17:02.014Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T03:27:52.051Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T07:37:20.298Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T07:37:36.039Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T07:37:59.508Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T07:38:04.260Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T07:38:10.913Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T07:38:21.279Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T07:38:39.058Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T07:38:51.521Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T07:39:05.470Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T07:44:55.052Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T07:45:12.334Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T08:35:03.016Z",
       "feature": "blog-collection",
       "phase": "do",
       "action": "updated"
