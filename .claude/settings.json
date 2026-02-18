@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "mcp__filesystem__directory_tree",
-      "Bash(yarn add:*)"
+      "Bash(yarn add:*)",
+      "WebFetch(domain:rss.blog.naver.com)"
     ]
   }
 }
