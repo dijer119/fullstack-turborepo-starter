@@ -44,13 +44,19 @@ export async function importCompaniesAction(rows: ImportRow[]): Promise<ImportRe
     });
   });
 
+  // 단일 사용자 가정: 동시 import 시 pre-loaded Set이 stale될 수 있음.
+  // ticker UNIQUE 제약이 fallback (충돌 시 chunk 전체 실패 → 아래 errors에 명시).
   // 청크 단위 insert (Supabase request 크기 제한 회피)
   const CHUNK = 500;
   for (let i = 0; i < toInsert.length; i += CHUNK) {
     const chunk = toInsert.slice(i, i + CHUNK);
     const { error } = await supabase.from("companies").insert(chunk);
     if (error) {
-      result.errors.push({ row: i + 1, message: error.message });
+      // chunk 전체가 실패함을 명시 (PG insert는 statement 단위 atomic)
+      result.errors.push({
+        row: i + 1,
+        message: `chunk[${i}..${i + chunk.length - 1}] failed (${chunk.length}건): ${error.message}`,
+      });
     } else {
       result.inserted += chunk.length;
     }
