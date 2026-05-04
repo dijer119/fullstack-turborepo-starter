@@ -8,7 +8,8 @@ export default async function CompaniesPage({
 }) {
   const params = await searchParams;
   const search = params.search ?? "";
-  const page = Number(params.page ?? "1");
+  const rawPage = Number(params.page ?? "1");
+  const page = Number.isFinite(rawPage) && rawPage >= 1 ? Math.floor(rawPage) : 1;
   const { rows, total } = await listCompanies({ search, page });
   const PAGE_SIZE = 50;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));

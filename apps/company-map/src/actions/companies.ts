@@ -16,7 +16,7 @@ export async function listCompanies(opts?: {
   page?: number;
 }): Promise<{ rows: Company[]; total: number }> {
   const supabase = await createClient();
-  const page = opts?.page ?? 1;
+  const page = Math.max(1, Math.floor(opts?.page ?? 1));
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
   let q = supabase.from("companies").select("*", { count: "exact" }).order("name");
