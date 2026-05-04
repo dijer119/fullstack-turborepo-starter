@@ -6,6 +6,11 @@ import type { Company } from "@/types/company";
 
 const PAGE_SIZE = 50;
 
+/** PostgREST filter syntax の構造文字/ワイルドカードをエスケープ。 */
+function escapeIlikePattern(input: string): string {
+  return input.replace(/([\\,()*])/g, "\\$1");
+}
+
 export async function listCompanies(opts?: {
   search?: string;
   page?: number;
@@ -16,7 +21,8 @@ export async function listCompanies(opts?: {
   const to = from + PAGE_SIZE - 1;
   let q = supabase.from("companies").select("*", { count: "exact" }).order("name");
   if (opts?.search) {
-    q = q.or(`name.ilike.%${opts.search}%,ticker.ilike.%${opts.search}%`);
+    const safe = escapeIlikePattern(opts.search);
+    q = q.or(`name.ilike.%${safe}%,ticker.ilike.%${safe}%`);
   }
   const { data, error, count } = await q.range(from, to);
   if (error) throw new Error(error.message);
@@ -37,10 +43,11 @@ export async function getCompany(id: string): Promise<Company | null> {
 export async function searchCompanies(query: string, limit = 20): Promise<Company[]> {
   if (!query.trim()) return [];
   const supabase = await createClient();
+  const safe = escapeIlikePattern(query);
   const { data, error } = await supabase
     .from("companies")
     .select("*")
-    .or(`name.ilike.%${query}%,ticker.ilike.%${query}%`)
+    .or(`name.ilike.%${safe}%,ticker.ilike.%${safe}%`)
     .limit(limit)
     .order("name");
   if (error) throw new Error(error.message);
