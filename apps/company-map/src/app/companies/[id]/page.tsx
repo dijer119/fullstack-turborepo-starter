@@ -52,7 +52,9 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
   }
 
   async function onDelete() {
-    if (!confirm(`${company.name}을(를) 삭제하시겠습니까? 매핑도 함께 삭제됩니다.`)) return;
+    if (!company) return;
+    const name = company.name;
+    if (!confirm(`${name}을(를) 삭제하시겠습니까? 매핑도 함께 삭제됩니다.`)) return;
     await deleteCompany(id);
     router.push("/companies");
   }
