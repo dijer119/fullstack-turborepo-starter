@@ -142,13 +142,59 @@ export function MapGraph({
     });
 
     // tree edges (점선) — 산업 포커스인 경우 부모/형제/자식 표현
-    if (focus?.type === "industry" && neighborhood.treeParent) {
-      const id = `t-parent-${neighborhood.treeParent.id}`;
-      rfEdges.push({
-        id, source: `industry-${neighborhood.treeParent.id}`, target: `industry-${focus.id}`,
-        animated: false, style: { stroke: "#64748b", strokeDasharray: "4 3" },
-      });
-      layoutEdges.push({ source: `industry-${neighborhood.treeParent.id}`, target: `industry-${focus.id}`, kind: "tree" });
+    if (focus?.type === "industry") {
+      const dashStyle = { stroke: "#64748b", strokeDasharray: "4 3" };
+
+      // 부모 → focus
+      if (neighborhood.treeParent) {
+        const parentId = neighborhood.treeParent.id;
+        rfEdges.push({
+          id: `t-parent-${parentId}`,
+          source: `industry-${parentId}`,
+          target: `industry-${focus.id}`,
+          animated: false,
+          style: dashStyle,
+        });
+        layoutEdges.push({
+          source: `industry-${parentId}`,
+          target: `industry-${focus.id}`,
+          kind: "tree",
+        });
+
+        // 부모 → 형제 (각 sibling)
+        neighborhood.treeSiblings?.forEach((sib) => {
+          rfEdges.push({
+            id: `t-sib-${sib.id}`,
+            source: `industry-${parentId}`,
+            target: `industry-${sib.id}`,
+            animated: false,
+            style: dashStyle,
+          });
+          layoutEdges.push({
+            source: `industry-${parentId}`,
+            target: `industry-${sib.id}`,
+            kind: "tree",
+          });
+        });
+      }
+
+      // focus → 자식 (industries 중 parent_id가 focus.id인 노드들)
+      neighborhood.industries
+        .filter((i) => i.parent_id === focus.id)
+        .forEach((child) => {
+          rfEdges.push({
+            id: `t-child-${child.id}`,
+            source: `industry-${focus.id}`,
+            target: `industry-${child.id}`,
+            animated: false,
+            style: dashStyle,
+          });
+          layoutEdges.push({
+            source: `industry-${focus.id}`,
+            target: `industry-${child.id}`,
+            kind: "tree",
+          });
+        });
     }
 
     const positioned = computeLayout(layoutNodes, layoutEdges, {
