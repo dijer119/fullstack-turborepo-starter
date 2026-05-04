@@ -21,6 +21,12 @@ export default function ImportPage() {
     setRunning(true);
     try {
       setResult(await importCompaniesAction(parse.rows));
+    } catch (e) {
+      setResult({
+        inserted: 0,
+        skipped: 0,
+        errors: [{ row: 0, message: e instanceof Error ? e.message : String(e) }],
+      });
     } finally {
       setRunning(false);
     }
@@ -31,6 +37,9 @@ export default function ImportPage() {
       <h2 className="text-2xl font-bold">CSV Import</h2>
       <p className="text-sm text-gray-500">
         지원 컬럼: <code>name</code>(또는 종목명/회사명), <code>ticker</code>(선택), <code>market</code>(선택)
+      </p>
+      <p className="text-xs text-gray-400">
+        ⚠️ 한글이 깨지면 CSV를 UTF-8 인코딩으로 저장한 후 다시 업로드하세요.
       </p>
       <input
         type="file"

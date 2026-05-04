@@ -33,7 +33,13 @@ export async function parseCsvFile(file: File): Promise<ParseResult> {
         const tickerCol = pickColumn(headers, COLUMN_ALIASES.ticker);
         const marketCol = pickColumn(headers, COLUMN_ALIASES.market);
         if (!nameCol) {
-          errors.push("필수 컬럼 'name'(또는 종목명/회사명) 을 찾지 못했습니다.");
+          if (headers.some((h) => /�/.test(h))) {
+            errors.push(
+              "헤더가 깨져 있습니다. CSV가 EUC-KR로 저장된 것으로 보입니다. UTF-8로 다시 저장해 주세요. (Excel: 다른 이름으로 저장 → CSV UTF-8)",
+            );
+          } else {
+            errors.push("필수 컬럼 'name'(또는 종목명/회사명) 을 찾지 못했습니다.");
+          }
           resolve({ rows: [], errors });
           return;
         }
