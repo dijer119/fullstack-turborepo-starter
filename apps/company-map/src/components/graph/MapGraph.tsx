@@ -10,7 +10,8 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { listIndustries } from "@/actions/industries";
 import { getCompany } from "@/actions/companies";
 import {
@@ -53,13 +54,18 @@ export function MapGraph({
     focus: null, industries: [], companies: [], mappings: [],
   });
 
+  const cbRef = useRef(onNeighborhoodChange);
+  useEffect(() => { cbRef.current = onNeighborhoodChange; });
+
+  const router = useRouter();
+
   // focus 바뀌면 주변 데이터 fetch
   useEffect(() => {
     let alive = true;
     (async () => {
       if (!focus) {
         const empty: FocusNeighborhood = { focus: null, industries: [], companies: [], mappings: [] };
-        if (alive) { setNeighborhood(empty); onNeighborhoodChange?.(empty); }
+        if (alive) { setNeighborhood(empty); cbRef.current?.(empty); }
         return;
       }
       if (focus.type === "industry") {
@@ -82,8 +88,7 @@ export function MapGraph({
           focus, industries: indSet, companies: members, mappings,
           treeParent: parent, treeSiblings: siblings,
         };
-        setNeighborhood(next);
-        onNeighborhoodChange?.(next);
+        if (alive) { setNeighborhood(next); cbRef.current?.(next); }
       } else {
         const [center, mappedIndustries] = await Promise.all([
           getCompany(focus.id),
@@ -94,12 +99,11 @@ export function MapGraph({
         const next: FocusNeighborhood = {
           focus, industries: mappedIndustries, companies: [center], mappings,
         };
-        setNeighborhood(next);
-        onNeighborhoodChange?.(next);
+        if (alive) { setNeighborhood(next); cbRef.current?.(next); }
       }
     })();
     return () => { alive = false; };
-  }, [focus, onNeighborhoodChange]);
+  }, [focus]);
 
   const { nodes, edges } = useMemo<{ nodes: Node[]; edges: Edge[] }>(() => {
     const rfNodes: Node[] = [];
@@ -160,17 +164,21 @@ export function MapGraph({
   }, [neighborhood, focus]);
 
   const onNodeClick: NodeMouseHandler = (_, node) => {
-    const [type, id] = node.id.split("-", 2);
+    const idx = node.id.indexOf("-");
+    if (idx === -1) return;
+    const type = node.id.slice(0, idx);
+    const id = node.id.slice(idx + 1);
     if (type === "industry" || type === "company") {
       onFocusChange({ type: type as "industry" | "company", id });
     }
   };
 
   const onNodeDoubleClick: NodeMouseHandler = (_, node) => {
-    const [type, id] = node.id.split("-", 2);
-    if (typeof window !== "undefined") {
-      window.location.href = `/${type === "industry" ? "industries" : "companies"}/${id}`;
-    }
+    const idx = node.id.indexOf("-");
+    if (idx === -1) return;
+    const type = node.id.slice(0, idx);
+    const id = node.id.slice(idx + 1);
+    router.push(`/${type === "industry" ? "industries" : "companies"}/${id}`);
   };
 
   if (!focus) {
