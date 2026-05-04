@@ -49,6 +49,7 @@ function HomePageInner() {
 
   useEffect(() => {
     getIndustryTree().then(setTree);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRecents(loadRecent());
   }, []);
 
@@ -63,6 +64,7 @@ function HomePageInner() {
       const c = neighborhood.companies.find((x: Company) => x.id === focus.id);
       if (c) {
         pushRecent({ id: c.id, name: c.name, ticker: c.ticker });
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setRecents(loadRecent());
       }
     }

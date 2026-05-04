@@ -7,7 +7,6 @@ import {
   type Edge,
   type Node,
   type NodeMouseHandler,
-  type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useRef, useState } from "react";

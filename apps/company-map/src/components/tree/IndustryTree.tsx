@@ -55,6 +55,7 @@ function TreeNode({
   const forced = expandedIds?.has(node.id) ?? false;
   const [open, setOpen] = useState(forced || depth < 1);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (forced) setOpen(true);
   }, [forced]);
   const isOpen = open;
