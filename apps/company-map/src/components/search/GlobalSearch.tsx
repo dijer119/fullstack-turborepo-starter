@@ -1,7 +1,7 @@
 "use client";
 
 import { Command } from "cmdk";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { searchCompanies } from "@/actions/companies";
 import { listIndustries } from "@/actions/industries";
@@ -24,7 +24,6 @@ export function GlobalSearch({
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const router = useRouter();
-  const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -63,25 +62,20 @@ export function GlobalSearch({
 
   return (
     <div className="relative w-full max-w-md">
-      <input
-        ref={ref}
-        type="text"
-        value={q}
-        onChange={(e) => {
-          setQ(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder={placeholder}
-        className="w-full border rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-900"
-      />
-      {open && q.trim() && (
-        <Command
-          className="absolute top-full left-0 right-0 mt-1 border rounded bg-white dark:bg-gray-900 shadow z-30 max-h-80 overflow-auto"
-          shouldFilter={false}
-        >
-          <Command.List>
+      <Command shouldFilter={false}>
+        <Command.Input
+          value={q}
+          onValueChange={(v) => {
+            setQ(v);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder={placeholder}
+          className="w-full border rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-900 outline-none"
+        />
+        {open && q.trim() && (
+          <Command.List className="absolute top-full left-0 right-0 mt-1 border rounded bg-white dark:bg-gray-900 shadow z-30 max-h-80 overflow-auto">
             {items.length === 0 && (
               <div className="text-xs text-gray-500 p-3">결과 없음</div>
             )}
@@ -108,8 +102,8 @@ export function GlobalSearch({
               </Command.Item>
             ))}
           </Command.List>
-        </Command>
-      )}
+        )}
+      </Command>
     </div>
   );
 }
