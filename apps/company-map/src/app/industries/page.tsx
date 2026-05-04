@@ -13,6 +13,7 @@ export default function IndustriesPage() {
   async function reload() {
     setTree(await getIndustryTree());
   }
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { reload(); }, []);
 
   const selected = selectedId ? findNode(tree, selectedId) : null;

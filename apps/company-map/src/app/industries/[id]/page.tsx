@@ -21,6 +21,7 @@ export default function IndustryDetailPage({ params }: { params: Promise<{ id: s
     setIndustry(i);
     setMembers(m);
   }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { reload(); }, [id]);
 
   useEffect(() => {
