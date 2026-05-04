@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { IndustryNode } from "@/types/industry";
 
 export function IndustryTree({
@@ -54,7 +54,10 @@ function TreeNode({
 }) {
   const forced = expandedIds?.has(node.id) ?? false;
   const [open, setOpen] = useState(forced || depth < 1);
-  const isOpen = forced || open;
+  useEffect(() => {
+    if (forced) setOpen(true);
+  }, [forced]);
+  const isOpen = open;
   const hasChildren = node.children.length > 0;
   const isSelected = selectedId === node.id;
   const isHighlight = highlightIds?.has(node.id) ?? false;
