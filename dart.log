@@ -38,3 +38,9 @@ A value is trying to be set on a copy of a slice from a DataFrame.
 Try using .loc[row_indexer,col_indexer] = value instead
 
 See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+2026-05-05 07:16:47 | root | <module> | INFO | server started, usecase = light
+2026-05-05 07:16:47 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type ListToolsRequest
+2026-05-05 07:16:57 | root | <module> | INFO | server started, usecase = light
+2026-05-05 07:16:57 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type ListToolsRequest
+2026-05-05 07:48:18 | root | <module> | INFO | server started, usecase = light
+2026-05-05 07:48:18 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type ListToolsRequest
