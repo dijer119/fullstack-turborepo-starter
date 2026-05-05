@@ -63,6 +63,26 @@ export function extractBalanceSheet(
   };
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetriable(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  // undici wraps the underlying error in `cause`
+  const cause = (err as { cause?: { code?: string } }).cause;
+  const code =
+    cause?.code ?? (err as { code?: string }).code ?? undefined;
+  return (
+    code === "ECONNRESET" ||
+    code === "ETIMEDOUT" ||
+    code === "EAI_AGAIN" ||
+    code === "ECONNREFUSED" ||
+    code === "UND_ERR_SOCKET" ||
+    (err as { name?: string }).name === "TimeoutError"
+  );
+}
+
 export async function fetchDartFinancial(
   corpCode: string,
   bsnsYear: number,
@@ -75,14 +95,28 @@ export async function fetchDartFinancial(
   url.searchParams.set("corp_code", corpCode);
   url.searchParams.set("bsns_year", String(bsnsYear));
   url.searchParams.set("reprt_code", reprtCode);
-  try {
-    const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-    if (!resp.ok) return null;
-    return (await resp.json()) as DartResponse;
-  } catch (err) {
-    console.warn(`[dart] financial fetch failed for corp=${corpCode}:`, err);
-    return null;
+
+  // Retry up to 3 times on transient network errors with exponential backoff.
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+      if (!resp.ok) return null;
+      return (await resp.json()) as DartResponse;
+    } catch (err) {
+      if (attempt < MAX_ATTEMPTS && isRetriable(err)) {
+        const backoff = 500 * 2 ** (attempt - 1); // 500, 1000, 2000ms
+        await sleep(backoff);
+        continue;
+      }
+      console.warn(
+        `[dart] financial fetch failed for corp=${corpCode} year=${bsnsYear} (attempt ${attempt}/${MAX_ATTEMPTS}):`,
+        err instanceof Error ? err.message : err,
+      );
+      return null;
+    }
   }
+  return null;
 }
 
 /**

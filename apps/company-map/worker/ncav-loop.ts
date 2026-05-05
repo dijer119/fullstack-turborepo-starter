@@ -3,6 +3,13 @@ import { loadCorpCodeMap } from "@/lib/dart/corp-code";
 import { getLatestFinancial } from "@/lib/dart/financial";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+// DART OpenAPI는 빠른 연속 호출 시 ECONNRESET을 자주 던진다.
+// 호출 간격을 띄워 서버 부담을 낮추고 rate-limit 차단을 회피.
+const DART_REQUEST_INTERVAL_MS = 150;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export async function runNcavScreening(): Promise<{
   analyzed: number;
@@ -43,6 +50,7 @@ export async function runNcavScreening(): Promise<{
       continue;
     }
 
+    await sleep(DART_REQUEST_INTERVAL_MS);
     const fin = await getLatestFinancial(corpCode);
     if (!fin) continue;
 
