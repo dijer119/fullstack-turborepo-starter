@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "./db";
 import seed from "@/data/krx_stocks.json" with { type: "json" };
 import type { KrxStockSeed } from "@/types/stocks";
 

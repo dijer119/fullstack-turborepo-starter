@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "./db";
 import { analyzeStock } from "@/lib/stocks/analyze-stock";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
