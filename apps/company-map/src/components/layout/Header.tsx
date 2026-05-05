@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppMenu } from "./AppMenu";
 import { ThemeToggle } from "./ThemeToggle";
+import { ActiveNav } from "./ActiveNav";
 
 export function Header() {
   return (
@@ -10,10 +11,7 @@ export function Header() {
       <span className="text-gray-300 dark:text-gray-700 select-none">|</span>
       <span className="text-sm text-gray-600 dark:text-gray-400">Company Map</span>
       <nav className="ml-auto flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-        <Link href="/map" className="hover:underline">Map</Link>
-        <Link href="/calculator" className="hover:underline">계산기</Link>
-        <Link href="/top-stocks" className="hover:underline">상위종목</Link>
-        <Link href="/ncav" className="hover:underline">NCAV</Link>
+        <ActiveNav />
         <ThemeToggle />
       </nav>
     </header>
