@@ -26,12 +26,28 @@ const NCAV_OPTIONS: Array<{ label: string; value: number | null }> = [
   { label: "≥ 150%", value: 150 },
   { label: "≥ 200%", value: 200 },
 ];
+const PER_OPTIONS: Array<{ label: string; value: number | null }> = [
+  { label: "전체", value: null },
+  { label: "≤ 5", value: 5 },
+  { label: "≤ 10", value: 10 },
+  { label: "≤ 15", value: 15 },
+  { label: "≤ 20", value: 20 },
+];
+const PBR_OPTIONS: Array<{ label: string; value: number | null }> = [
+  { label: "전체", value: null },
+  { label: "≤ 0.5", value: 0.5 },
+  { label: "≤ 1.0", value: 1.0 },
+  { label: "≤ 1.5", value: 1.5 },
+  { label: "≤ 2.0", value: 2.0 },
+];
 
 export function TopStocksClient({ initial }: { initial: TopStockRow[] }) {
   const [rows, setRows] = useState<TopStockRow[]>(initial);
   const [limit, setLimit] = useState(30);
   const [dividend, setDividend] = useState<number | null>(null);
   const [ncavRatio, setNcavRatio] = useState<number | null>(null);
+  const [perMax, setPerMax] = useState<number | null>(null);
+  const [pbrMax, setPbrMax] = useState<number | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [loading, startLoad] = useTransition();
   const [exporting, startExport] = useTransition();
@@ -42,10 +58,16 @@ export function TopStocksClient({ initial }: { initial: TopStockRow[] }) {
 
   useEffect(() => {
     startLoad(async () => {
-      const data = await getTopStocks({ limit, dividend, ncavRatio });
+      const data = await getTopStocks({
+        limit,
+        dividend,
+        ncavRatio,
+        perMax,
+        pbrMax,
+      });
       setRows(data);
     });
-  }, [limit, dividend, ncavRatio]);
+  }, [limit, dividend, ncavRatio, perMax, pbrMax]);
 
   const handleToggle = (code: string) => {
     setFavorites(new Set(toggleWatchlistCode(code)));
@@ -56,6 +78,8 @@ export function TopStocksClient({ initial }: { initial: TopStockRow[] }) {
       let filename = `안전마진_상위${limit}종목`;
       if (dividend != null) filename += `_배당수익률${dividend}%이상`;
       if (ncavRatio != null) filename += `_NCAV${ncavRatio}%이상`;
+      if (perMax != null) filename += `_PER${perMax}이하`;
+      if (pbrMax != null) filename += `_PBR${pbrMax}이하`;
       filename += ".xlsx";
       const { buffer } = await exportStocksExcel(rows, {
         sheetName: "안전마진 상위종목",
@@ -120,6 +144,38 @@ export function TopStocksClient({ initial }: { initial: TopStockRow[] }) {
             className="rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-800"
           >
             {NCAV_OPTIONS.map((opt) => (
+              <option key={opt.label} value={opt.value ?? ""}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2">
+          PER
+          <select
+            value={perMax ?? ""}
+            onChange={(e) =>
+              setPerMax(e.target.value === "" ? null : Number(e.target.value))
+            }
+            className="rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-800"
+          >
+            {PER_OPTIONS.map((opt) => (
+              <option key={opt.label} value={opt.value ?? ""}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2">
+          PBR
+          <select
+            value={pbrMax ?? ""}
+            onChange={(e) =>
+              setPbrMax(e.target.value === "" ? null : Number(e.target.value))
+            }
+            className="rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-800"
+          >
+            {PBR_OPTIONS.map((opt) => (
               <option key={opt.label} value={opt.value ?? ""}>
                 {opt.label}
               </option>

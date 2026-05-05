@@ -43,6 +43,7 @@ export function parseNaverMain(
   const epsRow = findRow("EPS");
   const bpsRow = findRow("BPS");
   const pbrRow = findRow("PBR");
+  const perRow = findRow("PER");
 
   const cellAt = (row: ReturnType<typeof finTable.find>, colIdx: number): number | null => {
     if (!row.length) return null;
@@ -58,6 +59,7 @@ export function parseNaverMain(
     const col = i + 1;
     historicalData[period] = {
       PBR: cellAt(pbrRow, col),
+      PER: cellAt(perRow, col),
       EPS: cellAt(epsRow, col),
       BPS: cellAt(bpsRow, col),
     } satisfies FinancialPeriod;

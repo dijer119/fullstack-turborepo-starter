@@ -24,6 +24,8 @@ export async function analyzeStock(ticker: string): Promise<AnalyzeStockResult> 
   const intrinsicValue = calculateIntrinsicValue(epsArr, latestBps, treasury);
   const safetyMargin = calculateSafetyMargin(intrinsicValue, main.currentPrice);
 
+  const latest = main.historicalData["직전년도"];
+
   return {
     stockName: main.stockName,
     currentPrice: main.currentPrice,
@@ -32,6 +34,8 @@ export async function analyzeStock(ticker: string): Promise<AnalyzeStockResult> 
     treasuryShares: treasury.shares,
     treasuryRatio: treasury.ratio,
     dividendYield: main.dividendYield,
+    per: latest.PER,
+    pbr: latest.PBR,
     historicalData: main.historicalData,
   };
 }

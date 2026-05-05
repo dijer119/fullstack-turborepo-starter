@@ -49,6 +49,8 @@ export function TopStocksTable({
               <th className="px-3 py-2 text-right">현재가</th>
               <th className="px-3 py-2 text-right">내재가치</th>
               <th className="px-3 py-2 text-right">안전마진</th>
+              <th className="px-3 py-2 text-right">PER</th>
+              <th className="px-3 py-2 text-right">PBR</th>
               <th className="px-3 py-2 text-right">자사주</th>
               <th className="px-3 py-2 text-right">배당</th>
               <th className="px-3 py-2 text-right">NCAV</th>
@@ -84,6 +86,12 @@ export function TopStocksTable({
                   {r.safetyMargin != null
                     ? `${r.safetyMargin > 0 ? "+" : ""}${r.safetyMargin.toFixed(1)}%`
                     : "-"}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums">
+                  {r.per != null ? r.per.toFixed(2) : "-"}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums">
+                  {r.pbr != null ? r.pbr.toFixed(2) : "-"}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums">
                   {r.treasuryRatio != null

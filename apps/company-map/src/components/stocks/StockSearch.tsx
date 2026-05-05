@@ -100,6 +100,8 @@ export function StockSearch({ onSelect }: Props) {
                         safetyMargin: r.safetyMargin,
                         treasuryRatio: null,
                         dividendYield: null,
+                        per: null,
+                        pbr: null,
                         lastUpdated: r.lastUpdated,
                         ncavRatio: null,
                       });

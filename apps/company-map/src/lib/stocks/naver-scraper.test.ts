@@ -26,13 +26,14 @@ describe("parseNaverMain", () => {
     expect(result.currentPrice!).toBeGreaterThan(0);
   });
 
-  it("extracts EPS, BPS, PBR fields for all 3 periods", () => {
+  it("extracts EPS, BPS, PBR, PER fields for all 3 periods", () => {
     const { historicalData } = parseNaverMain(mainHtml);
     for (const period of ["3년전", "2년전", "직전년도"] as const) {
       expect(historicalData[period]).toBeDefined();
       expect(historicalData[period]).toHaveProperty("EPS");
       expect(historicalData[period]).toHaveProperty("BPS");
       expect(historicalData[period]).toHaveProperty("PBR");
+      expect(historicalData[period]).toHaveProperty("PER");
     }
   });
 

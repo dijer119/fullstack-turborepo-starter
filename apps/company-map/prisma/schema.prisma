@@ -72,12 +72,16 @@ model StockAnalysis {
   safetyMargin      Float?   @map("safety_margin")
   treasuryRatio     Float?   @map("treasury_ratio")
   dividendYield     Float?   @map("dividend_yield")
+  per               Float?   @map("per")
+  pbr               Float?   @map("pbr")
   lastUpdated       DateTime @map("last_updated")
 
   master  StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@index([safetyMargin])
   @@index([dividendYield])
+  @@index([per])
+  @@index([pbr])
   @@index([lastUpdated])
   @@map("stock_analyses")
 }

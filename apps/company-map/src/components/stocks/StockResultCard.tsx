@@ -47,7 +47,7 @@ export function StockResultCard({ row, isFavorite, onToggleFavorite }: Props) {
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Metric
           label="현재가"
           value={
@@ -74,22 +74,28 @@ export function StockResultCard({ row, isFavorite, onToggleFavorite }: Props) {
           valueClass={safetyColor(row.safetyMargin)}
         />
         <Metric
-          label="자사주비율"
-          value={
-            row.treasuryRatio != null ? `${row.treasuryRatio.toFixed(2)}%` : "-"
-          }
-        />
-        <Metric
           label="배당수익률"
           value={
             row.dividendYield != null ? `${row.dividendYield.toFixed(2)}%` : "-"
           }
         />
         <Metric
-          label="NCAV 비율"
+          label="PER"
+          value={row.per != null ? row.per.toFixed(2) : "-"}
+        />
+        <Metric
+          label="PBR"
+          value={row.pbr != null ? row.pbr.toFixed(2) : "-"}
+        />
+        <Metric
+          label="자사주비율"
           value={
-            row.ncavRatio != null ? `${row.ncavRatio.toFixed(1)}%` : "-"
+            row.treasuryRatio != null ? `${row.treasuryRatio.toFixed(2)}%` : "-"
           }
+        />
+        <Metric
+          label="NCAV 비율"
+          value={row.ncavRatio != null ? `${row.ncavRatio.toFixed(1)}%` : "-"}
         />
       </div>
 

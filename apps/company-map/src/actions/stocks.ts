@@ -53,11 +53,22 @@ export async function getTopStocks(opts: {
   limit?: number;
   dividend?: number | null;
   ncavRatio?: number | null;
+  /** PER 상한 (이하만 포함). null/undefined면 무필터. */
+  perMax?: number | null;
+  /** PBR 상한 (이하만 포함). */
+  pbrMax?: number | null;
 }): Promise<TopStockRow[]> {
   const limit = Math.max(1, Math.min(500, opts.limit ?? 30));
   const where: Record<string, unknown> = { safetyMargin: { not: null } };
   if (opts.dividend != null) {
     where.dividendYield = { gte: opts.dividend };
+  }
+  if (opts.perMax != null) {
+    // PER은 양수만 의미 있음 (적자 종목은 PER이 음수이거나 null) — 양수 + 상한.
+    where.per = { gt: 0, lte: opts.perMax };
+  }
+  if (opts.pbrMax != null) {
+    where.pbr = { gt: 0, lte: opts.pbrMax };
   }
 
   // NCAV 필터가 있으면 candidate를 충분히 크게 가져와서 메모리에서 필터.
@@ -94,6 +105,8 @@ export async function getTopStocks(opts: {
       safetyMargin: r.safetyMargin,
       treasuryRatio: r.treasuryRatio,
       dividendYield: r.dividendYield,
+      per: r.per,
+      pbr: r.pbr,
       lastUpdated: r.lastUpdated.toISOString(),
       ncavRatio: direct ?? fallback,
     } satisfies TopStockRow;
@@ -128,6 +141,8 @@ export async function analyzeStockOnDemand(code: string): Promise<TopStockRow> {
     safetyMargin: r.safetyMargin,
     treasuryRatio: r.treasuryRatio,
     dividendYield: r.dividendYield,
+    per: r.per,
+    pbr: r.pbr,
     lastUpdated: now,
   };
   const saved = await db.stockAnalysis.upsert({
@@ -144,6 +159,8 @@ export async function analyzeStockOnDemand(code: string): Promise<TopStockRow> {
     safetyMargin: saved.safetyMargin,
     treasuryRatio: saved.treasuryRatio,
     dividendYield: saved.dividendYield,
+    per: saved.per,
+    pbr: saved.pbr,
     lastUpdated: saved.lastUpdated.toISOString(),
     ncavRatio: ncav?.ncavRatio ?? null,
   };
@@ -166,6 +183,8 @@ export async function getStocksByCodes(codes: string[]): Promise<TopStockRow[]> 
     safetyMargin: r.safetyMargin,
     treasuryRatio: r.treasuryRatio,
     dividendYield: r.dividendYield,
+    per: r.per,
+    pbr: r.pbr,
     lastUpdated: r.lastUpdated.toISOString(),
     ncavRatio: ncavMap.get(r.code) ?? null,
   }));

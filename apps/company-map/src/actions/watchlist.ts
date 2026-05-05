@@ -25,6 +25,8 @@ export async function exportStocksExcel(
         ? Math.round(s.intrinsicValue).toLocaleString()
         : "",
     안전마진: s.safetyMargin != null ? s.safetyMargin.toFixed(2) : "",
+    PER: s.per != null ? s.per.toFixed(2) : "",
+    PBR: s.pbr != null ? s.pbr.toFixed(2) : "",
     자사주비율: s.treasuryRatio != null ? s.treasuryRatio.toFixed(2) : "",
     배당수익률: s.dividendYield != null ? s.dividendYield.toFixed(2) : "",
     "마지막 업데이트": new Date(s.lastUpdated).toLocaleString("ko-KR"),

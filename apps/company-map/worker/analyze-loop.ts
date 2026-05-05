@@ -56,6 +56,8 @@ export async function analyzeAllStocks({
         safetyMargin: r.safetyMargin,
         treasuryRatio: r.treasuryRatio,
         dividendYield: r.dividendYield,
+        per: r.per,
+        pbr: r.pbr,
         lastUpdated: new Date(),
       };
       await db.stockAnalysis.upsert({

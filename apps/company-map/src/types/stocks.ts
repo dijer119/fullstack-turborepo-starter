@@ -20,6 +20,7 @@ export interface StockMasterRow {
 
 export interface FinancialPeriod {
   PBR: number | null;
+  PER: number | null;
   EPS: number | null;
   BPS: number | null;
 }
@@ -37,6 +38,10 @@ export interface AnalyzeStockResult {
   treasuryShares: number;
   treasuryRatio: number;
   dividendYield: number | null;
+  /** 직전년도 PER (네이버 표 row 11). */
+  per: number | null;
+  /** 직전년도 PBR (네이버 표 row 13). */
+  pbr: number | null;
   historicalData: {
     "3년전": FinancialPeriod;
     "2년전": FinancialPeriod;
@@ -52,6 +57,8 @@ export interface TopStockRow {
   safetyMargin: number | null;
   treasuryRatio: number | null;
   dividendYield: number | null;
+  per: number | null;
+  pbr: number | null;
   lastUpdated: string;
   ncavRatio: number | null;
 }
