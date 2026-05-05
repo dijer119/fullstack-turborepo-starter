@@ -2,6 +2,7 @@
 
 import { Heart } from "lucide-react";
 import type { TopStockRow } from "@/types/stocks";
+import { NaverFinanceLink } from "./NaverFinanceLink";
 
 function safetyColor(margin: number | null): string {
   if (margin == null) return "text-gray-500";
@@ -23,7 +24,14 @@ export function StockResultCard({ row, isFavorite, onToggleFavorite }: Props) {
     <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold">{row.name}</h2>
+          <h2 className="text-2xl font-bold">
+            <NaverFinanceLink
+              code={row.code}
+              name={row.name}
+              iconSize={16}
+              className="text-gray-900 dark:text-gray-100"
+            />
+          </h2>
           <p className="text-sm text-gray-500">{row.code}</p>
         </div>
         <button

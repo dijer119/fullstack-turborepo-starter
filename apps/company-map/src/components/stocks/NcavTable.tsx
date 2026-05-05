@@ -1,6 +1,7 @@
 "use client";
 
 import type { NcavRow } from "@/types/stocks";
+import { NaverFinanceLink } from "./NaverFinanceLink";
 
 function fmtBig(v: string): string {
   try {
@@ -34,7 +35,9 @@ export function NcavTable({ rows }: { rows: NcavRow[] }) {
               className="border-t border-gray-100 dark:border-gray-900"
             >
               <td className="px-3 py-2">
-                <div className="font-medium">{r.name}</div>
+                <div className="font-medium">
+                  <NaverFinanceLink code={r.code} name={r.name} iconSize={11} />
+                </div>
                 <div className="text-xs text-gray-500">{r.code}</div>
               </td>
               <td className="px-3 py-2 text-right tabular-nums">

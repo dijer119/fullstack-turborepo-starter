@@ -2,6 +2,7 @@
 
 import { Heart, Download } from "lucide-react";
 import type { TopStockRow } from "@/types/stocks";
+import { NaverFinanceLink } from "./NaverFinanceLink";
 
 interface Props {
   rows: TopStockRow[];
@@ -62,7 +63,9 @@ export function TopStocksTable({
                 className="border-t border-gray-100 hover:bg-gray-50 dark:border-gray-900 dark:hover:bg-gray-800"
               >
                 <td className="px-3 py-2">
-                  <div className="font-medium">{r.name}</div>
+                  <div className="font-medium">
+                    <NaverFinanceLink code={r.code} name={r.name} iconSize={11} />
+                  </div>
                   <div className="text-xs text-gray-500">{r.code}</div>
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums">

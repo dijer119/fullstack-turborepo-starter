@@ -5,6 +5,7 @@ import { Download, X } from "lucide-react";
 import { getStocksByCodes } from "@/actions/stocks";
 import { exportStocksExcel } from "@/actions/watchlist";
 import type { TopStockRow } from "@/types/stocks";
+import { NaverFinanceLink } from "./NaverFinanceLink";
 
 const STORAGE_KEY = "company-map.watchlist";
 
@@ -98,7 +99,12 @@ export function WatchlistPanel({
               className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               <span>
-                <span className="font-medium">{r.name}</span>
+                <NaverFinanceLink
+                  code={r.code}
+                  name={r.name}
+                  className="font-medium"
+                  iconSize={11}
+                />
                 <span className="ml-2 text-xs text-gray-500">{r.code}</span>
               </span>
               <span className="flex items-center gap-3">
