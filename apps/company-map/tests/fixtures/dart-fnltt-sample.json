@@ -1,0 +1,12 @@
+{
+  "status": "000",
+  "message": "정상",
+  "list": [
+    {"sj_nm": "재무상태표", "fs_nm": "연결재무제표", "account_nm": "유동자산",   "thstrm_amount": "100,000,000,000"},
+    {"sj_nm": "재무상태표", "fs_nm": "연결재무제표", "account_nm": "부채총계",   "thstrm_amount": "30,000,000,000"},
+    {"sj_nm": "재무상태표", "fs_nm": "연결재무제표", "account_nm": "자산총계",   "thstrm_amount": "200,000,000,000"},
+    {"sj_nm": "재무상태표", "fs_nm": "연결재무제표", "account_nm": "자본총계",   "thstrm_amount": "170,000,000,000"},
+    {"sj_nm": "재무상태표", "fs_nm": "재무제표",     "account_nm": "유동자산",   "thstrm_amount": "50,000,000,000"},
+    {"sj_nm": "재무상태표", "fs_nm": "재무제표",     "account_nm": "부채총계",   "thstrm_amount": "20,000,000,000"}
+  ]
+}
