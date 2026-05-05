@@ -11,7 +11,7 @@ export function Header() {
         <MobileNav>
           <Sidebar />
         </MobileNav>
-        <Link href="/" className="font-semibold">금융 포털</Link>
+        <a href="http://localhost:3004/" className="font-semibold hover:underline">금융 포털</a>
         <span className="text-gray-300 dark:text-gray-700 select-none hidden sm:inline">|</span>
         <span className="text-sm text-gray-600 dark:text-gray-400 hidden sm:inline">Blog Collection</span>
       </div>
