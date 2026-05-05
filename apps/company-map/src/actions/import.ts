@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { Prisma } from "@prisma/client";
+import { db } from "@/lib/db";
 
 export type ImportRow = {
   name: string;
@@ -16,49 +17,54 @@ export type ImportResult = {
 };
 
 export async function importCompaniesAction(rows: ImportRow[]): Promise<ImportResult> {
-  const supabase = await createClient();
   const result: ImportResult = { inserted: 0, skipped: 0, errors: [] };
+  if (rows.length === 0) return result;
 
-  // 기존 ticker set 미리 로드 (1000개+ 일 때 N+1 회피)
-  const { data: existing } = await supabase
-    .from("companies")
-    .select("ticker")
-    .not("ticker", "is", null);
-  const existingTickers = new Set((existing ?? []).map((r) => r.ticker as string));
+  // 기존 ticker 미리 로드 (1000개+ 일 때 N+1 회피)
+  // 단일 사용자 가정: 동시 import 시 stale Set 위험 있음. ticker UNIQUE 제약이 fallback.
+  const existing = await db.company.findMany({
+    where: { ticker: { not: null } },
+    select: { ticker: true },
+  });
+  const existingTickers = new Set(existing.map((r) => r.ticker as string));
 
-  const toInsert: ImportRow[] = [];
+  const toInsert: { name: string; ticker: string | null; market: string | null }[] = [];
   rows.forEach((row, idx) => {
     if (!row.name || !row.name.trim()) {
       result.errors.push({ row: idx + 1, message: "name 누락" });
       return;
     }
-    if (row.ticker && existingTickers.has(row.ticker)) {
+    const ticker = row.ticker?.trim() || null;
+    if (ticker && existingTickers.has(ticker)) {
       result.skipped += 1;
       return;
     }
-    if (row.ticker) existingTickers.add(row.ticker);
+    if (ticker) existingTickers.add(ticker);
     toInsert.push({
       name: row.name.trim(),
-      ticker: row.ticker?.trim() || null,
+      ticker,
       market: row.market?.trim() || null,
     });
   });
 
-  // 단일 사용자 가정: 동시 import 시 pre-loaded Set이 stale될 수 있음.
-  // ticker UNIQUE 제약이 fallback (충돌 시 chunk 전체 실패 → 아래 errors에 명시).
-  // 청크 단위 insert (Supabase request 크기 제한 회피)
+  // SQLite의 SQLITE_MAX_VARIABLE_NUMBER 기본값(보통 32766) 회피 + 큰 트랜잭션 회피
   const CHUNK = 500;
   for (let i = 0; i < toInsert.length; i += CHUNK) {
     const chunk = toInsert.slice(i, i + CHUNK);
-    const { error } = await supabase.from("companies").insert(chunk);
-    if (error) {
-      // chunk 전체가 실패함을 명시 (PG insert는 statement 단위 atomic)
+    try {
+      await db.company.createMany({ data: chunk });
+      result.inserted += chunk.length;
+    } catch (e) {
+      const msg =
+        e instanceof Prisma.PrismaClientKnownRequestError
+          ? `${e.code}: ${e.message}`
+          : e instanceof Error
+            ? e.message
+            : String(e);
       result.errors.push({
         row: i + 1,
-        message: `chunk[${i}..${i + chunk.length - 1}] failed (${chunk.length}건): ${error.message}`,
+        message: `chunk[${i}..${i + chunk.length - 1}] failed (${chunk.length}건): ${msg}`,
       });
-    } else {
-      result.inserted += chunk.length;
     }
   }
   revalidatePath("/companies");
