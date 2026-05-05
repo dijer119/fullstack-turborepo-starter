@@ -57,7 +57,7 @@ export function WatchlistPanel({
         sheetName: "관심종목",
         filename: "관심종목.xlsx",
       });
-      const blob = new Blob([buffer], {
+      const blob = new Blob([buffer as unknown as BlobPart], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
       const url = URL.createObjectURL(blob);

@@ -3,7 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, Map as MapIcon, Rss, ExternalLink } from "lucide-react";
+import {
+  Menu,
+  X,
+  Map as MapIcon,
+  Rss,
+  ExternalLink,
+  Calculator,
+  TrendingUp,
+  Filter,
+} from "lucide-react";
 
 type Service = {
   key: string;
@@ -33,6 +42,39 @@ const SERVICES: Service[] = [
     href: "http://localhost:3002",
     icon: Rss,
     enabled: true,
+  },
+];
+
+// 같은 앱 내부 도구 — 햄버거 메뉴의 별도 섹션으로 노출.
+type Tool = {
+  key: string;
+  name: string;
+  description: string;
+  path: string;
+  icon: typeof MapIcon;
+};
+
+const TOOLS: Tool[] = [
+  {
+    key: "calculator",
+    name: "내재가치 계산기",
+    description: "종목 검색 및 안전마진 계산",
+    path: "/calculator",
+    icon: Calculator,
+  },
+  {
+    key: "top-stocks",
+    name: "안전마진 상위종목",
+    description: "상위 N개 종목 + 배당 필터",
+    path: "/top-stocks",
+    icon: TrendingUp,
+  },
+  {
+    key: "ncav",
+    name: "NCAV 스크리닝",
+    description: "청산가치 > 시가총액 종목",
+    path: "/ncav",
+    icon: Filter,
   },
 ];
 
@@ -162,6 +204,38 @@ export function AppMenu() {
                   >
                     {inner}
                   </a>
+                );
+              })}
+
+              <div className="mt-6 text-xs font-semibold uppercase tracking-wider text-gray-500 px-2 mb-2">
+                도구
+              </div>
+              {TOOLS.map((t) => {
+                const Icon = t.icon;
+                const active =
+                  pathname === t.path ||
+                  (t.path !== "/" && pathname.startsWith(t.path));
+                return (
+                  <Link
+                    key={t.key}
+                    href={t.path}
+                    onClick={() => setOpen(false)}
+                    className={`block rounded p-2 transition ${
+                      active
+                        ? "bg-blue-50 dark:bg-blue-950"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Icon size={18} className="mt-0.5 text-blue-600" />
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{t.name}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {t.description}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
                 );
               })}
             </nav>
