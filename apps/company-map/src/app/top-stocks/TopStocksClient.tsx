@@ -19,11 +19,19 @@ const DIVIDEND_OPTIONS: Array<{ label: string; value: number | null }> = [
   { label: "≥ 5%", value: 5 },
   { label: "≥ 7%", value: 7 },
 ];
+const NCAV_OPTIONS: Array<{ label: string; value: number | null }> = [
+  { label: "전체", value: null },
+  { label: "≥ 50%", value: 50 },
+  { label: "≥ 100%", value: 100 },
+  { label: "≥ 150%", value: 150 },
+  { label: "≥ 200%", value: 200 },
+];
 
 export function TopStocksClient({ initial }: { initial: TopStockRow[] }) {
   const [rows, setRows] = useState<TopStockRow[]>(initial);
   const [limit, setLimit] = useState(30);
   const [dividend, setDividend] = useState<number | null>(null);
+  const [ncavRatio, setNcavRatio] = useState<number | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [loading, startLoad] = useTransition();
   const [exporting, startExport] = useTransition();
@@ -34,10 +42,10 @@ export function TopStocksClient({ initial }: { initial: TopStockRow[] }) {
 
   useEffect(() => {
     startLoad(async () => {
-      const data = await getTopStocks({ limit, dividend });
+      const data = await getTopStocks({ limit, dividend, ncavRatio });
       setRows(data);
     });
-  }, [limit, dividend]);
+  }, [limit, dividend, ncavRatio]);
 
   const handleToggle = (code: string) => {
     setFavorites(new Set(toggleWatchlistCode(code)));
@@ -45,10 +53,10 @@ export function TopStocksClient({ initial }: { initial: TopStockRow[] }) {
 
   const handleExport = () => {
     startExport(async () => {
-      const filename =
-        dividend != null
-          ? `안전마진_상위${limit}종목_배당수익률${dividend}%이상.xlsx`
-          : `안전마진_상위${limit}종목.xlsx`;
+      let filename = `안전마진_상위${limit}종목`;
+      if (dividend != null) filename += `_배당수익률${dividend}%이상`;
+      if (ncavRatio != null) filename += `_NCAV${ncavRatio}%이상`;
+      filename += ".xlsx";
       const { buffer } = await exportStocksExcel(rows, {
         sheetName: "안전마진 상위종목",
         filename,
@@ -94,6 +102,24 @@ export function TopStocksClient({ initial }: { initial: TopStockRow[] }) {
             className="rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-800"
           >
             {DIVIDEND_OPTIONS.map((opt) => (
+              <option key={opt.label} value={opt.value ?? ""}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2">
+          NCAV
+          <select
+            value={ncavRatio ?? ""}
+            onChange={(e) =>
+              setNcavRatio(
+                e.target.value === "" ? null : Number(e.target.value),
+              )
+            }
+            className="rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-800"
+          >
+            {NCAV_OPTIONS.map((opt) => (
               <option key={opt.label} value={opt.value ?? ""}>
                 {opt.label}
               </option>

@@ -42,12 +42,17 @@ export async function searchStocks(keyword: string): Promise<StockListItem[]> {
 }
 
 /**
- * 안전마진 상위 종목 + 배당 필터.
+ * 안전마진 상위 종목 + 배당 + NCAV 비율 필터.
  * NCAV 비율은 보통주(코드 끝 0)로 fallback 매핑.
+ *
+ * NCAV 필터가 활성화되면 candidate를 더 크게 가져온 뒤 NCAV 매핑을 적용해
+ * 필터링한 후 최종 limit로 자른다. 우선주는 보통주의 NCAV로 매칭하므로
+ * 단순 SQL JOIN으로는 처리할 수 없어서 메모리 매핑이 필요.
  */
 export async function getTopStocks(opts: {
   limit?: number;
   dividend?: number | null;
+  ncavRatio?: number | null;
 }): Promise<TopStockRow[]> {
   const limit = Math.max(1, Math.min(500, opts.limit ?? 30));
   const where: Record<string, unknown> = { safetyMargin: { not: null } };
@@ -55,10 +60,14 @@ export async function getTopStocks(opts: {
     where.dividendYield = { gte: opts.dividend };
   }
 
+  // NCAV 필터가 있으면 candidate를 충분히 크게 가져와서 메모리에서 필터.
+  const fetchLimit =
+    opts.ncavRatio != null ? Math.max(limit * 5, 500) : limit;
+
   const rows = await db.stockAnalysis.findMany({
     where,
     orderBy: [{ safetyMargin: "desc" }],
-    take: limit,
+    take: fetchLimit,
   });
 
   const allCodes = new Set<string>();
@@ -72,7 +81,7 @@ export async function getTopStocks(opts: {
   });
   const ncavMap = new Map(ncavRows.map((n) => [n.code, n.ncavRatio]));
 
-  return rows.map((r) => {
+  let mapped = rows.map((r) => {
     const direct = ncavMap.get(r.code) ?? null;
     const fallback = !r.code.endsWith("0")
       ? (ncavMap.get(r.code.slice(0, -1) + "0") ?? null)
@@ -89,6 +98,14 @@ export async function getTopStocks(opts: {
       ncavRatio: direct ?? fallback,
     } satisfies TopStockRow;
   });
+
+  if (opts.ncavRatio != null) {
+    mapped = mapped.filter(
+      (r) => r.ncavRatio != null && r.ncavRatio >= opts.ncavRatio!,
+    );
+  }
+
+  return mapped.slice(0, limit);
 }
 
 /** 즉시 네이버 크롤링 + DB 갱신. 워커 안 도는 환경에서 사용. */
