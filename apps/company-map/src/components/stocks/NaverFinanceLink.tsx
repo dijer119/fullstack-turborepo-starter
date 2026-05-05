@@ -18,7 +18,7 @@ export function NaverFinanceLink({
 }: Props) {
   return (
     <a
-      href={`https://finance.naver.com/item/main.naver?code=${code}`}
+      href={`https://stock.naver.com/domestic/stock/${code}/price`}
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
