@@ -49,3 +49,56 @@ model CompanyIndustry {
   @@index([industryId])
   @@map("company_industries")
 }
+
+model StockMaster {
+  code      String   @id
+  name      String
+  marcap    BigInt?
+  corpCode  String?  @map("corp_code")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  analysis    StockAnalysis?
+  ncavResult  NcavResult?
+
+  @@index([name])
+  @@map("stock_masters")
+}
+
+model StockAnalysis {
+  code              String   @id
+  name              String
+  currentPrice      Float?   @map("current_price")
+  intrinsicValue    Float?   @map("intrinsic_value")
+  safetyMargin      Float?   @map("safety_margin")
+  treasuryRatio     Float?   @map("treasury_ratio")
+  dividendYield     Float?   @map("dividend_yield")
+  lastUpdated       DateTime @map("last_updated")
+
+  master  StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+
+  @@index([safetyMargin])
+  @@index([dividendYield])
+  @@index([lastUpdated])
+  @@map("stock_analyses")
+}
+
+model NcavResult {
+  code              String   @id
+  name              String
+  ncav              BigInt
+  marcap            BigInt
+  ncavRatio         Float?   @map("ncav_ratio")
+  currentAssets     BigInt   @map("current_assets")
+  totalLiabilities  BigInt   @map("total_liabilities")
+  totalAssets       BigInt   @map("total_assets")
+  totalEquity       BigInt   @map("total_equity")
+  bsnsYear          Int      @map("bsns_year")
+  ncavPositive      Boolean  @map("ncav_positive")
+  lastUpdated       DateTime @map("last_updated")
+
+  master  StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+
+  @@index([ncavRatio])
+  @@index([ncavPositive])
+  @@map("ncav_results")
+}
