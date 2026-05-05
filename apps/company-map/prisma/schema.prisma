@@ -1,0 +1,51 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Industry {
+  id          String   @id @default(uuid())
+  name        String
+  parentId    String?  @map("parent_id")
+  parent      Industry?  @relation("IndustryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Industry[] @relation("IndustryTree")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt       @map("updated_at")
+  companyMappings CompanyIndustry[]
+
+  @@index([parentId])
+  @@index([name])
+  @@map("industries")
+}
+
+model Company {
+  id          String   @id @default(uuid())
+  name        String
+  ticker      String?  @unique
+  market      String?
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt       @map("updated_at")
+  industryMappings CompanyIndustry[]
+
+  @@index([name])
+  @@map("companies")
+}
+
+model CompanyIndustry {
+  companyId  String   @map("company_id")
+  industryId String   @map("industry_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  industry   Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, industryId])
+  @@index([industryId])
+  @@map("company_industries")
+}
