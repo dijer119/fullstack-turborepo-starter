@@ -1,28 +1,35 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
 import type { Industry, IndustryNode } from "@/types/industry";
 
+function toDomainIndustry(row: {
+  id: string;
+  name: string;
+  parentId: string | null;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): Industry {
+  return {
+    id: row.id,
+    name: row.name,
+    parent_id: row.parentId,
+    description: row.description,
+    created_at: row.createdAt.toISOString(),
+    updated_at: row.updatedAt.toISOString(),
+  };
+}
+
 export async function listIndustries(): Promise<Industry[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("industries")
-    .select("*")
-    .order("name");
-  if (error) throw new Error(error.message);
-  return data ?? [];
+  const rows = await db.industry.findMany({ orderBy: [{ name: "asc" }, { id: "asc" }] });
+  return rows.map(toDomainIndustry);
 }
 
 export async function getIndustry(id: string): Promise<Industry | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("industries")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return data;
+  const row = await db.industry.findUnique({ where: { id } });
+  return row ? toDomainIndustry(row) : null;
 }
 
 export async function getIndustryTree(): Promise<IndustryNode[]> {
@@ -31,7 +38,7 @@ export async function getIndustryTree(): Promise<IndustryNode[]> {
   all.forEach((i) => byId.set(i.id, { ...i, children: [] }));
   const roots: IndustryNode[] = [];
   byId.forEach((node) => {
-    if (node.parent_id && byId.has(node.parent_id)) {
+    if (node.parent_id && node.parent_id !== node.id && byId.has(node.parent_id)) {
       byId.get(node.parent_id)!.children.push(node);
     } else {
       roots.push(node);
@@ -45,20 +52,16 @@ export async function createIndustry(input: {
   parent_id: string | null;
   description?: string | null;
 }): Promise<Industry> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("industries")
-    .insert({
+  const row = await db.industry.create({
+    data: {
       name: input.name,
-      parent_id: input.parent_id,
+      parentId: input.parent_id,
       description: input.description ?? null,
-    })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+    },
+  });
   revalidatePath("/industries");
   revalidatePath("/");
-  return data;
+  return toDomainIndustry(row);
 }
 
 export async function updateIndustry(
@@ -66,42 +69,39 @@ export async function updateIndustry(
   input: { name?: string; parent_id?: string | null; description?: string | null },
 ): Promise<Industry> {
   if (input.parent_id !== undefined && input.parent_id !== null) {
-    // 순환 참조 검증: 새 부모가 자기 자신의 자손이면 거부
     const descendants = await collectDescendantIds(id);
     if (input.parent_id === id || descendants.has(input.parent_id)) {
       throw new Error("순환 참조: 자기 자신 또는 자손을 부모로 지정할 수 없습니다.");
     }
   }
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("industries")
-    .update(input)
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const row = await db.industry.update({
+    where: { id },
+    data: {
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.parent_id !== undefined ? { parentId: input.parent_id } : {}),
+    },
+  });
   revalidatePath("/industries");
   revalidatePath(`/industries/${id}`);
   revalidatePath("/");
-  return data;
+  return toDomainIndustry(row);
 }
 
 export async function deleteIndustry(id: string): Promise<void> {
-  const supabase = await createClient();
-  const { error } = await supabase.from("industries").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  await db.industry.delete({ where: { id } });
   revalidatePath("/industries");
   revalidatePath("/");
 }
 
 async function collectDescendantIds(rootId: string): Promise<Set<string>> {
-  const all = await listIndustries();
+  const all = await db.industry.findMany({ select: { id: true, parentId: true } });
   const out = new Set<string>();
   const stack = [rootId];
   while (stack.length) {
     const cur = stack.pop()!;
     all
-      .filter((i) => i.parent_id === cur)
+      .filter((i) => i.parentId === cur)
       .forEach((c) => {
         if (!out.has(c.id)) {
           out.add(c.id);
