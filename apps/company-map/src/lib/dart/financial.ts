@@ -1,7 +1,5 @@
 import type { DartFinancialResult } from "@/types/stocks";
 
-const DART_API_KEY = process.env.DART_API_KEY;
-
 interface DartListItem {
   sj_nm?: string;
   fs_nm?: string;
@@ -70,9 +68,10 @@ export async function fetchDartFinancial(
   bsnsYear: number,
   reprtCode = "11011",
 ): Promise<DartResponse | null> {
-  if (!DART_API_KEY) throw new Error("DART_API_KEY not set");
+  const apiKey = process.env.DART_API_KEY;
+  if (!apiKey) throw new Error("DART_API_KEY not set");
   const url = new URL("https://opendart.fss.or.kr/api/fnlttSinglAcnt.json");
-  url.searchParams.set("crtfc_key", DART_API_KEY);
+  url.searchParams.set("crtfc_key", apiKey);
   url.searchParams.set("corp_code", corpCode);
   url.searchParams.set("bsns_year", String(bsnsYear));
   url.searchParams.set("reprt_code", reprtCode);

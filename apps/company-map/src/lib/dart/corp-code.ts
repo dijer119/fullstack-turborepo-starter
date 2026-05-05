@@ -1,8 +1,6 @@
 import AdmZip from "adm-zip";
 import { XMLParser } from "fast-xml-parser";
 
-const DART_API_KEY = process.env.DART_API_KEY;
-
 let cachedMap: Map<string, string> | null = null;
 
 /**
@@ -11,9 +9,10 @@ let cachedMap: Map<string, string> | null = null;
  */
 export async function loadCorpCodeMap(): Promise<Map<string, string>> {
   if (cachedMap) return cachedMap;
-  if (!DART_API_KEY) throw new Error("DART_API_KEY not set");
+  const apiKey = process.env.DART_API_KEY;
+  if (!apiKey) throw new Error("DART_API_KEY not set");
 
-  const url = `https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key=${DART_API_KEY}`;
+  const url = `https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key=${apiKey}`;
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`DART corpCode fetch failed: ${resp.status}`);
   const buffer = Buffer.from(await resp.arrayBuffer());

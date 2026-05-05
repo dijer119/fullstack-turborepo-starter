@@ -1,3 +1,5 @@
+import "./setup-env"; // MUST be the first import — populates process.env
+
 import { loadKrxStocks } from "./load-krx";
 import { analyzeAllStocks } from "./analyze-loop";
 import { runNcavScreening } from "./ncav-loop";
