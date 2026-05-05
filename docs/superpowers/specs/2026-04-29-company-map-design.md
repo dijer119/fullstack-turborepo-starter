@@ -22,50 +22,74 @@
 
 ## 2. 데이터 모델
 
-### 2.1 테이블 (Postgres / Supabase)
+### 2.1 스키마 (Prisma + SQLite)
 
-```sql
--- 산업: 다단계 트리 (parent_id self-reference)
-CREATE TABLE industries (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name        text NOT NULL,
-  parent_id   uuid REFERENCES industries(id) ON DELETE CASCADE,
-  description text,
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  updated_at  timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX idx_industries_parent_id ON industries(parent_id);
+`apps/company-map/prisma/schema.prisma`:
 
--- 기업: 종목코드 unique, 이름은 중복 허용 (동명이인 가능)
-CREATE TABLE companies (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name        text NOT NULL,
-  ticker      text UNIQUE,            -- nullable: 비상장사도 등록 가능
-  market      text,                   -- 'KOSPI' | 'KOSDAQ' | NULL
-  description text,
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  updated_at  timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX idx_companies_name ON companies(name);
-CREATE INDEX idx_industries_name ON industries(name);
+```prisma
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"]
+}
 
--- 매핑: 다대다, 가중치 없음
-CREATE TABLE company_industries (
-  company_id  uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-  industry_id uuid NOT NULL REFERENCES industries(id) ON DELETE CASCADE,
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (company_id, industry_id)
-);
-CREATE INDEX idx_company_industries_industry ON company_industries(industry_id);
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL") // 예: "file:./data/company-map.db"
+}
+
+model Industry {
+  id          String   @id @default(uuid())
+  name        String
+  parentId    String?  @map("parent_id")
+  parent      Industry?  @relation("IndustryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Industry[] @relation("IndustryTree")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt       @map("updated_at")
+  companyMappings CompanyIndustry[]
+
+  @@index([parentId])
+  @@index([name])
+  @@map("industries")
+}
+
+model Company {
+  id          String   @id @default(uuid())
+  name        String
+  ticker      String?  @unique               // nullable: 비상장사도 등록 가능
+  market      String?                        // 'KOSPI' | 'KOSDAQ' | NULL
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt       @map("updated_at")
+  industryMappings CompanyIndustry[]
+
+  @@index([name])
+  @@map("companies")
+}
+
+// 매핑: 다대다, 가중치 없음
+model CompanyIndustry {
+  companyId  String   @map("company_id")
+  industryId String   @map("industry_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  industry   Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, industryId])
+  @@index([industryId])
+  @@map("company_industries")
+}
 ```
 
 ### 2.2 모델링 결정
 
-- **다단계 트리**: `parent_id` self-reference로 깊이 제한 없음. 너무 깊어지지 않도록 운영으로 관리.
+- **다단계 트리**: `parentId` self-reference로 깊이 제한 없음. 너무 깊어지지 않도록 운영으로 관리.
 - **N:M 매핑**: 가중치(주력/부가) 없음. YAGNI — 필요해지면 컬럼 추가로 점진적 도입 가능.
 - **자유 매핑**: 기업은 산업 트리의 어느 레벨에든 매핑 가능 (잎 노드 강제 X).
-- **RLS off**: 본인용 도구이므로 anon key가 풀 권한. 외부 노출되면 RLS 정책 추가 필요.
-- **삭제 정책**: 산업 삭제 시 자식 산업과 매핑이 cascade로 함께 삭제. UI에서 명시적 확인 필요.
+- **외부 의존성 0**: SQLite single-file DB. 별도 서버·인증 레이어 불필요. anon key, RLS 모두 미사용.
+- **삭제 정책**: 산업 삭제 시 자식 산업과 매핑이 Prisma의 `onDelete: Cascade`로 함께 삭제. UI에서 명시적 확인 필요.
+- **PRAGMA foreign_keys=ON**: SQLite는 default off — Prisma가 connection 시 자동으로 켜줌.
+- **timestamps**: Prisma는 `DateTime`(JS `Date` 객체)로 반환. 도메인 type은 `string` (ISO) 유지하기 위해 server action에서 `toISOString()` 변환 후 client에 전달.
 
 ## 3. 화면 / 라우트
 
@@ -171,29 +195,38 @@ CSV에 없는 기업(비상장사·신규 IPO·테마주)을 직접 추가하는
 - Next.js 16.1.6 (App Router) + React 19.2
 - Tailwind CSS v4
 - TypeScript 5
-- Supabase (`@supabase/ssr`, `@supabase/supabase-js`)
 
-### 5.2 새로 추가할 라이브러리
+### 5.2 데이터 / DB
 
 | 패키지 | 용도 | 비고 |
 |--------|------|------|
-| `@xyflow/react` | 그래프 시각화 (React Flow) | 노드 클릭/드래그/우클릭 메뉴 기본 지원 |
-| `d3-force` | 그래프 force layout 계산 | React Flow에 위치 전달 |
-| `papaparse` | CSV 파싱 | 한국어 인코딩 처리 |
-| `cmdk` | 통합 검색 자동완성 | Vercel/Linear 스타일 |
-| `lucide-react` | 아이콘 | 가벼움 |
+| `prisma` (dev) | 마이그레이션·생성기 | `apps/api`와 동일 패턴 |
+| `@prisma/client` | 런타임 ORM 클라이언트 | type-safe query, generated from schema |
+| `@prisma/adapter-better-sqlite3` (또는 SQLite native driver) | SQLite 드라이버 | 단일 파일 DB |
 
-### 5.3 명시적으로 배제하는 것
+### 5.3 UI / 그래프 / 검색
 
-- **트리 라이브러리**: 자체 구현 (재귀 컴포넌트 ~100줄로 충분, 우리 데이터 모델에 맞춤)
-- **드래그&드롭**: 산업 부모 변경은 폼에서 picker 변경. `@dnd-kit/core` 추가는 YAGNI
-- **상태 관리 라이브러리**: Redux/Zustand 없이 URL query param + React `useState`/`useReducer`로 충분
-- **외부 데이터 자동 fetch**: DART API 연동·시총 자동 갱신 등은 범위 밖
+| 패키지 | 용도 |
+|--------|------|
+| `@xyflow/react` | 그래프 시각화 (React Flow) |
+| `d3-force` | 그래프 force layout 계산 |
+| `papaparse` | CSV 파싱 (한국어 인코딩 처리) |
+| `cmdk` | 통합 검색 자동완성 |
+| `lucide-react` | 아이콘 |
 
-### 5.4 데이터 페칭 / 상태 관리 정책
+### 5.4 명시적으로 배제하는 것
+
+- **외부 DB 의존**: Supabase·Postgres·클라우드 SQLite (Turso 등) 모두 미사용 — 100% 로컬
+- **인증·세션 관리**: 본인용 도구이므로 anon key·RLS·login 미구현
+- **트리 라이브러리**: 자체 구현 (재귀 컴포넌트로 충분)
+- **드래그&드롭**: 폼 picker로 대체
+- **상태 관리 라이브러리**: URL query param + React state로 충분
+- **외부 데이터 자동 fetch**: DART API 연동·시총 자동 갱신 범위 밖
+
+### 5.5 데이터 페칭 / 상태 관리 정책
 
 - 리스트·상세 페이지: **Server Components** + Server Actions로 mutation 후 `revalidatePath()`
-- 메인 그래프(`/`): **Client Component** (인터랙션 무거움). 초기 데이터는 server prefetch → props 전달, 이후 클라이언트에서 Supabase JS SDK로 lazy fetch
+- 메인 그래프(`/`): **Client Component** (인터랙션 무거움). 모든 DB 조회는 Server Action을 호출 (브라우저에서 SQLite 직접 접근 불가)
 - 검색·중심 노드: **URL query param**에 저장 (북마크·뒤로가기)
 - 그 외 UI 상태: 컴포넌트 로컬 `useState`/`useReducer`
 
@@ -233,30 +266,35 @@ apps/company-map/
 │   │       ├── Header.tsx
 │   │       └── Sidebar.tsx
 │   ├── lib/
-│   │   ├── supabase/
-│   │   │   ├── client.ts             # browser client
-│   │   │   └── server.ts             # server client
+│   │   ├── db.ts                     # Prisma client singleton (server-only)
 │   │   ├── csv/parser.ts             # papaparse 래퍼
 │   │   └── graph/layout.ts           # d3-force layout 계산
 │   └── types/
 │       ├── industry.ts
 │       ├── company.ts
 │       └── mapping.ts
-└── supabase/
-    └── migrations/
-        └── 0001_init.sql             # 위 §2.1 스키마
+└── prisma/
+    ├── schema.prisma                 # §2.1 스키마
+    ├── migrations/                   # prisma migrate dev로 생성
+    └── (data/company-map.db)         # SQLite 파일 (gitignored)
 ```
 
-## 7. Supabase 설정
+## 7. DB 설정 (Prisma + SQLite)
 
-- **신규 Supabase 프로젝트**를 만들거나, 기존 프로젝트에 `company_map` 스키마를 분리해 사용
-- 마이그레이션은 `apps/company-map/supabase/migrations/` SQL 파일로 관리 (blog-collection과 동일 패턴)
+- DB 파일 위치: `apps/company-map/data/company-map.db` (또는 `prisma/dev.db`). git 제외.
 - 환경변수 (`apps/company-map/.env.local`):
   ```
-  NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-  NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+  DATABASE_URL="file:../data/company-map.db"
   ```
-- RLS는 **꺼두기**. 외부 노출 시 정책 추가 필요.
+  (`schema.prisma` 위치 기준 상대경로. Prisma 관례)
+- 첫 실행:
+  ```
+  yarn workspace company-map prisma migrate dev --name init
+  yarn workspace company-map prisma generate
+  ```
+- 마이그레이션 변경 시 `prisma migrate dev --name <change>` 추가. SQL 직접 작성 불필요.
+- 인증/RLS 없음 — DB 파일에 접근 가능한 사람이 모든 권한.
+- 백업: DB 파일 자체를 복사 (단일 파일).
 
 ## 8. 범위 밖 (Out of Scope)
 
@@ -283,5 +321,10 @@ apps/company-map/
 | 메인 시각화 | 사이드바 트리 + 부분 force-directed 네트워크 그래프 |
 | 양방향 탐색 | 트리·검색·그래프 노드 클릭 모두를 진입점으로 |
 | 데이터 입력 | KRX CSV 일괄 import + UI 매핑 (DART 연동 X) |
-| 저장소 | Supabase (신규 프로젝트 권장) |
+| 저장소 | Prisma + SQLite 단일 파일 (외부 의존성 0) |
 | 그래프 라이브러리 | React Flow (`@xyflow/react`) + d3-force |
+
+## 10. 변경 이력
+
+- **2026-04-29 v1**: 초기 design (Supabase 기반).
+- **2026-04-29 v2**: DB layer를 Supabase → Prisma + SQLite로 변경. 100% 로컬 도구 목표. RLS·anon key 패턴 제거. §2, §5, §6, §7, §9 갱신. 그 외 기능·UX 결정은 모두 동일 유지.
