@@ -1,57 +1,80 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { Prisma } from "@prisma/client";
+import { db } from "@/lib/db";
 import type { Company } from "@/types/company";
 
 const PAGE_SIZE = 50;
 
-/** PostgREST filter syntax の構造文字/ワイルドカードをエスケープ。 */
-function escapeIlikePattern(input: string): string {
-  return input.replace(/([\\,()*])/g, "\\$1");
+function toDomainCompany(row: {
+  id: string;
+  name: string;
+  ticker: string | null;
+  market: string | null;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): Company {
+  return {
+    id: row.id,
+    name: row.name,
+    ticker: row.ticker,
+    market: row.market,
+    description: row.description,
+    created_at: row.createdAt.toISOString(),
+    updated_at: row.updatedAt.toISOString(),
+  };
 }
 
 export async function listCompanies(opts?: {
   search?: string;
   page?: number;
 }): Promise<{ rows: Company[]; total: number }> {
-  const supabase = await createClient();
   const page = Math.max(1, Math.floor(opts?.page ?? 1));
-  const from = (page - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
-  let q = supabase.from("companies").select("*", { count: "exact" }).order("name");
-  if (opts?.search) {
-    const safe = escapeIlikePattern(opts.search);
-    q = q.or(`name.ilike.%${safe}%,ticker.ilike.%${safe}%`);
-  }
-  const { data, error, count } = await q.range(from, to);
-  if (error) throw new Error(error.message);
-  return { rows: data ?? [], total: count ?? 0 };
+  const skip = (page - 1) * PAGE_SIZE;
+
+  const where: Prisma.CompanyWhereInput | undefined = opts?.search?.trim()
+    ? {
+        OR: [
+          { name: { contains: opts.search } },
+          { ticker: { contains: opts.search } },
+        ],
+      }
+    : undefined;
+
+  const [rows, total] = await Promise.all([
+    db.company.findMany({
+      where,
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      skip,
+      take: PAGE_SIZE,
+    }),
+    db.company.count({ where }),
+  ]);
+
+  return { rows: rows.map(toDomainCompany), total };
 }
 
 export async function getCompany(id: string): Promise<Company | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("companies")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return data;
+  const row = await db.company.findUnique({ where: { id } });
+  return row ? toDomainCompany(row) : null;
 }
 
 export async function searchCompanies(query: string, limit = 20): Promise<Company[]> {
-  if (!query.trim()) return [];
-  const supabase = await createClient();
-  const safe = escapeIlikePattern(query);
-  const { data, error } = await supabase
-    .from("companies")
-    .select("*")
-    .or(`name.ilike.%${safe}%,ticker.ilike.%${safe}%`)
-    .limit(limit)
-    .order("name");
-  if (error) throw new Error(error.message);
-  return data ?? [];
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  const rows = await db.company.findMany({
+    where: {
+      OR: [
+        { name: { contains: trimmed } },
+        { ticker: { contains: trimmed } },
+      ],
+    },
+    orderBy: [{ name: "asc" }, { id: "asc" }],
+    take: limit,
+  });
+  return rows.map(toDomainCompany);
 }
 
 export async function createCompany(input: {
@@ -60,42 +83,37 @@ export async function createCompany(input: {
   market?: string | null;
   description?: string | null;
 }): Promise<Company> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("companies")
-    .insert({
+  const row = await db.company.create({
+    data: {
       name: input.name,
-      ticker: input.ticker || null,
-      market: input.market || null,
-      description: input.description || null,
-    })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+      ticker: input.ticker?.trim() || null,
+      market: input.market?.trim() || null,
+      description: input.description?.trim() || null,
+    },
+  });
   revalidatePath("/companies");
-  return data;
+  return toDomainCompany(row);
 }
 
 export async function updateCompany(
   id: string,
   input: Partial<Omit<Company, "id" | "created_at" | "updated_at">>,
 ): Promise<Company> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("companies")
-    .update(input)
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
+  const row = await db.company.update({
+    where: { id },
+    data: {
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.ticker !== undefined ? { ticker: input.ticker } : {}),
+      ...(input.market !== undefined ? { market: input.market } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+    },
+  });
   revalidatePath("/companies");
   revalidatePath(`/companies/${id}`);
-  return data;
+  return toDomainCompany(row);
 }
 
 export async function deleteCompany(id: string): Promise<void> {
-  const supabase = await createClient();
-  const { error } = await supabase.from("companies").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  await db.company.delete({ where: { id } });
   revalidatePath("/companies");
 }
