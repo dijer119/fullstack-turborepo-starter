@@ -2,15 +2,18 @@ const path = require("path");
 
 const apiPath = path.resolve(__dirname, "apps/api");
 const webPath = path.resolve(__dirname, "apps/web");
+const todoPath = path.resolve(__dirname, "apps/todo");
 
 const ciApiPath = path.resolve(__dirname, "out/apps/api");
 const ciWebPath = path.resolve(__dirname, "out/apps/web");
+const ciTodoPath = path.resolve(__dirname, "out/apps/todo");
 
 module.exports = {
   scripts: {
     prepare: {
-      default: `nps prepare.web prepare.api`,
+      default: `nps prepare.web prepare.api prepare.todo`,
       web: `yarn`,
+      todo: `yarn`,
       api: `nps prepare.docker prisma.migrate.dev`,
       docker: "docker compose up -d",
       ci: {
@@ -19,18 +22,21 @@ module.exports = {
       },
     },
     test: {
-      default: `nps test.web test.api`,
+      default: `nps test.web test.api test.todo`,
       web: `cd ${webPath} && yarn test`,
       api: `cd ${apiPath} && yarn test`,
+      todo: `cd ${todoPath} && yarn test`,
       ci: {
-        default: `nps test.ci.web test.ci.api`,
+        default: `nps test.ci.web test.ci.api test.ci.todo`,
         web: `cd ${ciWebPath} && yarn test:ci`,
         api: `cd ${ciApiPath} && yarn test:ci`,
+        todo: `cd ${ciTodoPath} && yarn test:ci`,
       },
       watch: {
-        default: `nps test.watch.web test.watch.api`,
+        default: `nps test.watch.web test.watch.api test.watch.todo`,
         web: `cd ${webPath} && yarn test:watch`,
         api: `cd ${apiPath} && yarn test:watch`,
+        todo: `cd ${todoPath} && yarn test:watch`,
       },
     },
     prisma: {

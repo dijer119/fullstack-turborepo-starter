@@ -54,7 +54,7 @@ export default function IndustryDetailPage({ params }: { params: Promise<{ id: s
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">{industry.name}</h2>
-        <Link href={`/?focus=industry:${id}`} className="border rounded px-3 py-1.5 text-sm">맵에서 보기</Link>
+        <Link href={`/map?focus=industry:${id}`} className="border rounded px-3 py-1.5 text-sm">맵에서 보기</Link>
       </div>
       {industry.description && <p className="text-sm text-gray-500">{industry.description}</p>}
 

@@ -1,0 +1,322 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - button "메뉴 열기" [ref=e4]:
+        - img [ref=e5]
+      - link "금융 포털" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e7]: "|"
+      - generic [ref=e8]: Company Map
+      - navigation [ref=e9]:
+        - link "Map" [ref=e10] [cursor=pointer]:
+          - /url: /
+        - link "Companies" [ref=e11] [cursor=pointer]:
+          - /url: /companies
+        - link "Industries" [ref=e12] [cursor=pointer]:
+          - /url: /industries
+        - link "Import" [ref=e13] [cursor=pointer]:
+          - /url: /import
+    - main [ref=e14]:
+      - generic [ref=e15]:
+        - complementary [ref=e16]:
+          - combobox [expanded] [ref=e20]
+          - generic [ref=e21]:
+            - generic [ref=e22]: 산업 트리
+            - generic [ref=e23]:
+              - generic [ref=e24]:
+                - generic [ref=e25] [cursor=pointer]:
+                  - button [ref=e26]:
+                    - img [ref=e27]
+                  - generic [ref=e29]: IT/반도체
+                - generic [ref=e30]:
+                  - generic [ref=e32] [cursor=pointer]:
+                    - button "·" [ref=e33]:
+                      - generic [ref=e34]: ·
+                    - generic [ref=e35]: IT서비스/SI
+                  - generic [ref=e37] [cursor=pointer]:
+                    - button [ref=e38]:
+                      - img [ref=e39]
+                    - generic [ref=e41]: SW/플랫폼
+                  - generic [ref=e43] [cursor=pointer]:
+                    - button [ref=e44]:
+                      - img [ref=e45]
+                    - generic [ref=e47]: 디스플레이
+                  - generic [ref=e49] [cursor=pointer]:
+                    - button [ref=e50]:
+                      - img [ref=e51]
+                    - generic [ref=e53]: 반도체
+                  - generic [ref=e55] [cursor=pointer]:
+                    - button [ref=e56]:
+                      - img [ref=e57]
+                    - generic [ref=e59]: 전자부품/IT하드웨어
+              - generic [ref=e60]:
+                - generic [ref=e61] [cursor=pointer]:
+                  - button [ref=e62]:
+                    - img [ref=e63]
+                  - generic [ref=e65]: 금융
+                - generic [ref=e66]:
+                  - generic [ref=e68] [cursor=pointer]:
+                    - button "·" [ref=e69]:
+                      - generic [ref=e70]: ·
+                    - generic [ref=e71]: 보험
+                  - generic [ref=e73] [cursor=pointer]:
+                    - button "·" [ref=e74]:
+                      - generic [ref=e75]: ·
+                    - generic [ref=e76]: 은행/지주
+                  - generic [ref=e78] [cursor=pointer]:
+                    - button "·" [ref=e79]:
+                      - generic [ref=e80]: ·
+                    - generic [ref=e81]: 증권
+                  - generic [ref=e83] [cursor=pointer]:
+                    - button "·" [ref=e84]:
+                      - generic [ref=e85]: ·
+                    - generic [ref=e86]: 카드/캐피탈
+              - generic [ref=e87]:
+                - generic [ref=e88] [cursor=pointer]:
+                  - button [ref=e89]:
+                    - img [ref=e90]
+                  - generic [ref=e92]: 농축수산·환경
+                - generic [ref=e93]:
+                  - generic [ref=e95] [cursor=pointer]:
+                    - button "·" [ref=e96]:
+                      - generic [ref=e97]: ·
+                    - generic [ref=e98]: 농업/사료
+                  - generic [ref=e100] [cursor=pointer]:
+                    - button "·" [ref=e101]:
+                      - generic [ref=e102]: ·
+                    - generic [ref=e103]: 축산/식육
+                  - generic [ref=e105] [cursor=pointer]:
+                    - button "·" [ref=e106]:
+                      - generic [ref=e107]: ·
+                    - generic [ref=e108]: 환경/폐기물
+              - generic [ref=e109]:
+                - generic [ref=e110] [cursor=pointer]:
+                  - button [ref=e111]:
+                    - img [ref=e112]
+                  - generic [ref=e114]: 모빌리티
+                - generic [ref=e115]:
+                  - generic [ref=e117] [cursor=pointer]:
+                    - button "·" [ref=e118]:
+                      - generic [ref=e119]: ·
+                    - generic [ref=e120]: 자동차 부품
+                  - generic [ref=e122] [cursor=pointer]:
+                    - button "·" [ref=e123]:
+                      - generic [ref=e124]: ·
+                    - generic [ref=e125]: 자동차 완성차
+                  - generic [ref=e127] [cursor=pointer]:
+                    - button "·" [ref=e128]:
+                      - generic [ref=e129]: ·
+                    - generic [ref=e130]: 자동차 전장
+                  - generic [ref=e132] [cursor=pointer]:
+                    - button "·" [ref=e133]:
+                      - generic [ref=e134]: ·
+                    - generic [ref=e135]: 조선
+                  - generic [ref=e137] [cursor=pointer]:
+                    - button "·" [ref=e138]:
+                      - generic [ref=e139]: ·
+                    - generic [ref=e140]: 철도/궤도
+                  - generic [ref=e142] [cursor=pointer]:
+                    - button "·" [ref=e143]:
+                      - generic [ref=e144]: ·
+                    - generic [ref=e145]: 타이어
+                  - generic [ref=e147] [cursor=pointer]:
+                    - button "·" [ref=e148]:
+                      - generic [ref=e149]: ·
+                    - generic [ref=e150]: 항공
+              - generic [ref=e151]:
+                - generic [ref=e152] [cursor=pointer]:
+                  - button [ref=e153]:
+                    - img [ref=e154]
+                  - generic [ref=e156]: 방산·우주
+                - generic [ref=e157]:
+                  - generic [ref=e159] [cursor=pointer]:
+                    - button "·" [ref=e160]:
+                      - generic [ref=e161]: ·
+                    - generic [ref=e162]: 방위산업
+                  - generic [ref=e164] [cursor=pointer]:
+                    - button "·" [ref=e165]:
+                      - generic [ref=e166]: ·
+                    - generic [ref=e167]: 항공우주
+              - generic [ref=e168]:
+                - generic [ref=e169] [cursor=pointer]:
+                  - button [ref=e170]:
+                    - img [ref=e171]
+                  - generic [ref=e173]: 부동산·리츠
+                - generic [ref=e176] [cursor=pointer]:
+                  - button "·" [ref=e177]:
+                    - generic [ref=e178]: ·
+                  - generic [ref=e179]: 리츠/부동산투자
+              - generic [ref=e180]:
+                - generic [ref=e181] [cursor=pointer]:
+                  - button [ref=e182]:
+                    - img [ref=e183]
+                  - generic [ref=e185]: 산업재
+                - generic [ref=e186]:
+                  - generic [ref=e188] [cursor=pointer]:
+                    - button "·" [ref=e189]:
+                      - generic [ref=e190]: ·
+                    - generic [ref=e191]: 건설
+                  - generic [ref=e193] [cursor=pointer]:
+                    - button "·" [ref=e194]:
+                      - generic [ref=e195]: ·
+                    - generic [ref=e196]: 건자재
+                  - generic [ref=e198] [cursor=pointer]:
+                    - button "·" [ref=e199]:
+                      - generic [ref=e200]: ·
+                    - generic [ref=e201]: 기계/장비
+                  - generic [ref=e203] [cursor=pointer]:
+                    - button "·" [ref=e204]:
+                      - generic [ref=e205]: ·
+                    - generic [ref=e206]: 비철금속
+                  - generic [ref=e208] [cursor=pointer]:
+                    - button "·" [ref=e209]:
+                      - generic [ref=e210]: ·
+                    - generic [ref=e211]: 운송/물류
+                  - generic [ref=e213] [cursor=pointer]:
+                    - button "·" [ref=e214]:
+                      - generic [ref=e215]: ·
+                    - generic [ref=e216]: 제지/펄프
+                  - generic [ref=e218] [cursor=pointer]:
+                    - button "·" [ref=e219]:
+                      - generic [ref=e220]: ·
+                    - generic [ref=e221]: 종합상사
+                  - generic [ref=e223] [cursor=pointer]:
+                    - button "·" [ref=e224]:
+                      - generic [ref=e225]: ·
+                    - generic [ref=e226]: 지주회사
+                  - generic [ref=e228] [cursor=pointer]:
+                    - button "·" [ref=e229]:
+                      - generic [ref=e230]: ·
+                    - generic [ref=e231]: 철강
+              - generic [ref=e232]:
+                - generic [ref=e233] [cursor=pointer]:
+                  - button [ref=e234]:
+                    - img [ref=e235]
+                  - generic [ref=e237]: 소비재
+                - generic [ref=e238]:
+                  - generic [ref=e240] [cursor=pointer]:
+                    - button "·" [ref=e241]:
+                      - generic [ref=e242]: ·
+                    - generic [ref=e243]: 담배
+                  - generic [ref=e245] [cursor=pointer]:
+                    - button "·" [ref=e246]:
+                      - generic [ref=e247]: ·
+                    - generic [ref=e248]: 미디어/방송
+                  - generic [ref=e250] [cursor=pointer]:
+                    - button "·" [ref=e251]:
+                      - generic [ref=e252]: ·
+                    - generic [ref=e253]: 뷰티/생활용품
+                  - generic [ref=e255] [cursor=pointer]:
+                    - button "·" [ref=e256]:
+                      - generic [ref=e257]: ·
+                    - generic [ref=e258]: 식음료
+                  - generic [ref=e260] [cursor=pointer]:
+                    - button "·" [ref=e261]:
+                      - generic [ref=e262]: ·
+                    - generic [ref=e263]: 엔터테인먼트
+                  - generic [ref=e265] [cursor=pointer]:
+                    - button "·" [ref=e266]:
+                      - generic [ref=e267]: ·
+                    - generic [ref=e268]: 유통/리테일
+                  - generic [ref=e270] [cursor=pointer]:
+                    - button "·" [ref=e271]:
+                      - generic [ref=e272]: ·
+                    - generic [ref=e273]: 콘텐츠/웹툰
+                  - generic [ref=e275] [cursor=pointer]:
+                    - button "·" [ref=e276]:
+                      - generic [ref=e277]: ·
+                    - generic [ref=e278]: 패션/의류
+                  - generic [ref=e280] [cursor=pointer]:
+                    - button "·" [ref=e281]:
+                      - generic [ref=e282]: ·
+                    - generic [ref=e283]: 화장품
+              - generic [ref=e284]:
+                - generic [ref=e285] [cursor=pointer]:
+                  - button [ref=e286]:
+                    - img [ref=e287]
+                  - generic [ref=e289]: 에너지·소재
+                - generic [ref=e290]:
+                  - generic [ref=e292] [cursor=pointer]:
+                    - button [ref=e293]:
+                      - img [ref=e294]
+                    - generic [ref=e296]: 2차전지
+                  - generic [ref=e298] [cursor=pointer]:
+                    - button "·" [ref=e299]:
+                      - generic [ref=e300]: ·
+                    - generic [ref=e301]: ESS
+                  - generic [ref=e303] [cursor=pointer]:
+                    - button "·" [ref=e304]:
+                      - generic [ref=e305]: ·
+                    - generic [ref=e306]: 수소/연료전지
+                  - generic [ref=e308] [cursor=pointer]:
+                    - button "·" [ref=e309]:
+                      - generic [ref=e310]: ·
+                    - generic [ref=e311]: 신재생/태양광
+                  - generic [ref=e313] [cursor=pointer]:
+                    - button "·" [ref=e314]:
+                      - generic [ref=e315]: ·
+                    - generic [ref=e316]: 원자력
+                  - generic [ref=e318] [cursor=pointer]:
+                    - button "·" [ref=e319]:
+                      - generic [ref=e320]: ·
+                    - generic [ref=e321]: 전력유틸리티
+                  - generic [ref=e323] [cursor=pointer]:
+                    - button "·" [ref=e324]:
+                      - generic [ref=e325]: ·
+                    - generic [ref=e326]: 정유/가스
+                  - generic [ref=e328] [cursor=pointer]:
+                    - button "·" [ref=e329]:
+                      - generic [ref=e330]: ·
+                    - generic [ref=e331]: 특수화학소재
+                  - generic [ref=e333] [cursor=pointer]:
+                    - button "·" [ref=e334]:
+                      - generic [ref=e335]: ·
+                    - generic [ref=e336]: 화학/석유화학
+              - generic [ref=e337]:
+                - generic [ref=e338] [cursor=pointer]:
+                  - button [ref=e339]:
+                    - img [ref=e340]
+                  - generic [ref=e342]: 통신
+                - generic [ref=e343]:
+                  - generic [ref=e345] [cursor=pointer]:
+                    - button "·" [ref=e346]:
+                      - generic [ref=e347]: ·
+                    - generic [ref=e348]: 통신서비스
+                  - generic [ref=e350] [cursor=pointer]:
+                    - button "·" [ref=e351]:
+                      - generic [ref=e352]: ·
+                    - generic [ref=e353]: 통신장비
+              - generic [ref=e354]:
+                - generic [ref=e355] [cursor=pointer]:
+                  - button [ref=e356]:
+                    - img [ref=e357]
+                  - generic [ref=e359]: 헬스케어
+                - generic [ref=e360]:
+                  - generic [ref=e362] [cursor=pointer]:
+                    - button "·" [ref=e363]:
+                      - generic [ref=e364]: ·
+                    - generic [ref=e365]: 바이오/신약개발
+                  - generic [ref=e367] [cursor=pointer]:
+                    - button "·" [ref=e368]:
+                      - generic [ref=e369]: ·
+                    - generic [ref=e370]: 바이오시밀러
+                  - generic [ref=e372] [cursor=pointer]:
+                    - button "·" [ref=e373]:
+                      - generic [ref=e374]: ·
+                    - generic [ref=e375]: 의료기기
+                  - generic [ref=e377] [cursor=pointer]:
+                    - button "·" [ref=e378]:
+                      - generic [ref=e379]: ·
+                    - generic [ref=e380]: 제약
+                  - generic [ref=e382] [cursor=pointer]:
+                    - button "·" [ref=e383]:
+                      - generic [ref=e384]: ·
+                    - generic [ref=e385]: 진단/체외진단
+                  - generic [ref=e387] [cursor=pointer]:
+                    - button "·" [ref=e388]:
+                      - generic [ref=e389]: ·
+                    - generic [ref=e390]: 헬스케어 서비스
+        - generic [ref=e392]: 좌측 트리에서 산업을 선택하거나 검색바로 시작하세요.
+  - button "Open Next.js Dev Tools" [ref=e398] [cursor=pointer]:
+    - img [ref=e399]
+  - alert [ref=e402]

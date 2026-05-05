@@ -33,6 +33,10 @@ interface KrxStock {
 export class KrxSchedulerService implements OnModuleInit {
   private readonly logger = new Logger(KrxSchedulerService.name);
   private readonly dataPath = path.join(process.cwd(), 'data', 'krx_stocks.json');
+  private static readonly MAX_DECIMAL_10_2_ABS = 100_000_000;
+  private static readonly MAX_DECIMAL_10_4_ABS = 1_000_000;
+  private static readonly MAX_DECIMAL_15_2_ABS = 10_000_000_000_000;
+  private static readonly MAX_REASONABLE_EPS_BPS_RATIO = 1;
 
   private readonly defaultHeaders = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -528,22 +532,29 @@ export class KrxSchedulerService implements OnModuleInit {
             const currentPrice = parseFloat(stock.close.toString());
 
             if (financialData.eps !== null && financialData.bps !== null && financialData.bps > 0) {
+              const epsBpsRatio = financialData.eps / financialData.bps;
               // ROE = EPS / BPS * 100 (자기자본이익률 %)
-              roe = (financialData.eps / financialData.bps) * 100;
+              roe = epsBpsRatio * 100;
 
-              // 10년가치 = BPS*(1+(EPS/BPS))^10
-              const growthRate = 1 + (financialData.eps / financialData.bps);
-              tenYearValue = financialData.bps * Math.pow(growthRate, 10);
+              if (epsBpsRatio > 0 && epsBpsRatio <= KrxSchedulerService.MAX_REASONABLE_EPS_BPS_RATIO) {
+                // 10년가치 = BPS*(1+(EPS/BPS))^10
+                const growthRate = 1 + epsBpsRatio;
+                tenYearValue = financialData.bps * Math.pow(growthRate, 10);
 
-              // 10년승수 = ten_year_value / 현재가
-              if (currentPrice > 0) {
-                tenYearMultiple = tenYearValue / currentPrice;
+                // 10년승수 = ten_year_value / 현재가
+                if (currentPrice > 0) {
+                  tenYearMultiple = tenYearValue / currentPrice;
 
-                // 주식가치 = (10^(LOG10(ten_year_multiple)/10)-1)*100
-                if (tenYearMultiple > 0) {
-                  stockValue = (Math.pow(10, Math.log10(tenYearMultiple) / 10) - 1) * 100;
+                  // 주식가치 = (10^(LOG10(ten_year_multiple)/10)-1)*100
+                  if (tenYearMultiple > 0) {
+                    stockValue = (Math.pow(10, Math.log10(tenYearMultiple) / 10) - 1) * 100;
+                  }
                 }
+              } else {
+                this.logger.warn(`   종목 ${stock.code}(${stock.name}) EPS/BPS 비율 비정상: ${epsBpsRatio}`);
+              }
 
+              if (currentPrice > 0) {
                 // PBR = 현재가 / BPS (주가순자산비율)
                 pbr = currentPrice / financialData.bps;
               }
@@ -560,13 +571,13 @@ export class KrxSchedulerService implements OnModuleInit {
               data: {
                 eps: financialData.eps,
                 bps: financialData.bps,
-                dividendYield: financialData.dividendYield,
-                tenYearValue: tenYearValue,
-                tenYearMultiple: tenYearMultiple,
-                stockValue: stockValue,
-                roe: roe,
-                per: per,
-                pbr: pbr,
+                dividendYield: this.toDecimalOrNull(financialData.dividendYield, KrxSchedulerService.MAX_DECIMAL_10_2_ABS),
+                tenYearValue: this.toDecimalOrNull(tenYearValue, KrxSchedulerService.MAX_DECIMAL_15_2_ABS),
+                tenYearMultiple: this.toDecimalOrNull(tenYearMultiple, KrxSchedulerService.MAX_DECIMAL_10_4_ABS),
+                stockValue: this.toDecimalOrNull(stockValue, KrxSchedulerService.MAX_DECIMAL_10_2_ABS),
+                roe: this.toDecimalOrNull(roe, KrxSchedulerService.MAX_DECIMAL_10_2_ABS),
+                per: this.toDecimalOrNull(per, KrxSchedulerService.MAX_DECIMAL_10_2_ABS),
+                pbr: this.toDecimalOrNull(pbr, KrxSchedulerService.MAX_DECIMAL_10_2_ABS),
               },
             });
             successCount++;
@@ -618,5 +629,16 @@ export class KrxSchedulerService implements OnModuleInit {
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
-}
 
+  private toDecimalOrNull(value: number | null, maxAbsExclusive: number): number | null {
+    if (value === null || !Number.isFinite(value)) {
+      return null;
+    }
+
+    if (Math.abs(value) >= maxAbsExclusive) {
+      return null;
+    }
+
+    return value;
+  }
+}

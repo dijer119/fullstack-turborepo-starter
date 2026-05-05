@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  experimental: {
+    serverActions: {
+      allowedOrigins: ["dijer.synology.me", "dijer.synology.me:3000"],
+    },
+  },
 };
 
 export default nextConfig;

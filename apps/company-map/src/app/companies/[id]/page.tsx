@@ -68,7 +68,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
             <button onClick={() => setEditing(true)} className="border rounded px-3 py-1.5 text-sm">편집</button>
           )}
           <button onClick={onDelete} className="border border-red-300 text-red-600 rounded px-3 py-1.5 text-sm">삭제</button>
-          <Link href={`/?focus=company:${id}`} className="border rounded px-3 py-1.5 text-sm">맵에서 보기</Link>
+          <Link href={`/map?focus=company:${id}`} className="border rounded px-3 py-1.5 text-sm">맵에서 보기</Link>
         </div>
       </div>
 

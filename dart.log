@@ -1,2 +1,40 @@
 2026-02-15 02:22:59 | root | <module> | INFO | server started, usecase = light
 2026-02-15 02:22:59 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type ListToolsRequest
+2026-04-28 22:55:23 | root | <module> | INFO | server started, usecase = light
+2026-04-28 22:55:23 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type ListToolsRequest
+2026-04-28 22:57:53 | root | <module> | INFO | server started, usecase = light
+2026-04-28 22:57:53 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type ListToolsRequest
+2026-05-05 05:20:13 | root | <module> | INFO | server started, usecase = light
+2026-05-05 05:20:13 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type ListToolsRequest
+2026-05-05 05:20:39 | root | <module> | INFO | server started, usecase = light
+2026-05-05 05:20:39 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type ListToolsRequest
+2026-05-05 05:39:02 | root | <module> | INFO | server started, usecase = light
+2026-05-05 05:39:02 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type ListToolsRequest
+2026-05-05 06:10:37 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type CallToolRequest
+2026-05-05 06:10:37 | httpx | _send_single_request | INFO | HTTP Request: GET https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key=51cdca36cb2f1cfc9a726e3884cc0715a144a9f4 "HTTP/1.1 200 OK"
+2026-05-05 06:10:50 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type CallToolRequest
+2026-05-05 06:10:52 | mcp.server.lowlevel.server | _handle_message | INFO | Warning: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+2026-05-05 06:10:58 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type CallToolRequest
+2026-05-05 06:10:58 | httpx | _send_single_request | INFO | HTTP Request: GET https://opendart.fss.or.kr/api/company.json?crtfc_key=51cdca36cb2f1cfc9a726e3884cc0715a144a9f4&corp_code=00126380 "HTTP/1.1 200 OK"
+2026-05-05 06:18:57 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type CallToolRequest
+2026-05-05 06:18:59 | mcp.server.lowlevel.server | _handle_message | INFO | Warning: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+2026-05-05 06:19:06 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type CallToolRequest
+2026-05-05 06:19:08 | mcp.server.lowlevel.server | _handle_message | INFO | Warning: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+2026-05-05 06:19:13 | mcp.server.lowlevel.server | _handle_request | INFO | Processing request of type CallToolRequest
+2026-05-05 06:19:16 | mcp.server.lowlevel.server | _handle_message | INFO | Warning: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy

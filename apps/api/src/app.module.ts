@@ -15,6 +15,7 @@ import { TelegramModule } from './telegram/telegram.module';
 import { IntrinsicValueModule } from './intrinsic-value/intrinsic-value.module';
 import { KrxModule } from './krx/krx.module';
 import { StockModule } from './stock/stock.module';
+import { TodosModule } from './todos/todos.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { StockModule } from './stock/stock.module';
     IntrinsicValueModule,
     KrxModule,
     StockModule,
+    TodosModule,
   ],
   controllers: [AppController],
   providers: [AppService, AppResolver],

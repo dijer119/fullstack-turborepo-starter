@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Company {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  code        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("companies")
+}
+
+model MaddingStockMessage {
+  id              Int      @id @default(autoincrement())
+  messageId       BigInt   @unique @map("message_id")
+  rawText         String   @map("raw_text")
+  stockName       String?  @map("stock_name")
+  price           String?
+  changePercent   String?  @map("change_percent")
+  keywords        String[] @default([])
+  symbols         String[] @default([])
+  urls            String[] @default([])
+  messageDate     DateTime @map("message_date")
+  channelUsername String   @map("channel_username")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  additionalInfo  String?  @map("additional_info")
+  profitRate      String?  @map("profit_rate")
+  status          String?
+  strategy        String?
+  tradeType       String?  @map("trade_type")
+
+  @@index([messageDate])
+  @@index([stockName])
+  @@index([channelUsername])
+  @@index([tradeType])
+  @@map("maddingstock_messages")
+}
+
+model Stock {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique
+  isuCd           String   @map("isu_cd")
+  name            String
+  market          String
+  marketId        String   @map("market_id")
+  dept            String?
+  close           Decimal  @db.Decimal(10, 2)
+  changeCode      String   @map("change_code")
+  changes         Decimal  @db.Decimal(10, 2)
+  chagesRatio     Decimal  @map("chages_ratio") @db.Decimal(10, 4)
+  open            Decimal  @db.Decimal(10, 2)
+  high            Decimal  @db.Decimal(10, 2)
+  low             Decimal  @db.Decimal(10, 2)
+  volume          BigInt
+  amount          BigInt
+  marcap          BigInt
+  stocks          BigInt
+  treasuryStocks  BigInt   @map("treasury_stocks")
+  treasuryRatio   Decimal  @map("treasury_ratio") @db.Decimal(5, 2)
+  eps             Decimal? @db.Decimal(10, 2)
+  dataDate        DateTime @default(now()) @map("data_date")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  bps             Decimal? @db.Decimal(10, 2)
+  tenYearValue    Decimal? @map("ten_year_value") @db.Decimal(15, 2)
+  tenYearMultiple Decimal? @map("ten_year_multiple") @db.Decimal(10, 4)
+  stockValue      Decimal? @map("stock_value") @db.Decimal(10, 2)
+  roe             Decimal? @db.Decimal(10, 2)
+  per             Decimal? @db.Decimal(10, 2)
+  pbr             Decimal? @db.Decimal(10, 2)
+  exclude         Boolean  @default(false)
+  dividendYield   Decimal? @map("dividend_yield") @db.Decimal(10, 2)
+  favorite        Boolean  @default(false)
+  tags            String[] @default([])
+
+  @@index([code])
+  @@index([name])
+  @@index([market])
+  @@index([dataDate])
+  @@index([stockValue(sort: Desc)])
+  @@index([dividendYield(sort: Desc)])
+  @@index([marcap(sort: Desc)])
+  @@index([chagesRatio(sort: Desc)])
+  @@index([close(sort: Desc)])
+  @@index([market, exclude])
+  @@index([favorite])
+  @@index([exclude])
+  @@index([roe])
+  @@index([tags])
+  @@map("stocks")
+}
+
+model Todo {
+  id        Int      @id @default(autoincrement())
+  title     String
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+}

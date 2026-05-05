@@ -47,7 +47,7 @@ export default async function FeedPage({
             )}
           </div>
         </div>
-        <RefreshButton feedId={id} />
+        {/* <RefreshButton feedId={id} /> */}
       </div>
 
       <PostList feedId={id} page={page} search={sp.search} tag={sp.tag} />

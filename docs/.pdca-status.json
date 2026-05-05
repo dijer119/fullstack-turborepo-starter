@@ -1,8 +1,10 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-02-18T09:16:15.076Z",
+  "lastUpdated": "2026-05-05T07:13:01.464Z",
   "activeFeatures": [
-    "blog-collection"
+    "blog-collection",
+    ".claude",
+    "company-map"
   ],
   "primaryFeature": "blog-collection",
   "features": {
@@ -30,9 +32,35 @@
       },
       "timestamps": {
         "started": "2026-02-17T23:08:20.426Z",
-        "lastUpdated": "2026-02-18T09:16:15.076Z"
+        "lastUpdated": "2026-05-05T07:13:01.464Z"
       },
-      "lastFile": "/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/blog-collection/src/app/api/rss/refresh/route.ts"
+      "lastFile": "/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/blog-collection/src/components/layout/AppMenu.tsx"
+    },
+    ".claude": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-04-28T22:43:02.618Z",
+        "lastUpdated": "2026-04-28T22:44:58.533Z"
+      },
+      "lastFile": "/Users/dijer/.claude/statusline-command.sh"
+    },
+    "company-map": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-05-04T11:55:08.321Z",
+        "lastUpdated": "2026-05-05T07:12:41.408Z"
+      },
+      "lastFile": "/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/src/components/layout/AppMenu.tsx"
     }
   },
   "pipeline": {
@@ -43,7 +71,7 @@
   "session": {
     "startedAt": "2026-02-17T22:58:25.500Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-02-18T09:16:15.076Z"
+    "lastActivity": "2026-05-05T07:13:01.464Z"
   },
   "history": [
     {
@@ -426,6 +454,540 @@
     },
     {
       "timestamp": "2026-02-18T09:16:15.076Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T09:49:17.128Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-02-18T10:45:12.419Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-28T22:43:02.618Z",
+      "feature": ".claude",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-28T22:44:58.533Z",
+      "feature": ".claude",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T11:55:08.321Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T11:55:11.492Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T11:55:16.905Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T11:55:18.690Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T13:46:17.519Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T13:46:30.810Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T13:46:33.337Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T20:17:42.417Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T20:26:07.036Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T20:29:34.358Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T20:29:40.624Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T20:29:44.546Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T20:34:11.558Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T20:41:32.972Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T20:50:41.457Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T20:52:52.740Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T20:53:04.067Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:00:37.121Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:00:41.097Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:00:45.664Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:04:20.558Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:07:18.178Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:07:26.391Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:42:58.642Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:44:05.916Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:47:01.598Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:47:04.536Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:47:12.743Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:49:07.350Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:51:49.397Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:51:52.759Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:53:46.998Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:56:44.217Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:59:30.837Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T21:59:34.083Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:01:25.150Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:04:37.239Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:07:44.836Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:10:20.618Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:12:13.781Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:13:55.732Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:13:59.987Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:14:12.440Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:14:16.040Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:14:43.593Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:14:47.694Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:17:44.825Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:17:57.963Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:20:30.025Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:20:47.920Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:20:55.234Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:23:24.291Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:24:19.837Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:28:25.258Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:28:28.680Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:28:31.968Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:28:35.837Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:30:31.496Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:30:35.188Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:30:45.023Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:30:48.181Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:31:00.336Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:31:08.937Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-04T22:37:29.130Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T05:38:57.107Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T05:43:06.583Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T05:44:07.567Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T05:44:56.292Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T05:45:48.694Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T06:53:39.723Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T06:53:51.584Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T06:57:16.658Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T06:57:32.317Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T06:57:49.175Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T07:05:06.505Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T07:05:24.052Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T07:06:32.939Z",
+      "feature": "blog-collection",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T07:11:20.671Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T07:11:35.029Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T07:11:59.066Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T07:12:10.025Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T07:12:25.814Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T07:12:34.254Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T07:12:41.408Z",
+      "feature": "company-map",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-05-05T07:13:01.464Z",
       "feature": "blog-collection",
       "phase": "do",
       "action": "updated"

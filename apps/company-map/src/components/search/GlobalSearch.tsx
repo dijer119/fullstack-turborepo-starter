@@ -57,7 +57,7 @@ export function GlobalSearch({
     setOpen(false);
     setQ("");
     if (onPick) onPick(item);
-    else router.push(`/?focus=${item.kind}:${item.value.id}`);
+    else router.push(`/map?focus=${item.kind}:${item.value.id}`);
   }
 
   return (
