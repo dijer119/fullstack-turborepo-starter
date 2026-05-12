@@ -1,0 +1,313 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - button "메뉴 열기" [ref=e4]:
+        - img [ref=e5]
+      - link "금융 포털" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=e7]:
+        - 'button "테마: 시스템 (다음: 라이트)" [ref=e8]':
+          - img [ref=e9]
+    - main [ref=e11]:
+      - main [ref=e12]:
+        - generic [ref=e13]:
+          - heading "반도체 수출입 동향" [level=1] [ref=e14]
+          - paragraph [ref=e15]: 관세청 OpenAPI 기준 HS 8542(집적회로) 월별 통관 실적. 2025-01 이후 데이터.
+        - generic [ref=e16]:
+          - generic [ref=e17]:
+            - 'heading "월별 수출입 추이 (단위: $B)" [level=2] [ref=e18]'
+            - generic [ref=e21]:
+              - list [ref=e23]:
+                - listitem [ref=e24]:
+                  - img "수입 legend icon" [ref=e25]
+                  - text: 수입
+                - listitem [ref=e27]:
+                  - img "수지 legend icon" [ref=e28]
+                  - text: 수지
+                - listitem [ref=e30]:
+                  - img "수출 legend icon" [ref=e31]
+                  - text: 수출
+              - application [ref=e33]:
+                - generic [ref=e170]:
+                  - generic [ref=e171]:
+                    - generic [ref=e173]: "2025.01"
+                    - generic [ref=e175]: "2025.02"
+                    - generic [ref=e177]: "2025.03"
+                    - generic [ref=e179]: "2025.04"
+                    - generic [ref=e181]: "2025.05"
+                    - generic [ref=e183]: "2025.06"
+                    - generic [ref=e185]: "2025.07"
+                    - generic [ref=e187]: "2025.08"
+                    - generic [ref=e189]: "2025.09"
+                    - generic [ref=e191]: "2025.10"
+                    - generic [ref=e193]: "2025.11"
+                    - generic [ref=e195]: "2025.12"
+                    - generic [ref=e197]: "2026.01"
+                    - generic [ref=e199]: "2026.02"
+                    - generic [ref=e201]: "2026.03"
+                    - generic [ref=e203]: "2026.04"
+                  - generic [ref=e204]:
+                    - generic [ref=e206]: 0B
+                    - generic [ref=e208]: 7B
+                    - generic [ref=e210]: 14B
+                    - generic [ref=e212]: 21B
+                    - generic [ref=e214]: 28B
+          - generic [ref=e215]:
+            - heading "월별 수출액 카테고리 분해 (HS 6자리)" [level=2] [ref=e216]
+            - table [ref=e218]:
+              - rowgroup [ref=e219]:
+                - row "월 메모리 854232 프로세서 854231 기타 IC 854239 부분품 854290 증폭기 854233 총수출 총수입" [ref=e220]:
+                  - columnheader "월" [ref=e221]
+                  - columnheader "메모리 854232" [ref=e222]:
+                    - text: 메모리
+                    - text: "854232"
+                  - columnheader "프로세서 854231" [ref=e223]:
+                    - text: 프로세서
+                    - text: "854231"
+                  - columnheader "기타 IC 854239" [ref=e224]:
+                    - text: 기타 IC
+                    - text: "854239"
+                  - columnheader "부분품 854290" [ref=e225]:
+                    - text: 부분품
+                    - text: "854290"
+                  - columnheader "증폭기 854233" [ref=e226]:
+                    - text: 증폭기
+                    - text: "854233"
+                  - columnheader "총수출" [ref=e227]
+                  - columnheader "총수입" [ref=e228]
+              - rowgroup [ref=e229]:
+                - row "2026.04 $20.83B $3.54B $818M $40M $14M $25.24B $7.59B" [ref=e230]:
+                  - cell "2026.04" [ref=e231]
+                  - cell "$20.83B" [ref=e232]
+                  - cell "$3.54B" [ref=e233]
+                  - cell "$818M" [ref=e234]
+                  - cell "$40M" [ref=e235]
+                  - cell "$14M" [ref=e236]
+                  - cell "$25.24B" [ref=e237]
+                  - cell "$7.59B" [ref=e238]
+                - row "2026.03 $20.76B $3.15B $941M $40M $16M $24.91B $7.21B" [ref=e239]:
+                  - cell "2026.03" [ref=e240]
+                  - cell "$20.76B" [ref=e241]
+                  - cell "$3.15B" [ref=e242]
+                  - cell "$941M" [ref=e243]
+                  - cell "$40M" [ref=e244]
+                  - cell "$16M" [ref=e245]
+                  - cell "$24.91B" [ref=e246]
+                  - cell "$7.21B" [ref=e247]
+                - row "2026.02 $15.81B $2.90B $697M $31M $11M $19.45B $5.65B" [ref=e248]:
+                  - cell "2026.02" [ref=e249]
+                  - cell "$15.81B" [ref=e250]
+                  - cell "$2.90B" [ref=e251]
+                  - cell "$697M" [ref=e252]
+                  - cell "$31M" [ref=e253]
+                  - cell "$11M" [ref=e254]
+                  - cell "$19.45B" [ref=e255]
+                  - cell "$5.65B" [ref=e256]
+                - row "2026.01 $12.11B $3.40B $837M $38M $18M $16.40B $6.13B" [ref=e257]:
+                  - cell "2026.01" [ref=e258]
+                  - cell "$12.11B" [ref=e259]
+                  - cell "$3.40B" [ref=e260]
+                  - cell "$837M" [ref=e261]
+                  - cell "$38M" [ref=e262]
+                  - cell "$18M" [ref=e263]
+                  - cell "$16.40B" [ref=e264]
+                  - cell "$6.13B" [ref=e265]
+                - row "2025.12 $12.64B $2.83B $1214M $28M $18M $16.73B $6.24B" [ref=e266]:
+                  - cell "2025.12" [ref=e267]
+                  - cell "$12.64B" [ref=e268]
+                  - cell "$2.83B" [ref=e269]
+                  - cell "$1214M" [ref=e270]
+                  - cell "$28M" [ref=e271]
+                  - cell "$18M" [ref=e272]
+                  - cell "$16.73B" [ref=e273]
+                  - cell "$6.24B" [ref=e274]
+                - row "2025.11 $10.16B $2.88B $863M $30M $15M $13.95B $5.10B" [ref=e275]:
+                  - cell "2025.11" [ref=e276]
+                  - cell "$10.16B" [ref=e277]
+                  - cell "$2.88B" [ref=e278]
+                  - cell "$863M" [ref=e279]
+                  - cell "$30M" [ref=e280]
+                  - cell "$15M" [ref=e281]
+                  - cell "$13.95B" [ref=e282]
+                  - cell "$5.10B" [ref=e283]
+                - row "2025.10 $8.89B $3.40B $849M $32M $12M $13.18B $5.28B" [ref=e284]:
+                  - cell "2025.10" [ref=e285]
+                  - cell "$8.89B" [ref=e286]
+                  - cell "$3.40B" [ref=e287]
+                  - cell "$849M" [ref=e288]
+                  - cell "$32M" [ref=e289]
+                  - cell "$12M" [ref=e290]
+                  - cell "$13.18B" [ref=e291]
+                  - cell "$5.28B" [ref=e292]
+                - row "2025.09 $9.35B $3.20B $1029M $36M $12M $13.62B $5.08B" [ref=e293]:
+                  - cell "2025.09" [ref=e294]
+                  - cell "$9.35B" [ref=e295]
+                  - cell "$3.20B" [ref=e296]
+                  - cell "$1029M" [ref=e297]
+                  - cell "$36M" [ref=e298]
+                  - cell "$12M" [ref=e299]
+                  - cell "$13.62B" [ref=e300]
+                  - cell "$5.08B" [ref=e301]
+                - row "2025.08 $8.50B $3.22B $844M $32M $13M $12.62B $5.19B" [ref=e302]:
+                  - cell "2025.08" [ref=e303]
+                  - cell "$8.50B" [ref=e304]
+                  - cell "$3.22B" [ref=e305]
+                  - cell "$844M" [ref=e306]
+                  - cell "$32M" [ref=e307]
+                  - cell "$13M" [ref=e308]
+                  - cell "$12.62B" [ref=e309]
+                  - cell "$5.19B" [ref=e310]
+                - row "2025.07 $7.56B $3.81B $868M $34M $12M $12.29B $5.37B" [ref=e311]:
+                  - cell "2025.07" [ref=e312]
+                  - cell "$7.56B" [ref=e313]
+                  - cell "$3.81B" [ref=e314]
+                  - cell "$868M" [ref=e315]
+                  - cell "$34M" [ref=e316]
+                  - cell "$12M" [ref=e317]
+                  - cell "$12.29B" [ref=e318]
+                  - cell "$5.37B" [ref=e319]
+                - row "2025.06 $8.23B $2.98B $1000M $31M $12M $12.26B $5.10B" [ref=e320]:
+                  - cell "2025.06" [ref=e321]
+                  - cell "$8.23B" [ref=e322]
+                  - cell "$2.98B" [ref=e323]
+                  - cell "$1000M" [ref=e324]
+                  - cell "$31M" [ref=e325]
+                  - cell "$12M" [ref=e326]
+                  - cell "$12.26B" [ref=e327]
+                  - cell "$5.10B" [ref=e328]
+                - row "2025.05 $7.34B $3.23B $959M $30M $15M $11.57B $4.62B" [ref=e329]:
+                  - cell "2025.05" [ref=e330]
+                  - cell "$7.34B" [ref=e331]
+                  - cell "$3.23B" [ref=e332]
+                  - cell "$959M" [ref=e333]
+                  - cell "$30M" [ref=e334]
+                  - cell "$15M" [ref=e335]
+                  - cell "$11.57B" [ref=e336]
+                  - cell "$4.62B" [ref=e337]
+                - row "2025.04 $5.76B $3.09B $875M $35M $17M $9.78B $4.74B" [ref=e338]:
+                  - cell "2025.04" [ref=e339]
+                  - cell "$5.76B" [ref=e340]
+                  - cell "$3.09B" [ref=e341]
+                  - cell "$875M" [ref=e342]
+                  - cell "$35M" [ref=e343]
+                  - cell "$17M" [ref=e344]
+                  - cell "$9.78B" [ref=e345]
+                  - cell "$4.74B" [ref=e346]
+                - row "2025.03 $6.69B $2.71B $1005M $28M $13M $10.46B $5.31B" [ref=e347]:
+                  - cell "2025.03" [ref=e348]
+                  - cell "$6.69B" [ref=e349]
+                  - cell "$2.71B" [ref=e350]
+                  - cell "$1005M" [ref=e351]
+                  - cell "$28M" [ref=e352]
+                  - cell "$13M" [ref=e353]
+                  - cell "$10.46B" [ref=e354]
+                  - cell "$5.31B" [ref=e355]
+                - row "2025.02 $4.73B $2.62B $727M $26M $16M $8.11B $4.75B" [ref=e356]:
+                  - cell "2025.02" [ref=e357]
+                  - cell "$4.73B" [ref=e358]
+                  - cell "$2.62B" [ref=e359]
+                  - cell "$727M" [ref=e360]
+                  - cell "$26M" [ref=e361]
+                  - cell "$16M" [ref=e362]
+                  - cell "$8.11B" [ref=e363]
+                  - cell "$4.75B" [ref=e364]
+                - row "2025.01 $4.77B $2.70B $762M $25M $15M $8.27B $4.92B" [ref=e365]:
+                  - cell "2025.01" [ref=e366]
+                  - cell "$4.77B" [ref=e367]
+                  - cell "$2.70B" [ref=e368]
+                  - cell "$762M" [ref=e369]
+                  - cell "$25M" [ref=e370]
+                  - cell "$15M" [ref=e371]
+                  - cell "$8.27B" [ref=e372]
+                  - cell "$4.92B" [ref=e373]
+          - generic [ref=e374]:
+            - generic [ref=e375]:
+              - heading "국가별 TOP 10 (수출 기준)" [level=2] [ref=e376]
+              - combobox [ref=e377]:
+                - option "2026.04" [selected]
+                - option "2026.03"
+                - option "2026.02"
+                - option "2026.01"
+                - option "2025.12"
+                - option "2025.11"
+                - option "2025.10"
+                - option "2025.09"
+                - option "2025.08"
+                - option "2025.07"
+                - option "2025.06"
+                - option "2025.05"
+                - option "2025.04"
+                - option "2025.03"
+                - option "2025.02"
+                - option "2025.01"
+            - table [ref=e379]:
+              - rowgroup [ref=e380]:
+                - row "순위 국가 수출 수입 무역수지" [ref=e381]:
+                  - columnheader "순위" [ref=e382]
+                  - columnheader "국가" [ref=e383]
+                  - columnheader "수출" [ref=e384]
+                  - columnheader "수입" [ref=e385]
+                  - columnheader "무역수지" [ref=e386]
+              - rowgroup [ref=e387]:
+                - row "1 중국 CN $9593.7M $3024.1M +$6569.6M" [ref=e388]:
+                  - cell "1" [ref=e389]
+                  - cell "중국 CN" [ref=e390]
+                  - cell "$9593.7M" [ref=e391]
+                  - cell "$3024.1M" [ref=e392]
+                  - cell "+$6569.6M" [ref=e393]
+                - row "2 베트남 VN $4144.7M $21.5M +$4123.2M" [ref=e394]:
+                  - cell "2" [ref=e395]
+                  - cell "베트남 VN" [ref=e396]
+                  - cell "$4144.7M" [ref=e397]
+                  - cell "$21.5M" [ref=e398]
+                  - cell "+$4123.2M" [ref=e399]
+                - row "3 대만 TW $3914.6M $2532.3M +$1382.3M" [ref=e400]:
+                  - cell "3" [ref=e401]
+                  - cell "대만 TW" [ref=e402]
+                  - cell "$3914.6M" [ref=e403]
+                  - cell "$2532.3M" [ref=e404]
+                  - cell "+$1382.3M" [ref=e405]
+                - row "4 홍콩 HK $3554.8M $79.4M +$3475.4M" [ref=e406]:
+                  - cell "4" [ref=e407]
+                  - cell "홍콩 HK" [ref=e408]
+                  - cell "$3554.8M" [ref=e409]
+                  - cell "$79.4M" [ref=e410]
+                  - cell "+$3475.4M" [ref=e411]
+                - row "5 인도 IN $696.5M $3.2M +$693.3M" [ref=e412]:
+                  - cell "5" [ref=e413]
+                  - cell "인도 IN" [ref=e414]
+                  - cell "$696.5M" [ref=e415]
+                  - cell "$3.2M" [ref=e416]
+                  - cell "+$693.3M" [ref=e417]
+                - row "6 말레이시아 MY $674.7M $182.1M +$492.5M" [ref=e418]:
+                  - cell "6" [ref=e419]
+                  - cell "말레이시아 MY" [ref=e420]
+                  - cell "$674.7M" [ref=e421]
+                  - cell "$182.1M" [ref=e422]
+                  - cell "+$492.5M" [ref=e423]
+                - row "7 필리핀 PH $650.1M $55.2M +$594.8M" [ref=e424]:
+                  - cell "7" [ref=e425]
+                  - cell "필리핀 PH" [ref=e426]
+                  - cell "$650.1M" [ref=e427]
+                  - cell "$55.2M" [ref=e428]
+                  - cell "+$594.8M" [ref=e429]
+                - row "8 싱가포르 SG $539.6M $586.6M $-47.0M" [ref=e430]:
+                  - cell "8" [ref=e431]
+                  - cell "싱가포르 SG" [ref=e432]
+                  - cell "$539.6M" [ref=e433]
+                  - cell "$586.6M" [ref=e434]
+                  - cell "$-47.0M" [ref=e435]
+                - row "9 미국 US $319.9M $170.9M +$148.9M" [ref=e436]:
+                  - cell "9" [ref=e437]
+                  - cell "미국 US" [ref=e438]
+                  - cell "$319.9M" [ref=e439]
+                  - cell "$170.9M" [ref=e440]
+                  - cell "+$148.9M" [ref=e441]
+                - row "10 브라질 BR $281.4M $0.0M +$281.4M" [ref=e442]:
+                  - cell "10" [ref=e443]
+                  - cell "브라질 BR" [ref=e444]
+                  - cell "$281.4M" [ref=e445]
+                  - cell "$0.0M" [ref=e446]
+                  - cell "+$281.4M" [ref=e447]
+  - alert [ref=e448]
+  - generic [ref=e449]: "0"

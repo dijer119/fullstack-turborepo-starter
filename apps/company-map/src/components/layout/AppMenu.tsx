@@ -15,6 +15,7 @@ import {
   Building2,
   Layers,
   Upload,
+  Cpu,
 } from "lucide-react";
 
 type Service = {
@@ -92,6 +93,13 @@ const TOOLS: Tool[] = [
     description: "청산가치 > 시가총액 종목",
     path: "/ncav",
     icon: Filter,
+  },
+  {
+    key: "trade",
+    name: "수출입 동향",
+    description: "관세청 월별 통관 통계 (반도체·화장품)",
+    path: "/trade",
+    icon: Cpu,
   },
 ];
 

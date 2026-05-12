@@ -3,6 +3,7 @@ import "./setup-env"; // MUST be the first import — populates process.env
 import { loadKrxStocks } from "./load-krx";
 import { analyzeAllStocks } from "./analyze-loop";
 import { runNcavScreening } from "./ncav-loop";
+import { tradeSyncTick } from "./trade-sync-loop";
 
 const TWO_MINUTES_MS = 120_000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -35,6 +36,12 @@ async function backgroundUpdate() {
       } catch (err) {
         console.error("[worker] NCAV screening error:", err);
       }
+
+      try {
+        await tradeSyncTick();
+      } catch (err) {
+        console.error("[worker] trade sync error:", err);
+      }
     } catch (err) {
       console.error("[worker] cycle error:", err);
     }
@@ -65,6 +72,7 @@ if (process.argv.includes("--once")) {
     await loadKrxStocks();
     await analyzeAllStocks({ shouldStop: () => false });
     await runNcavScreening();
+    await tradeSyncTick();
     process.exit(0);
   })();
 } else {

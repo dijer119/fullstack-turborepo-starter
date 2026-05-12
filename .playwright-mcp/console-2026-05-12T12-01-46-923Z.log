@@ -1,0 +1,32 @@
+[     160ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[     172ms] [LOG] [Fast Refresh] done in 113ms @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[     403ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[     427ms] [LOG] [HMR] connected @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[     448ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[     449ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  269116ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  269204ms] [LOG] [Fast Refresh] done in 79ms @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  276016ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  276278ms] [LOG] [Fast Refresh] done in 270ms @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  283536ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  283629ms] [LOG] [Fast Refresh] done in 22ms @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  291923ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  292020ms] [LOG] [Fast Refresh] done in 28ms @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  310702ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  311002ms] [LOG] [Fast Refresh] done in 126ms @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  319034ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  319045ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  319046ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[  319155ms] [LOG] [Fast Refresh] done in 24ms @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297

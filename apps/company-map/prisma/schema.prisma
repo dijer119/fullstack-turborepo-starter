@@ -106,3 +106,24 @@ model NcavResult {
   @@index([ncavPositive])
   @@map("ncav_results")
 }
+
+model TradeStat {
+  id          Int      @id @default(autoincrement())
+  category    String   @default("semiconductor")
+  yearMonth   String   @map("year_month")
+  hsCode      String   @map("hs_code")
+  hsCodeName  String?  @map("hs_code_name")
+  countryCd   String   @map("country_cd")
+  countryName String   @map("country_name")
+  expDlr      BigInt   @map("exp_dlr")
+  impDlr      BigInt   @map("imp_dlr")
+  expWgt      BigInt   @map("exp_wgt")
+  impWgt      BigInt   @map("imp_wgt")
+  balPayments BigInt   @map("bal_payments")
+  fetchedAt   DateTime @default(now()) @map("fetched_at")
+
+  @@unique([category, yearMonth, hsCode, countryCd], name: "uniq_cat_ym_hs_cnty")
+  @@index([category, yearMonth])
+  @@index([category, hsCode])
+  @@map("trade_stats")
+}

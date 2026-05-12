@@ -109,9 +109,12 @@ export function MapGraph({
     const rfEdges: Edge[] = [];
     const layoutNodes: LayoutNode[] = [];
     const layoutEdges: LayoutEdge[] = [];
+    // focus prop은 useEffect 완료 전에 먼저 갱신되므로, 동기 useMemo에서는
+    // fetch 결과와 일관된 neighborhood.focus만 사용한다 (race 방지).
+    const activeFocus = neighborhood.focus;
 
     neighborhood.industries.forEach((i) => {
-      const isFocus = focus?.type === "industry" && focus.id === i.id;
+      const isFocus = activeFocus?.type === "industry" && activeFocus.id === i.id;
       rfNodes.push({
         id: `industry-${i.id}`,
         type: "industry",
@@ -121,7 +124,7 @@ export function MapGraph({
       layoutNodes.push({ id: `industry-${i.id}`, type: "industry" });
     });
     neighborhood.companies.forEach((c) => {
-      const isFocus = focus?.type === "company" && focus.id === c.id;
+      const isFocus = activeFocus?.type === "company" && activeFocus.id === c.id;
       rfNodes.push({
         id: `company-${c.id}`,
         type: "company",
@@ -142,7 +145,7 @@ export function MapGraph({
     });
 
     // tree edges (점선) — 산업 포커스인 경우 부모/형제/자식 표현
-    if (focus?.type === "industry") {
+    if (activeFocus?.type === "industry") {
       const dashStyle = { stroke: "#64748b", strokeDasharray: "4 3" };
 
       // 부모 → focus
@@ -151,13 +154,13 @@ export function MapGraph({
         rfEdges.push({
           id: `t-parent-${parentId}`,
           source: `industry-${parentId}`,
-          target: `industry-${focus.id}`,
+          target: `industry-${activeFocus.id}`,
           animated: false,
           style: dashStyle,
         });
         layoutEdges.push({
           source: `industry-${parentId}`,
-          target: `industry-${focus.id}`,
+          target: `industry-${activeFocus.id}`,
           kind: "tree",
         });
 
@@ -178,19 +181,19 @@ export function MapGraph({
         });
       }
 
-      // focus → 자식 (industries 중 parent_id가 focus.id인 노드들)
+      // focus → 자식 (industries 중 parent_id가 activeFocus.id인 노드들)
       neighborhood.industries
-        .filter((i) => i.parent_id === focus.id)
+        .filter((i) => i.parent_id === activeFocus.id)
         .forEach((child) => {
           rfEdges.push({
             id: `t-child-${child.id}`,
-            source: `industry-${focus.id}`,
+            source: `industry-${activeFocus.id}`,
             target: `industry-${child.id}`,
             animated: false,
             style: dashStyle,
           });
           layoutEdges.push({
-            source: `industry-${focus.id}`,
+            source: `industry-${activeFocus.id}`,
             target: `industry-${child.id}`,
             kind: "tree",
           });
@@ -206,7 +209,7 @@ export function MapGraph({
       if (p) n.position = { x: p.x, y: p.y };
     });
     return { nodes: rfNodes, edges: rfEdges };
-  }, [neighborhood, focus]);
+  }, [neighborhood]);
 
   const onNodeClick: NodeMouseHandler = (_, node) => {
     const idx = node.id.indexOf("-");
