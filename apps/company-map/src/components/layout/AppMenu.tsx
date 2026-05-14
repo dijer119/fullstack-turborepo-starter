@@ -113,9 +113,36 @@ function isInternal(href: string): boolean {
   }
 }
 
+/** SERVICE 정의의 `localhost` host를 현재 브라우저 hostname으로 치환.
+ *  포트는 SERVICE 정의 그대로, protocol은 현재 브라우저 protocol로 맞춤.
+ *  → 외부에서 dijer.synology.me:3000 접근 시 메뉴 링크가 dijer.synology.me:3004 식으로 동작.
+ *  → localhost 접근 시 변화 없음. */
+function rewriteHostToCurrent(href: string): string {
+  if (typeof window === "undefined") return href;
+  try {
+    const u = new URL(href);
+    if (u.hostname === "localhost" || u.hostname === "127.0.0.1") {
+      u.protocol = window.location.protocol;
+      u.hostname = window.location.hostname;
+    }
+    return u.toString();
+  } catch {
+    return href;
+  }
+}
+
 export function AppMenu() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const [services, setServices] = useState<Service[]>(SERVICES);
+
+  // mount 이후 SERVICE URL의 localhost를 현재 브라우저 origin host로 치환.
+  // SSR/CSR mismatch 방지를 위해 첫 render 후 useEffect에서 1회 갱신.
+  useEffect(() => {
+    setServices((prev) =>
+      prev.map((s) => ({ ...s, href: rewriteHostToCurrent(s.href) })),
+    );
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -160,7 +187,7 @@ export function AppMenu() {
               <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 px-2 mb-2">
                 서비스
               </div>
-              {SERVICES.map((s) => {
+              {services.map((s) => {
                 const Icon = s.icon;
                 const internal = isInternal(s.href);
                 // internal 서비스는 pathname으로 active 판정. 절대 URL 기반이라 path 추출.

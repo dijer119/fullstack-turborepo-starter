@@ -8,7 +8,8 @@ export type CategoryKey =
   | "ess"
   | "battery"
   | "nuclear"
-  | "solar";
+  | "solar"
+  | "automotive";
 
 export type SubCategory = {
   /** HS code prefix — matched via `hsCode.startsWith(hsPrefix)`. */
@@ -150,6 +151,19 @@ export const CATEGORIES: CategoryDef[] = [
     subCategories: [
       { hsPrefix: "854143", label: "광전지 모듈" },
       { hsPrefix: "854142", label: "광전지 셀" },
+    ],
+  },
+  {
+    key: "automotive",
+    label: "자동차",
+    // 8703 승용차(SUV·세단·해치백) + 8708 부품 + 8704 트럭 + 8702 버스.
+    // 트랙터(8701)·모터사이클(8711)·자전거(8712) 등은 별개 산업이라 제외.
+    hsSgnList: ["8703", "8708", "8704", "8702"],
+    subCategories: [
+      { hsPrefix: "8703", label: "승용차" },
+      { hsPrefix: "8708", label: "자동차 부품" },
+      { hsPrefix: "8704", label: "화물자동차" },
+      { hsPrefix: "8702", label: "버스·승합차" },
     ],
   },
 ];

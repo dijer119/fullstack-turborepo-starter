@@ -1,0 +1,19 @@
+[     173ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[     209ms] [LOG] [Fast Refresh] done in 137ms @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[     653ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[     671ms] [LOG] [HMR] connected @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[     700ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[     700ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[34442454ms] [LOG] [HMR] connected @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[40017794ms] [LOG] [HMR] connected @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[44537605ms] [LOG] [HMR] connected @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[89120154ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[89120180ms] [LOG] [Fast Refresh] done in 130ms @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[102633853ms] [LOG] [HMR] connected @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297
+[110012179ms] [LOG] [HMR] connected @ http://localhost:3004/_next/static/chunks/50cd2_next_dist_616ca610._.js:2297

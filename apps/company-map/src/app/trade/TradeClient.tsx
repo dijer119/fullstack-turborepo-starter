@@ -66,6 +66,13 @@ function formatYm(yyyymm: string): string {
   return `${yyyymm.slice(0, 4)}.${yyyymm.slice(4)}`;
 }
 
+/** "2026.04" → "2025.04" (전년동월). */
+function prevYearYm(yyyyDotMm: string): string {
+  const y = Number(yyyyDotMm.slice(0, 4));
+  const m = yyyyDotMm.slice(5);
+  return `${y - 1}.${m}`;
+}
+
 function SyncPanel() {
   const router = useRouter();
   const recent = useMemo(() => recentMonthsYYYYMM(3), []);
@@ -174,20 +181,45 @@ export function TradeClient({ bundles, initialTab }: Props) {
     });
   }, [tab, month, active.latest]);
 
+  // 표시는 2025-01 이후만 — 그 이전(2024) 데이터는 YoY 계산용으로만 활용.
+  const DISPLAY_FROM = "2025.01";
+  const displaySummary = useMemo(
+    () => active.summary.filter((s) => s.yearMonth >= DISPLAY_FROM),
+    [active.summary],
+  );
+  const summaryByYm = useMemo(
+    () => new Map(active.summary.map((s) => [s.yearMonth, s])),
+    [active.summary],
+  );
+
   // Chart 단위는 카테고리별로 동적 결정 — 반도체는 $B, 화장품은 $M 수준.
-  const maxExp = Math.max(...active.summary.map((s) => s.expDlr), 0);
+  const maxExp = Math.max(...displaySummary.map((s) => s.expDlr), 0);
   const useBillion = maxExp >= 5 * BILLION;
   const unit = useBillion ? BILLION : MILLION;
   const unitLabel = useBillion ? "B" : "M";
 
-  const chartData = active.summary.map((s) => ({
-    yearMonth: s.yearMonth,
-    수출: +(s.expDlr / unit).toFixed(useBillion ? 2 : 0),
-    수입: +(s.impDlr / unit).toFixed(useBillion ? 2 : 0),
-    수지: +(s.balPayments / unit).toFixed(useBillion ? 2 : 0),
-  }));
+  const chartData = displaySummary.map((s) => {
+    const prev = summaryByYm.get(prevYearYm(s.yearMonth));
+    const yoyExp =
+      prev && prev.expDlr > 0
+        ? ((s.expDlr - prev.expDlr) / prev.expDlr) * 100
+        : null;
+    return {
+      yearMonth: s.yearMonth,
+      수출: +(s.expDlr / unit).toFixed(useBillion ? 2 : 0),
+      수입: +(s.impDlr / unit).toFixed(useBillion ? 2 : 0),
+      수지: +(s.balPayments / unit).toFixed(useBillion ? 2 : 0),
+      yoyExp,
+    };
+  });
 
-  const tableRows = [...active.breakdown].reverse();
+  const tableRows = useMemo(
+    () =>
+      [...active.breakdown]
+        .filter((r) => r.yearMonth >= DISPLAY_FROM)
+        .reverse(),
+    [active.breakdown],
+  );
 
   return (
     <div className="space-y-6">
@@ -240,11 +272,55 @@ export function TradeClient({ bundles, initialTab }: Props) {
                 <LabelList
                   dataKey="수출"
                   position="top"
-                  formatter={(v: unknown) =>
-                    `${Number(v).toFixed(useBillion ? 1 : 0)}${unitLabel}`
-                  }
-                  className="fill-gray-700 dark:fill-gray-300"
-                  style={{ fontSize: 10, fontWeight: 600 }}
+                  content={(props) => {
+                    const { x, y, width, value, index } = props as {
+                      x?: number;
+                      y?: number;
+                      width?: number;
+                      value?: number;
+                      index?: number;
+                    };
+                    if (
+                      x == null ||
+                      y == null ||
+                      width == null ||
+                      value == null ||
+                      index == null
+                    ) {
+                      return null;
+                    }
+                    const cx = x + width / 2;
+                    const row = chartData[index];
+                    const yoy = row?.yoyExp;
+                    return (
+                      <g>
+                        <text
+                          x={cx}
+                          y={y - 14}
+                          textAnchor="middle"
+                          className="fill-gray-700 dark:fill-gray-300"
+                          style={{ fontSize: 10, fontWeight: 600 }}
+                        >
+                          {`${Number(value).toFixed(useBillion ? 1 : 0)}${unitLabel}`}
+                        </text>
+                        {yoy != null && (
+                          <text
+                            x={cx}
+                            y={y - 3}
+                            textAnchor="middle"
+                            className={
+                              yoy >= 0
+                                ? "fill-green-600 dark:fill-green-400"
+                                : "fill-red-600 dark:fill-red-400"
+                            }
+                            style={{ fontSize: 9, fontWeight: 700 }}
+                          >
+                            {`${yoy >= 0 ? "+" : ""}${yoy.toFixed(1)}%`}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  }}
                 />
               </Bar>
               <Bar dataKey="수입" fill="#f87171" />
