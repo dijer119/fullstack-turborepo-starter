@@ -1,5 +1,5 @@
 import type { DartDisclosureRow } from "./disclosure-list";
-import { db } from "@/lib/db";
+import { db } from "../../../worker/db";
 import { iterateDartDisclosures } from "./disclosure-list";
 import { loadCorpCodeReverseMap } from "./corp-code";
 
@@ -62,14 +62,17 @@ export function toVipHoldingInput(
 }
 
 export interface RefreshVipHoldingsResult {
-  fetched: number;        // total D disclosures iterated
-  matchedVip: number;     // rows passing isVipDisclosure
-  mapped: number;         // rows for which we could map to a stock_code
-  upserted: number;       // upsert calls made
-  pruned: number;         // rows deleted as out-of-window
+  fetched: number;
+  matchedVip: number;
+  mapped: number;
+  upserted: number;
+  pruned: number;
 }
 
-const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 30 * 6;
+/** 6개월 보유. DART list.json은 corp_code 없이 호출 시 90일 max라 청크 분할. */
+const RETENTION_DAYS = 180;
+const DART_MAX_WINDOW_DAYS = 90;
+const DAY_MS = 1000 * 60 * 60 * 24;
 
 function toDateString(d: Date): string {
   const y = d.getFullYear();
@@ -78,49 +81,71 @@ function toDateString(d: Date): string {
   return `${y}${m}${day}`;
 }
 
+/** [cutoff, now] 구간을 ≤90일 청크로 분할. 각 청크는 inclusive on both ends. */
+export function dateChunks(
+  cutoff: Date,
+  now: Date,
+  chunkDays: number,
+): Array<{ bgnDe: string; endDe: string }> {
+  const chunks: Array<{ bgnDe: string; endDe: string }> = [];
+  let chunkEnd = new Date(now);
+  while (chunkEnd >= cutoff) {
+    const chunkStart = new Date(chunkEnd.getTime() - (chunkDays - 1) * DAY_MS);
+    const effectiveStart = chunkStart < cutoff ? cutoff : chunkStart;
+    chunks.push({
+      bgnDe: toDateString(effectiveStart),
+      endDe: toDateString(chunkEnd),
+    });
+    chunkEnd = new Date(effectiveStart.getTime() - DAY_MS);
+  }
+  return chunks;
+}
+
 export async function refreshVipHoldings(
   now: Date = new Date(),
 ): Promise<RefreshVipHoldingsResult> {
-  const cutoff = new Date(now.getTime() - SIX_MONTHS_MS);
-  const bgnDe = toDateString(cutoff);
-  const endDe = toDateString(now);
-
+  const cutoff = new Date(now.getTime() - RETENTION_DAYS * DAY_MS);
   const reverseMap = await loadCorpCodeReverseMap();
+  const chunks = dateChunks(cutoff, now, DART_MAX_WINDOW_DAYS);
 
   let fetched = 0;
   let matchedVip = 0;
   let mapped = 0;
   let upserted = 0;
+  const seen = new Set<string>(); // dedupe rcpNo across overlapping chunks
 
-  for await (const row of iterateDartDisclosures({
-    bgnDe,
-    endDe,
-    pblntfTy: "D",
-  })) {
-    fetched++;
-    if (!isVipDisclosure(row)) continue;
-    matchedVip++;
+  for (const { bgnDe, endDe } of chunks) {
+    for await (const row of iterateDartDisclosures({
+      bgnDe,
+      endDe,
+      pblntfTy: "D",
+    })) {
+      fetched++;
+      if (!isVipDisclosure(row)) continue;
+      matchedVip++;
+      if (seen.has(row.rcpNo)) continue;
+      seen.add(row.rcpNo);
 
-    // stock_code가 응답에 있으면 우선 사용, 없으면 corp_code → stock_code fallback.
-    const stockCode = row.stockCode || reverseMap.get(row.corpCode) || "";
-    if (!stockCode || stockCode.length !== 6) continue;
-    mapped++;
+      const stockCode = row.stockCode || reverseMap.get(row.corpCode) || "";
+      if (!stockCode || stockCode.length !== 6) continue;
+      mapped++;
 
-    const input = toVipHoldingInput(row, stockCode);
-    await db.vipHolding.upsert({
-      where: { rcpNo: input.rcpNo },
-      create: input,
-      update: {
-        code: input.code,
-        corpCode: input.corpCode,
-        corpName: input.corpName,
-        reportNm: input.reportNm,
-        reportType: input.reportType,
-        flrNm: input.flrNm,
-        rceptDt: input.rceptDt,
-      },
-    });
-    upserted++;
+      const input = toVipHoldingInput(row, stockCode);
+      await db.vipHolding.upsert({
+        where: { rcpNo: input.rcpNo },
+        create: input,
+        update: {
+          code: input.code,
+          corpCode: input.corpCode,
+          corpName: input.corpName,
+          reportNm: input.reportNm,
+          reportType: input.reportType,
+          flrNm: input.flrNm,
+          rceptDt: input.rceptDt,
+        },
+      });
+      upserted++;
+    }
   }
 
   const pruneResult = await db.vipHolding.deleteMany({

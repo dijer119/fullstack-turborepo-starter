@@ -4,6 +4,7 @@ import {
   classifyReportType,
   isVipDisclosure,
   toVipHoldingInput,
+  dateChunks,
 } from "./vip-holdings";
 import type { DartDisclosureRow } from "./disclosure-list";
 
@@ -73,5 +74,31 @@ describe("toVipHoldingInput", () => {
     expect(() =>
       toVipHoldingInput({ ...baseRow, reportNm: "분기보고서" }, "017250"),
     ).toThrow(/classify/i);
+  });
+});
+
+describe("dateChunks", () => {
+  it("splits 180-day window into two ≤90-day chunks ending today", () => {
+    const now = new Date("2026-05-21T00:00:00.000Z");
+    const cutoff = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+    const chunks = dateChunks(cutoff, now, 90);
+    expect(chunks).toHaveLength(3); // 180 days needs ceil(180/90)+1 = 3 chunks because endpoints are inclusive
+    expect(chunks[0].endDe).toBe("20260521");
+    // last chunk's bgnDe must be >= cutoff date
+    const lastBgn = chunks[chunks.length - 1].bgnDe;
+    const cutoffStr =
+      cutoff.getFullYear().toString() +
+      String(cutoff.getMonth() + 1).padStart(2, "0") +
+      String(cutoff.getDate()).padStart(2, "0");
+    expect(lastBgn >= cutoffStr).toBe(true);
+  });
+
+  it("returns one chunk when window is smaller than chunkDays", () => {
+    const now = new Date("2026-05-21T00:00:00.000Z");
+    const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const chunks = dateChunks(cutoff, now, 90);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].bgnDe).toBe("20260421");
+    expect(chunks[0].endDe).toBe("20260521");
   });
 });
