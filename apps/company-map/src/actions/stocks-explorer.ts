@@ -18,6 +18,7 @@ export interface StocksExplorerParams {
   sort?: StocksSort;
   page?: number;
   pageSize?: number;
+  vipOnly?: boolean;
 }
 
 export interface StocksExplorerRow {
@@ -32,6 +33,8 @@ export interface StocksExplorerRow {
   dividendYield: number | null;
   safetyMargin: number | null;
   analyzed: boolean;
+  vipHoldingsCount: number;
+  vipLatestRceptDt: string | null;   // ISO 8601 or null
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -86,6 +89,10 @@ export async function getStocksExplorer(
     where.analysis = { is: analysisFilter };
   }
 
+  if (params.vipOnly) {
+    where.vipHoldings = { some: {} };
+  }
+
   // SQLite의 NULLS LAST 지원이 불안정해 분기 처리.
   // marcap_desc: marcap이 nullable이라 raw SQL로 NULL을 끝에 강제.
   // safetyMargin_desc: analyzed only이므로 NULL 없음 → 안전.
@@ -113,7 +120,15 @@ export async function getStocksExplorer(
   const [masters, total] = await Promise.all([
     db.stockMaster.findMany({
       where,
-      include: { analysis: true },
+      include: {
+        analysis: true,
+        vipHoldings: {
+          orderBy: { rceptDt: "desc" },
+          take: 1,
+          select: { rceptDt: true },
+        },
+        _count: { select: { vipHoldings: true } },
+      },
       orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -132,6 +147,8 @@ export async function getStocksExplorer(
     dividendYield: m.analysis?.dividendYield ?? null,
     safetyMargin: m.analysis?.safetyMargin ?? null,
     analyzed: m.analysis != null,
+    vipHoldingsCount: m._count.vipHoldings,
+    vipLatestRceptDt: m.vipHoldings[0]?.rceptDt.toISOString() ?? null,
   }));
 
   return { rows, total };
