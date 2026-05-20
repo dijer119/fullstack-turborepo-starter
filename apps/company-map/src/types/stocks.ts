@@ -2,6 +2,8 @@ export interface KrxStockSeed {
   Code: string;
   Name: string;
   Marcap: number;
+  /** "KOSPI" | "KOSDAQ". Optional for backward compatibility with older JSON dumps. */
+  Market?: string;
 }
 
 export interface InvestmentQuote {

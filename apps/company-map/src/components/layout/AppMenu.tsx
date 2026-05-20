@@ -16,6 +16,7 @@ import {
   Layers,
   Upload,
   Cpu,
+  Search,
 } from "lucide-react";
 
 type Service = {
@@ -100,6 +101,13 @@ const TOOLS: Tool[] = [
     description: "관세청 월별 통관 통계 (반도체·화장품)",
     path: "/trade",
     icon: Cpu,
+  },
+  {
+    key: "stocks",
+    name: "전종목 조회",
+    description: "KOSPI/KOSDAQ 전체 상장 종목 탐색",
+    path: "/stocks",
+    icon: Search,
   },
 ];
 

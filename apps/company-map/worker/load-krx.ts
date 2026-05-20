@@ -9,10 +9,11 @@ export async function loadKrxStocks(): Promise<number> {
   for (const s of stocks) {
     if (!s.Code) continue;
     const marcap = s.Marcap != null ? BigInt(Math.round(s.Marcap)) : null;
+    const market = s.Market ?? null;
     await db.stockMaster.upsert({
       where: { code: s.Code },
-      create: { code: s.Code, name: s.Name, marcap },
-      update: { name: s.Name, marcap },
+      create: { code: s.Code, name: s.Name, market, marcap },
+      update: { name: s.Name, market, marcap },
     });
     upserted++;
   }

@@ -1,5 +1,6 @@
 generator client {
   provider      = "prisma-client-js"
+  output        = "../../../node_modules/@prisma-clients/company-map"
   binaryTargets = ["native"]
 }
 
@@ -53,6 +54,7 @@ model CompanyIndustry {
 model StockMaster {
   code      String   @id
   name      String
+  market    String?
   marcap    BigInt?
   corpCode  String?  @map("corp_code")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -61,6 +63,8 @@ model StockMaster {
   ncavResult  NcavResult?
 
   @@index([name])
+  @@index([market])
+  @@index([marcap])
   @@map("stock_masters")
 }
 
