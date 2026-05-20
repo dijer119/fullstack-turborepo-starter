@@ -122,18 +122,24 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
       else next.add(code);
       return next;
     });
-    if (!expanded.has(code) && !vipDetails[code]) {
-      setVipLoading((prev) => new Set(prev).add(code));
-      startTransition(async () => {
-        const rows = await getVipHoldingsByCode(code);
-        setVipDetails((prev) => ({ ...prev, [code]: rows }));
+    // Fetch is guarded by data state, not expand state — so double-clicks
+    // and toggles can't trigger duplicate or stuck loads.
+    if (vipDetails[code] || vipLoading.has(code)) return;
+    setVipLoading((prev) => new Set(prev).add(code));
+    startTransition(async () => {
+      try {
+        const data = await getVipHoldingsByCode(code);
+        setVipDetails((prev) => ({ ...prev, [code]: data }));
+      } catch (err) {
+        console.error("[vip] failed to load disclosures for", code, err);
+      } finally {
         setVipLoading((prev) => {
           const next = new Set(prev);
           next.delete(code);
           return next;
         });
-      });
-    }
+      }
+    });
   };
 
   const applyFilters = (e: React.FormEvent) => {
