@@ -36,3 +36,19 @@ export async function loadCorpCodeMap(): Promise<Map<string, string>> {
   console.log(`[dart] corp_code map loaded: ${map.size} listed companies`);
   return map;
 }
+
+/** Generic map inversion. Pure function — testable in isolation. */
+export function invertMap(forward: Map<string, string>): Map<string, string> {
+  const reverse = new Map<string, string>();
+  for (const [k, v] of forward) reverse.set(v, k);
+  return reverse;
+}
+
+let cachedReverseMap: Map<string, string> | null = null;
+
+/** corp_code → stock_code 매핑. loadCorpCodeMap() 결과를 invert + 캐싱. */
+export async function loadCorpCodeReverseMap(): Promise<Map<string, string>> {
+  if (cachedReverseMap) return cachedReverseMap;
+  cachedReverseMap = invertMap(await loadCorpCodeMap());
+  return cachedReverseMap;
+}
