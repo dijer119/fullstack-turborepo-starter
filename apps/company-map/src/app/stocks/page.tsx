@@ -38,6 +38,7 @@ export default async function StocksPage({
     perMax: parseOptionalNumber(sp.perMax),
     pbrMax: parseOptionalNumber(sp.pbrMax),
     analyzedOnly: sp.analyzed === "1",
+    vipOnly: sp.vip === "1",
     sort,
     page,
     pageSize: 50,

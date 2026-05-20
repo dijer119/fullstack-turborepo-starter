@@ -1,14 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import React, { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Filter, ChevronDown, ChevronUp } from "lucide-react";
+import { Filter, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import type {
   MarketFilter,
   StocksExplorerRow,
   StocksSort,
 } from "@/actions/stocks-explorer";
+import {
+  getVipHoldingsByCode,
+  type VipHoldingDetailRow,
+} from "@/actions/vip-holdings";
 import { formatMarcap } from "@/lib/format-marcap";
 
 export interface StocksExplorerView {
@@ -19,6 +23,7 @@ export interface StocksExplorerView {
   perMax: number | null;
   pbrMax: number | null;
   analyzedOnly: boolean;
+  vipOnly: boolean;
   sort: StocksSort;
   page: number;
   pageSize: number;
@@ -39,6 +44,7 @@ function buildQuery(view: Partial<StocksExplorerView>): string {
   if (view.perMax != null) qs.set("perMax", String(view.perMax));
   if (view.pbrMax != null) qs.set("pbrMax", String(view.pbrMax));
   if (view.analyzedOnly) qs.set("analyzed", "1");
+  if (view.vipOnly) qs.set("vip", "1");
   if (view.sort && view.sort !== "marcap_desc") qs.set("sort", view.sort);
   if (view.page && view.page > 1) qs.set("page", String(view.page));
   return qs.toString();
@@ -79,7 +85,8 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
       view.maxMarcapEok != null ||
       view.perMax != null ||
       view.pbrMax != null ||
-      view.analyzedOnly,
+      view.analyzedOnly ||
+      view.vipOnly,
   );
 
   // 폼 로컬 상태 (제출 전까지는 URL 미반영)
@@ -97,11 +104,36 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
     view.pbrMax != null ? String(view.pbrMax) : "",
   );
   const [analyzedOnly, setAnalyzedOnly] = useState(view.analyzedOnly);
+  const [vipOnly, setVipOnly] = useState(view.vipOnly);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [vipDetails, setVipDetails] = useState<Record<string, VipHoldingDetailRow[]>>({});
+  const [vipLoading, setVipLoading] = useState<Set<string>>(new Set());
 
   const navigate = (next: Partial<StocksExplorerView>) => {
     const merged: Partial<StocksExplorerView> = { ...view, ...next };
     const qs = buildQuery(merged);
     startTransition(() => router.replace(qs ? `/stocks?${qs}` : "/stocks"));
+  };
+
+  const toggleExpand = (code: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+    if (!expanded.has(code) && !vipDetails[code]) {
+      setVipLoading((prev) => new Set(prev).add(code));
+      startTransition(async () => {
+        const rows = await getVipHoldingsByCode(code);
+        setVipDetails((prev) => ({ ...prev, [code]: rows }));
+        setVipLoading((prev) => {
+          const next = new Set(prev);
+          next.delete(code);
+          return next;
+        });
+      });
+    }
   };
 
   const applyFilters = (e: React.FormEvent) => {
@@ -113,6 +145,7 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
       perMax: perMax ? Number(perMax) : null,
       pbrMax: pbrMax ? Number(pbrMax) : null,
       analyzedOnly,
+      vipOnly,
       page: 1,
     });
   };
@@ -124,6 +157,7 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
     setPerMax("");
     setPbrMax("");
     setAnalyzedOnly(false);
+    setVipOnly(false);
     startTransition(() => router.replace("/stocks"));
   };
 
@@ -258,6 +292,14 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
             />
             <span>분석된 종목만</span>
           </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={vipOnly}
+              onChange={(e) => setVipOnly(e.target.checked)}
+            />
+            <span>VIP 보유 종목만</span>
+          </label>
           <div className="flex items-center justify-end gap-2 md:col-span-2 lg:col-span-3">
             <button
               type="button"
@@ -302,45 +344,94 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
               <th className="p-2 font-medium text-right">PBR</th>
               <th className="p-2 font-medium text-right">배당%</th>
               <th className="p-2 font-medium text-right">안전마진</th>
+              <th className="p-2 font-medium text-right">VIP</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr
-                key={r.code}
-                className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900/50"
-              >
-                <td className="p-2 font-medium">
-                  <Link
-                    href={`/calculator?code=${r.code}`}
-                    className="text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    {r.name}
-                  </Link>
-                </td>
-                <td className="p-2 font-mono text-gray-500">{r.code}</td>
-                <td className="p-2 text-gray-500">{r.market ?? "—"}</td>
-                <td className="p-2 text-right">{formatMarcap(r.marcap)}</td>
-                <td className="p-2 text-right">{price(r.currentPrice)}</td>
-                <td className="p-2 text-right">{num(r.per)}</td>
-                <td className="p-2 text-right">{num(r.pbr, 2)}</td>
-                <td className="p-2 text-right">{num(r.dividendYield, 2)}</td>
-                <td
-                  className={`p-2 text-right ${
-                    r.safetyMargin == null
-                      ? ""
-                      : r.safetyMargin >= 0
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-red-600 dark:text-red-400"
-                  }`}
+              <React.Fragment key={r.code}>
+                <tr
+                  className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900/50"
                 >
-                  {pct(r.safetyMargin)}
-                </td>
-              </tr>
+                  <td className="p-2 font-medium">
+                    <Link
+                      href={`/calculator?code=${r.code}`}
+                      className="text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      {r.name}
+                    </Link>
+                  </td>
+                  <td className="p-2 font-mono text-gray-500">{r.code}</td>
+                  <td className="p-2 text-gray-500">{r.market ?? "—"}</td>
+                  <td className="p-2 text-right">{formatMarcap(r.marcap)}</td>
+                  <td className="p-2 text-right">{price(r.currentPrice)}</td>
+                  <td className="p-2 text-right">{num(r.per)}</td>
+                  <td className="p-2 text-right">{num(r.pbr, 2)}</td>
+                  <td className="p-2 text-right">{num(r.dividendYield, 2)}</td>
+                  <td
+                    className={`p-2 text-right ${
+                      r.safetyMargin == null
+                        ? ""
+                        : r.safetyMargin >= 0
+                          ? "text-green-600 dark:text-green-400"
+                          : "text-red-600 dark:text-red-400"
+                    }`}
+                  >
+                    {pct(r.safetyMargin)}
+                  </td>
+                  <td className="p-2 text-right">
+                    {r.vipHoldingsCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(r.code)}
+                        className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        {r.vipHoldingsCount}건
+                        {expanded.has(r.code) ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                </tr>
+                {expanded.has(r.code) && (
+                  <tr key={r.code + "-expand"} className="bg-blue-50/40 dark:bg-blue-950/20">
+                    <td colSpan={10} className="p-3">
+                      <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                        브이아이피자산운용 보유 공시 (최근 6개월)
+                      </div>
+                      {vipLoading.has(r.code) ? (
+                        <div className="text-sm text-gray-500">불러오는 중…</div>
+                      ) : (vipDetails[r.code] ?? []).length === 0 ? (
+                        <div className="text-sm text-gray-500">공시 없음</div>
+                      ) : (
+                        <ul className="space-y-1 text-sm">
+                          {(vipDetails[r.code] ?? []).map((d) => (
+                            <li key={d.rcpNo} className="flex items-center gap-3">
+                              <span className="font-mono text-gray-500 w-24">
+                                {d.rceptDt.slice(0, 10)}
+                              </span>
+                              <span className="flex-1">{d.reportNm}</span>
+                              <a
+                                href={d.dartUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
+                              >
+                                공시 보기 <ExternalLink size={12} />
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={9} className="p-6 text-center text-gray-500">
+                <td colSpan={10} className="p-6 text-center text-gray-500">
                   조건에 맞는 종목이 없습니다.
                 </td>
               </tr>
