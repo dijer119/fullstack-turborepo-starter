@@ -1,0 +1,32 @@
+{
+  "status": "000",
+  "message": "정상",
+  "page_no": 1,
+  "page_count": 100,
+  "total_count": 2,
+  "total_page": 1,
+  "list": [
+    {
+      "corp_cls": "K",
+      "corp_name": "한라IMS",
+      "corp_code": "00567890",
+      "stock_code": "017250",
+      "report_nm": "주식등의대량보유상황보고서(약식)",
+      "rcept_no": "20260518000285",
+      "flr_nm": "브이아이피자산운용",
+      "rcept_dt": "20260518",
+      "rm": ""
+    },
+    {
+      "corp_cls": "Y",
+      "corp_name": "다른회사",
+      "corp_code": "00111111",
+      "stock_code": "012345",
+      "report_nm": "분기보고서",
+      "rcept_no": "20260101000001",
+      "flr_nm": "다른제출인",
+      "rcept_dt": "20260101",
+      "rm": ""
+    }
+  ]
+}
