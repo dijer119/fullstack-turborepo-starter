@@ -35,6 +35,10 @@ export interface StocksExplorerRow {
   analyzed: boolean;
   vipHoldingsCount: number;
   vipLatestRceptDt: string | null;   // ISO 8601 or null
+  opIncome: number | null;
+  opIncomeYoyBase: number | null;
+  opIncomePrevReport: number | null;
+  latestReprtCode: string | null;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -128,6 +132,7 @@ export async function getStocksExplorer(
           select: { rceptDt: true },
         },
         _count: { select: { vipHoldings: true } },
+        financialSnapshot: true,
       },
       orderBy,
       skip: (page - 1) * pageSize,
@@ -149,6 +154,10 @@ export async function getStocksExplorer(
     analyzed: m.analysis != null,
     vipHoldingsCount: m._count.vipHoldings,
     vipLatestRceptDt: m.vipHoldings[0]?.rceptDt.toISOString() ?? null,
+    opIncome: m.financialSnapshot?.opIncome != null ? Number(m.financialSnapshot.opIncome) : null,
+    opIncomeYoyBase: m.financialSnapshot?.opIncomeYoyBase != null ? Number(m.financialSnapshot.opIncomeYoyBase) : null,
+    opIncomePrevReport: m.financialSnapshot?.opIncomePrevReport != null ? Number(m.financialSnapshot.opIncomePrevReport) : null,
+    latestReprtCode: m.financialSnapshot?.latestReprtCode ?? null,
   }));
 
   return { rows, total };
