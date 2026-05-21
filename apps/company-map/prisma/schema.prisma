@@ -134,17 +134,20 @@ model TradeStat {
 }
 
 model VipHolding {
-  rcpNo       String   @id @map("rcp_no")
-  code        String?
-  corpCode    String   @map("corp_code")
-  corpName    String   @map("corp_name")
-  reportNm    String   @map("report_nm")
-  reportType  String   @map("report_type")
-  flrNm       String   @map("flr_nm")
-  rceptDt     DateTime @map("rcept_dt")
-  fetchedAt   DateTime @default(now()) @map("fetched_at")
+  rcpNo            String   @id @map("rcp_no")
+  code             String?
+  corpCode         String   @map("corp_code")
+  corpName         String   @map("corp_name")
+  reportNm         String   @map("report_nm")
+  reportType       String   @map("report_type")
+  flrNm            String   @map("flr_nm")
+  rceptDt          DateTime @map("rcept_dt")
+  stockRatio       Float?   @map("stock_ratio")
+  stockRatioChange Float?   @map("stock_ratio_change")
+  reportResn       String?  @map("report_resn")
+  fetchedAt        DateTime @default(now()) @map("fetched_at")
 
-  master      StockMaster? @relation(fields: [code], references: [code], onDelete: SetNull)
+  master           StockMaster? @relation(fields: [code], references: [code], onDelete: SetNull)
 
   @@index([code])
   @@index([rceptDt])
