@@ -1,0 +1,35 @@
+{
+  "status": "000",
+  "list": [
+    {
+      "rcept_no": "20260514000123",
+      "sj_div": "IS",
+      "sj_nm": "손익계산서",
+      "fs_div": "CFS",
+      "fs_nm": "연결재무제표",
+      "account_nm": "영업이익",
+      "thstrm_nm": "제 58 기 1분기",
+      "thstrm_amount": "5,000,000,000",
+      "frmtrm_nm": "제 57 기 1분기",
+      "frmtrm_amount": "3,800,000,000",
+      "bfefrmtrm_nm": "제 56 기 1분기",
+      "bfefrmtrm_amount": "4,200,000,000"
+    },
+    {
+      "rcept_no": "20260514000123",
+      "sj_div": "IS",
+      "fs_div": "OFS",
+      "fs_nm": "재무제표",
+      "account_nm": "영업이익",
+      "thstrm_amount": "1,000,000,000",
+      "frmtrm_amount": "900,000,000"
+    },
+    {
+      "rcept_no": "20260514000123",
+      "fs_div": "CFS",
+      "fs_nm": "연결재무제표",
+      "account_nm": "매출액",
+      "thstrm_amount": "50,000,000,000"
+    }
+  ]
+}
