@@ -365,7 +365,6 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
               <th className="p-2 font-medium text-right">안전마진</th>
               <th className="p-2 font-medium text-right">VIP</th>
               <th className="p-2 font-medium text-right">YoY</th>
-              <th className="p-2 font-medium text-right">QoQ</th>
             </tr>
           </thead>
           <tbody>
@@ -427,21 +426,10 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
                       </td>
                     );
                   })()}
-                  {(() => {
-                    const qoq = computeGrowth(r.opIncome, r.opIncomePrevReport);
-                    return (
-                      <td
-                        className={`p-2 text-right font-mono ${growthColorClass(qoq)}`}
-                        title={titleForGrowth(r.latestReprtCode, "qoq")}
-                      >
-                        {formatGrowth(qoq)}
-                      </td>
-                    );
-                  })()}
                 </tr>
                 {expanded.has(r.code) && (
                   <tr key={r.code + "-expand"} className="bg-blue-50/40 dark:bg-blue-950/20">
-                    <td colSpan={12} className="p-3">
+                    <td colSpan={11} className="p-3">
                       <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
                         브이아이피자산운용 보유 공시 (최근 6개월)
                       </div>
@@ -479,7 +467,7 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={12} className="p-6 text-center text-gray-500">
+                <td colSpan={11} className="p-6 text-center text-gray-500">
                   조건에 맞는 종목이 없습니다.
                 </td>
               </tr>
