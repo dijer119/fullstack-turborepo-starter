@@ -361,12 +361,14 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
                   className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900/50"
                 >
                   <td className="p-2 font-medium">
-                    <Link
-                      href={`/calculator?code=${r.code}`}
+                    <a
+                      href={`https://finance.naver.com/item/main.naver?code=${r.code}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="text-blue-600 hover:underline dark:text-blue-400"
                     >
                       {r.name}
-                    </Link>
+                    </a>
                   </td>
                   <td className="p-2 font-mono text-gray-500">{r.code}</td>
                   <td className="p-2 text-gray-500">{r.market ?? "—"}</td>
