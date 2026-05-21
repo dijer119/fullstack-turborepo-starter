@@ -7,6 +7,9 @@ export interface VipHoldingDetailRow {
   reportNm: string;
   reportType: string;
   rceptDt: string;     // ISO 8601
+  stockRatio: number | null;
+  stockRatioChange: number | null;
+  reportResn: string | null;
   dartUrl: string;
 }
 
@@ -25,6 +28,9 @@ export async function getVipHoldingsByCode(
     reportNm: r.reportNm,
     reportType: r.reportType,
     rceptDt: r.rceptDt.toISOString(),
+    stockRatio: r.stockRatio,
+    stockRatioChange: r.stockRatioChange,
+    reportResn: r.reportResn,
     dartUrl: `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${r.rcpNo}`,
   }));
 }
