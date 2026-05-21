@@ -14,6 +14,7 @@ import {
   type VipHoldingDetailRow,
 } from "@/actions/vip-holdings";
 import { formatMarcap } from "@/lib/format-marcap";
+import { formatStockRatio, ratioColorClass } from "@/lib/format-ratio";
 
 export interface StocksExplorerView {
   market: MarketFilter;
@@ -417,7 +418,10 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
                               <span className="font-mono text-gray-500 w-24">
                                 {d.rceptDt.slice(0, 10)}
                               </span>
-                              <span className="flex-1">{d.reportNm}</span>
+                              <span className="flex-1 min-w-0 truncate">{d.reportNm}</span>
+                              <span className={`w-36 text-right font-mono ${ratioColorClass(d.stockRatioChange)}`}>
+                                {formatStockRatio(d.stockRatio, d.stockRatioChange, d.reportResn)}
+                              </span>
                               <a
                                 href={d.dartUrl}
                                 target="_blank"
