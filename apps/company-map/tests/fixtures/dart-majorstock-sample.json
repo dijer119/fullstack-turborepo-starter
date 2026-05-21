@@ -1,0 +1,32 @@
+{
+  "status": "000",
+  "message": "정상",
+  "list": [
+    {
+      "rcept_no": "20260518000285",
+      "rcept_dt": "20260518",
+      "corp_code": "00567890",
+      "corp_name": "한라IMS",
+      "stkqy": "1200000",
+      "stkqy_irds": "300000",
+      "stkrt": "5.12",
+      "stkrt_irds": "0.34",
+      "ctr_stkqy": "0",
+      "ctr_stkrt": "0",
+      "report_resn": "신규보고"
+    },
+    {
+      "rcept_no": "20260421000001",
+      "rcept_dt": "20260421",
+      "corp_code": "00567890",
+      "corp_name": "한라IMS",
+      "stkqy": "900000",
+      "stkqy_irds": "0",
+      "stkrt": "4.78",
+      "stkrt_irds": "-",
+      "ctr_stkqy": "0",
+      "ctr_stkrt": "0",
+      "report_resn": "신규보고"
+    }
+  ]
+}
