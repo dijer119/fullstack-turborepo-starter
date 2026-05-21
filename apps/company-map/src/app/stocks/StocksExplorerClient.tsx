@@ -15,6 +15,7 @@ import {
 } from "@/actions/vip-holdings";
 import { formatMarcap } from "@/lib/format-marcap";
 import { formatStockRatio, ratioColorClass } from "@/lib/format-ratio";
+import { computeGrowth, formatGrowth, growthColorClass } from "@/lib/format-growth";
 
 export interface StocksExplorerView {
   market: MarketFilter;
@@ -77,6 +78,17 @@ const SORT_OPTIONS: Array<{ value: StocksSort; label: string }> = [
   { value: "name_asc", label: "종목명 ↑" },
   { value: "safetyMargin_desc", label: "안전마진 ↓ (분석된 종목)" },
 ];
+
+function titleForGrowth(
+  latestReprtCode: string | null,
+  kind: "yoy" | "qoq",
+): string {
+  const base = kind === "yoy" ? "전년 동기 누계" : "직전 보고 누계";
+  const reportLabel = latestReprtCode
+    ? ({ "11011": "사업", "11013": "1분기", "11012": "반기", "11014": "3분기" } as Record<string, string>)[latestReprtCode] ?? latestReprtCode
+    : "?";
+  return `${base} 기준 (최신: ${reportLabel})`;
+}
 
 export function StocksExplorerClient({ rows, total, view }: Props) {
   const router = useRouter();
@@ -352,6 +364,8 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
               <th className="p-2 font-medium text-right">배당%</th>
               <th className="p-2 font-medium text-right">안전마진</th>
               <th className="p-2 font-medium text-right">VIP</th>
+              <th className="p-2 font-medium text-right">YoY</th>
+              <th className="p-2 font-medium text-right">QoQ</th>
             </tr>
           </thead>
           <tbody>
@@ -402,10 +416,32 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
                       <span className="text-gray-400">—</span>
                     )}
                   </td>
+                  {(() => {
+                    const yoy = computeGrowth(r.opIncome, r.opIncomeYoyBase);
+                    return (
+                      <td
+                        className={`p-2 text-right font-mono ${growthColorClass(yoy)}`}
+                        title={titleForGrowth(r.latestReprtCode, "yoy")}
+                      >
+                        {formatGrowth(yoy)}
+                      </td>
+                    );
+                  })()}
+                  {(() => {
+                    const qoq = computeGrowth(r.opIncome, r.opIncomePrevReport);
+                    return (
+                      <td
+                        className={`p-2 text-right font-mono ${growthColorClass(qoq)}`}
+                        title={titleForGrowth(r.latestReprtCode, "qoq")}
+                      >
+                        {formatGrowth(qoq)}
+                      </td>
+                    );
+                  })()}
                 </tr>
                 {expanded.has(r.code) && (
                   <tr key={r.code + "-expand"} className="bg-blue-50/40 dark:bg-blue-950/20">
-                    <td colSpan={10} className="p-3">
+                    <td colSpan={12} className="p-3">
                       <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
                         브이아이피자산운용 보유 공시 (최근 6개월)
                       </div>
@@ -443,7 +479,7 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={10} className="p-6 text-center text-gray-500">
+                <td colSpan={12} className="p-6 text-center text-gray-500">
                   조건에 맞는 종목이 없습니다.
                 </td>
               </tr>
