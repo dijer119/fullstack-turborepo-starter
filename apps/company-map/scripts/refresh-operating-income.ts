@@ -4,24 +4,36 @@ config({ path: path.resolve(__dirname, "..", ".env.local") });
 config({ path: path.resolve(__dirname, "..", ".env") });
 
 import { db } from "../worker/db";
-import {
-  findLatestOpIncomeReport,
-  fetchPrevOpIncomeReport,
-} from "@/lib/dart/operating-income";
+import { fetchDartFinancial } from "@/lib/dart/financial";
+import { extractOpIncome, type ReprtCode } from "@/lib/dart/operating-income";
 
 const CALL_DELAY_MS = 100;
+const REPORT_CODES: ReprtCode[] = ["11013", "11012", "11014", "11011"];
+// 최근성 순위: 3Q > 반기 > 1Q > 사업(전년). 같은 해 안에서 latest 결정용.
+const REPORT_PRIORITY: Record<ReprtCode, number> = {
+  "11014": 4,
+  "11012": 3,
+  "11013": 2,
+  "11011": 1,
+};
 
 (async () => {
   const start = Date.now();
+  const now = new Date();
+  const years = [now.getFullYear(), now.getFullYear() - 1];
+
   const masters = await db.stockMaster.findMany({
     where: { corpCode: { not: null } },
     select: { code: true, corpCode: true },
   });
-  console.log(`[op] ${masters.length} candidates`);
+  console.log(
+    `[op] ${masters.length} candidates × ${years.length * REPORT_CODES.length} report-slots`,
+  );
 
-  let upserted = 0;
-  let skipped = 0;
+  let historyUpserts = 0;
+  let snapshotUpserts = 0;
   let failed = 0;
+  let skipped = 0;
 
   for (let i = 0; i < masters.length; i++) {
     const m = masters[i];
@@ -29,15 +41,64 @@ const CALL_DELAY_MS = 100;
       skipped++;
       continue;
     }
-    try {
-      const latest = await findLatestOpIncomeReport(m.corpCode);
-      await new Promise((r) => setTimeout(r, CALL_DELAY_MS));
-      if (!latest) {
-        skipped++;
-        continue;
+
+    const collected: Array<{
+      bsnsYear: number;
+      reprtCode: ReprtCode;
+      thstrm: bigint;
+      frmtrm: bigint;
+    }> = [];
+
+    for (const year of years) {
+      for (const code of REPORT_CODES) {
+        try {
+          const resp = await fetchDartFinancial(m.corpCode, year, code);
+          await new Promise((r) => setTimeout(r, CALL_DELAY_MS));
+          if (!resp) continue;
+          const op = extractOpIncome(resp);
+          if (!op) continue;
+          collected.push({
+            bsnsYear: year,
+            reprtCode: code,
+            thstrm: op.thstrm,
+            frmtrm: op.frmtrm,
+          });
+          await db.operatingIncomeHistory.upsert({
+            where: {
+              code_bsnsYear_reprtCode: {
+                code: m.code,
+                bsnsYear: year,
+                reprtCode: code,
+              },
+            },
+            create: {
+              code: m.code,
+              bsnsYear: year,
+              reprtCode: code,
+              thstrm: op.thstrm,
+            },
+            update: {
+              thstrm: op.thstrm,
+              fetchedAt: new Date(),
+            },
+          });
+          historyUpserts++;
+        } catch (e) {
+          failed++;
+          console.error(`[op] ${m.code} ${year}-${code} failed:`, e);
+        }
       }
-      const prev = await fetchPrevOpIncomeReport(m.corpCode, latest);
-      await new Promise((r) => setTimeout(r, CALL_DELAY_MS));
+    }
+
+    // FinancialSnapshot 갱신: collected 중 가장 최근 (year desc, priority desc)
+    collected.sort((a, b) => {
+      if (a.bsnsYear !== b.bsnsYear) return b.bsnsYear - a.bsnsYear;
+      return REPORT_PRIORITY[b.reprtCode] - REPORT_PRIORITY[a.reprtCode];
+    });
+
+    if (collected.length > 0) {
+      const latest = collected[0];
+      const prev = collected.length > 1 ? collected[1] : null;
       await db.financialSnapshot.upsert({
         where: { code: m.code },
         create: {
@@ -57,21 +118,19 @@ const CALL_DELAY_MS = 100;
           fetchedAt: new Date(),
         },
       });
-      upserted++;
-    } catch (e) {
-      failed++;
-      console.error(`[op] ${m.code} failed:`, e);
+      snapshotUpserts++;
     }
-    if ((i + 1) % 100 === 0) {
+
+    if ((i + 1) % 50 === 0) {
       console.log(
-        `[op] progress ${i + 1}/${masters.length} (upserted=${upserted}, skipped=${skipped}, failed=${failed})`,
+        `[op] progress ${i + 1}/${masters.length} (history=${historyUpserts}, snapshot=${snapshotUpserts}, failed=${failed})`,
       );
     }
   }
 
   const elapsed = Math.round((Date.now() - start) / 1000);
   console.log(
-    `[op] done in ${elapsed}s { upserted: ${upserted}, skipped: ${skipped}, failed: ${failed} }`,
+    `[op] done in ${elapsed}s { history: ${historyUpserts}, snapshot: ${snapshotUpserts}, skipped: ${skipped}, failed: ${failed} }`,
   );
   process.exit(0);
 })();
