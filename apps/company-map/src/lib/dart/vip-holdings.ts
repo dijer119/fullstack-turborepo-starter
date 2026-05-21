@@ -2,6 +2,7 @@ import type { DartDisclosureRow } from "./disclosure-list";
 import { db } from "../../../worker/db";
 import { iterateDartDisclosures } from "./disclosure-list";
 import { loadCorpCodeReverseMap } from "./corp-code";
+import { fetchMajorStockByCorp } from "./major-stock";
 
 export const VIP_FLR_NM = "브이아이피자산운용";
 
@@ -61,12 +62,49 @@ export function toVipHoldingInput(
   };
 }
 
+const ENRICH_DELAY_MS = 150;
+
+/** 주어진 corp_code들에 대해 majorstock.json으로 보유율/증감/사유를 update.
+ *  rcpNo가 vip_holdings에 없으면 그 row는 skip. */
+export async function enrichVipHoldings(
+  corpCodes: Iterable<string>,
+): Promise<{ enriched: number }> {
+  const uniqueCodes = [...new Set(corpCodes)];
+  let enriched = 0;
+  for (let i = 0; i < uniqueCodes.length; i++) {
+    const corpCode = uniqueCodes[i];
+    let rows;
+    try {
+      rows = await fetchMajorStockByCorp(corpCode);
+    } catch (e) {
+      console.error(`[vip] majorstock fetch failed for ${corpCode}:`, e);
+      continue;
+    }
+    for (const r of rows) {
+      const result = await db.vipHolding.updateMany({
+        where: { rcpNo: r.rcpNo },
+        data: {
+          stockRatio: r.stockRatio,
+          stockRatioChange: r.stockRatioChange,
+          reportResn: r.reportResn,
+        },
+      });
+      enriched += result.count;
+    }
+    if (i < uniqueCodes.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, ENRICH_DELAY_MS));
+    }
+  }
+  return { enriched };
+}
+
 export interface RefreshVipHoldingsResult {
   fetched: number;
   matchedVip: number;
   mapped: number;
   upserted: number;
   pruned: number;
+  enriched: number;
 }
 
 /** 6개월 보유. DART list.json은 corp_code 없이 호출 시 90일 max라 청크 분할. */
@@ -112,6 +150,7 @@ export async function refreshVipHoldings(
   let matchedVip = 0;
   let mapped = 0;
   let upserted = 0;
+  const upsertedCorpCodes = new Set<string>();
   const seen = new Set<string>(); // dedupe rcpNo across overlapping chunks
 
   for (const { bgnDe, endDe } of chunks) {
@@ -145,6 +184,7 @@ export async function refreshVipHoldings(
         },
       });
       upserted++;
+      upsertedCorpCodes.add(input.corpCode);
     }
   }
 
@@ -152,5 +192,14 @@ export async function refreshVipHoldings(
     where: { rceptDt: { lt: cutoff } },
   });
 
-  return { fetched, matchedVip, mapped, upserted, pruned: pruneResult.count };
+  const enrichResult = await enrichVipHoldings(upsertedCorpCodes);
+
+  return {
+    fetched,
+    matchedVip,
+    mapped,
+    upserted,
+    pruned: pruneResult.count,
+    enriched: enrichResult.enriched,
+  };
 }
