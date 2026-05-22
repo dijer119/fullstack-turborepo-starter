@@ -64,6 +64,7 @@ model StockMaster {
   vipHoldings           VipHolding[]
   financialSnapshot     FinancialSnapshot?
   opIncomeHistory       OperatingIncomeHistory[]
+  tags                  StockTag[]
 
   @@index([name])
   @@index([market])
@@ -192,4 +193,26 @@ model RefreshState {
   output      String?
 
   @@map("refresh_states")
+}
+
+model Tag {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  createdAt DateTime   @default(now()) @map("created_at")
+  stocks    StockTag[]
+
+  @@map("tags")
+}
+
+model StockTag {
+  stockCode String   @map("stock_code")
+  tagId     Int      @map("tag_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  master    StockMaster @relation(fields: [stockCode], references: [code], onDelete: Cascade)
+  tag       Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([stockCode, tagId])
+  @@index([tagId])
+  @@map("stock_tags")
 }
