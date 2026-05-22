@@ -356,7 +356,6 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
             <tr className="text-left">
               <th className="p-2 font-medium">종목명</th>
               <th className="p-2 font-medium">코드</th>
-              <th className="p-2 font-medium">시장</th>
               <th className="p-2 font-medium text-right">시가총액</th>
               <th className="p-2 font-medium text-right">현재가</th>
               <th className="p-2 font-medium text-right">PER</th>
@@ -384,7 +383,6 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
                     </a>
                   </td>
                   <td className="p-2 font-mono text-gray-500">{r.code}</td>
-                  <td className="p-2 text-gray-500">{r.market ?? "—"}</td>
                   <td className="p-2 text-right">{formatMarcap(r.marcap)}</td>
                   <td className="p-2 text-right">{price(r.currentPrice)}</td>
                   <td className="p-2 text-right">{num(r.per)}</td>
@@ -429,7 +427,7 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
                 </tr>
                 {expanded.has(r.code) && (
                   <tr key={r.code + "-expand"} className="bg-blue-50/40 dark:bg-blue-950/20">
-                    <td colSpan={11} className="p-3">
+                    <td colSpan={10} className="p-3">
                       <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
                         브이아이피자산운용 보유 공시 (최근 6개월)
                       </div>
@@ -467,7 +465,7 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={11} className="p-6 text-center text-gray-500">
+                <td colSpan={10} className="p-6 text-center text-gray-500">
                   조건에 맞는 종목이 없습니다.
                 </td>
               </tr>
