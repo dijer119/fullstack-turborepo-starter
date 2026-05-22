@@ -183,3 +183,13 @@ model OperatingIncomeHistory {
   @@index([code, bsnsYear])
   @@map("operating_income_history")
 }
+
+model RefreshState {
+  kind        String   @id
+  status      String
+  startedAt   DateTime @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+  output      String?
+
+  @@map("refresh_states")
+}
