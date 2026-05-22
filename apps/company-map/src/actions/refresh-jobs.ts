@@ -3,13 +3,14 @@
 import { spawn } from "node:child_process";
 import { db } from "@/lib/db";
 
-export type RefreshKind = "krx_stocks" | "vip_holdings" | "operating_income" | "trade";
+export type RefreshKind = "krx_stocks" | "vip_holdings" | "operating_income" | "trade" | "price_changes";
 
 const VALID_KINDS = new Set<RefreshKind>([
   "krx_stocks",
   "vip_holdings",
   "operating_income",
   "trade",
+  "price_changes",
 ]);
 
 export interface RefreshStateView {

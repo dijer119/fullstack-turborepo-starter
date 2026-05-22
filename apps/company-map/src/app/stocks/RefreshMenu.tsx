@@ -14,6 +14,7 @@ const LABELS: Record<RefreshKind, { name: string; estimate: string }> = {
   vip_holdings: { name: "VIP 지분공시", estimate: "~6분" },
   operating_income: { name: "영업이익 시계열", estimate: "~60분" },
   trade: { name: "수출입 동향", estimate: "~3분" },
+  price_changes: { name: "주가 변동률", estimate: "~5분" },
 };
 
 const POLL_MS = 3000;

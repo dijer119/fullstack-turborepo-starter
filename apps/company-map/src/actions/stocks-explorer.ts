@@ -42,6 +42,7 @@ export interface StocksExplorerRow {
   opIncomePrevReport: number | null;
   latestReprtCode: string | null;
   tags: TagView[];
+  pctChange3M: number | null;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -143,6 +144,7 @@ export async function getStocksExplorer(
         _count: { select: { vipHoldings: true } },
         financialSnapshot: true,
         tags: { include: { tag: true } },
+        priceChange: true,
       },
       orderBy,
       skip: (page - 1) * pageSize,
@@ -169,6 +171,7 @@ export async function getStocksExplorer(
     opIncomePrevReport: m.financialSnapshot?.opIncomePrevReport != null ? Number(m.financialSnapshot.opIncomePrevReport) : null,
     latestReprtCode: m.financialSnapshot?.latestReprtCode ?? null,
     tags: m.tags.map((t) => ({ id: t.tag.id, name: t.tag.name })),
+    pctChange3M: m.priceChange?.pctChange ?? null,
   }));
 
   return { rows, total };
