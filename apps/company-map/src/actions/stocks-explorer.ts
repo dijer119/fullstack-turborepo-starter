@@ -158,7 +158,9 @@ export async function getStocksExplorer(
     name: m.name,
     market: m.market,
     marcap: m.marcap != null ? Number(m.marcap) : null,
-    currentPrice: m.analysis?.currentPrice ?? null,
+    // 우선 최신 일별 종가(PriceChange) → fallback NCAV/안전마진 worker가 채운 가격.
+    currentPrice:
+      m.priceChange?.currentPrice ?? m.analysis?.currentPrice ?? null,
     per: m.analysis?.per ?? null,
     pbr: m.analysis?.pbr ?? null,
     dividendYield: m.analysis?.dividendYield ?? null,
