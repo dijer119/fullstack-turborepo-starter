@@ -4,6 +4,8 @@ import {
   type StocksSort,
 } from "@/actions/stocks-explorer";
 import { StocksExplorerClient, type StocksExplorerView } from "./StocksExplorerClient";
+import { listRefreshStates } from "@/actions/refresh-jobs";
+import { RefreshMenu } from "./RefreshMenu";
 
 export const metadata = { title: "전종목 조회 — Company Map" };
 export const dynamic = "force-dynamic";
@@ -45,14 +47,18 @@ export default async function StocksPage({
   };
 
   const { rows, total } = await getStocksExplorer(view);
+  const refreshStates = await listRefreshStates();
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-4 py-6">
-      <header>
-        <h1 className="text-2xl font-bold">전종목 조회</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          KOSPI · KOSDAQ 전체 상장 종목. 필터·정렬로 탐색하세요.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">전종목 조회</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            KOSPI · KOSDAQ 전체 상장 종목. 필터·정렬로 탐색하세요.
+          </p>
+        </div>
+        <RefreshMenu initialStates={refreshStates} />
       </header>
       <StocksExplorerClient rows={rows} total={total} view={view} />
     </main>
