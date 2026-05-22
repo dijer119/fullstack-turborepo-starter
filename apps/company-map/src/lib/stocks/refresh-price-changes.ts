@@ -1,5 +1,5 @@
 import { db } from "../../../worker/db";
-import { fetchPriceChange3M } from "./price-history";
+import { fetchPriceChange3M, fetchMarketValue } from "./price-history";
 
 const KIND = "price_changes";
 const CALL_DELAY_MS = 100;
@@ -35,6 +35,9 @@ export async function refreshPriceChanges(): Promise<RefreshPriceChangesResult> 
         skipped++;
         continue;
       }
+      // 시가총액은 별도 endpoint. 실패해도 가격 데이터는 저장.
+      const marcap = await fetchMarketValue(code).catch(() => null);
+      await new Promise((r) => setTimeout(r, CALL_DELAY_MS));
       await db.priceChange.upsert({
         where: { code },
         create: {
@@ -43,12 +46,14 @@ export async function refreshPriceChanges(): Promise<RefreshPriceChangesResult> 
           pastPrice: r.pastPrice,
           pastDate: r.pastDate,
           pctChange: r.pctChange,
+          marcap,
         },
         update: {
           currentPrice: r.currentPrice,
           pastPrice: r.pastPrice,
           pastDate: r.pastDate,
           pctChange: r.pctChange,
+          marcap,
           fetchedAt: new Date(),
         },
       });

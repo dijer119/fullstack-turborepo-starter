@@ -157,7 +157,13 @@ export async function getStocksExplorer(
     code: m.code,
     name: m.name,
     market: m.market,
-    marcap: m.marcap != null ? Number(m.marcap) : null,
+    // 우선 최신 네이버 시총(PriceChange.marcap) → fallback KRX 시드(stock_masters.marcap).
+    marcap:
+      m.priceChange?.marcap != null
+        ? Number(m.priceChange.marcap)
+        : m.marcap != null
+          ? Number(m.marcap)
+          : null,
     // 우선 최신 일별 종가(PriceChange) → fallback NCAV/안전마진 worker가 채운 가격.
     currentPrice:
       m.priceChange?.currentPrice ?? m.analysis?.currentPrice ?? null,

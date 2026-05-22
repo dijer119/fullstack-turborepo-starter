@@ -1,10 +1,33 @@
+import { parseKoreanMarketValue } from "./parse-market-value";
+
 const API = "https://api.finance.naver.com/siseJson.naver";
+const INTEGRATION_API = "https://m.stock.naver.com/api/stock";
 
 export interface PriceChange3M {
   currentPrice: number;
   pastPrice: number;
   pastDate: Date;
   pctChange: number;
+}
+
+/** 네이버 모바일 stock integration API → 시가총액(BigInt 원 단위). */
+export async function fetchMarketValue(code: string): Promise<bigint | null> {
+  if (!/^\d{6}$/.test(code)) return null;
+  const res = await fetch(`${INTEGRATION_API}/${code}/integration`, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+  });
+  if (!res.ok) return null;
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    return null;
+  }
+  const infos = (data as { totalInfos?: Array<{ code?: string; value?: string }> })
+    .totalInfos;
+  if (!Array.isArray(infos)) return null;
+  const mv = infos.find((x) => x.code === "marketValue")?.value;
+  return parseKoreanMarketValue(mv);
 }
 
 function toYyyymmdd(d: Date): string {
