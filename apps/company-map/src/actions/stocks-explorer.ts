@@ -1,6 +1,7 @@
 "use server";
 
 import { Prisma } from "@prisma-clients/company-map";
+import type { TagView } from "./tags";
 import { db } from "@/lib/db";
 
 export type MarketFilter = "ALL" | "KOSPI" | "KOSDAQ";
@@ -19,6 +20,7 @@ export interface StocksExplorerParams {
   page?: number;
   pageSize?: number;
   vipOnly?: boolean;
+  tagIds?: number[];
 }
 
 export interface StocksExplorerRow {
@@ -39,6 +41,7 @@ export interface StocksExplorerRow {
   opIncomeYoyBase: number | null;
   opIncomePrevReport: number | null;
   latestReprtCode: string | null;
+  tags: TagView[];
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -97,6 +100,12 @@ export async function getStocksExplorer(
     where.vipHoldings = { some: {} };
   }
 
+  if (params.tagIds && params.tagIds.length > 0) {
+    where.AND = params.tagIds.map((tagId) => ({
+      tags: { some: { tagId } },
+    }));
+  }
+
   // SQLite의 NULLS LAST 지원이 불안정해 분기 처리.
   // marcap_desc: marcap이 nullable이라 raw SQL로 NULL을 끝에 강제.
   // safetyMargin_desc: analyzed only이므로 NULL 없음 → 안전.
@@ -133,6 +142,7 @@ export async function getStocksExplorer(
         },
         _count: { select: { vipHoldings: true } },
         financialSnapshot: true,
+        tags: { include: { tag: true } },
       },
       orderBy,
       skip: (page - 1) * pageSize,
@@ -158,6 +168,7 @@ export async function getStocksExplorer(
     opIncomeYoyBase: m.financialSnapshot?.opIncomeYoyBase != null ? Number(m.financialSnapshot.opIncomeYoyBase) : null,
     opIncomePrevReport: m.financialSnapshot?.opIncomePrevReport != null ? Number(m.financialSnapshot.opIncomePrevReport) : null,
     latestReprtCode: m.financialSnapshot?.latestReprtCode ?? null,
+    tags: m.tags.map((t) => ({ id: t.tag.id, name: t.tag.name })),
   }));
 
   return { rows, total };
