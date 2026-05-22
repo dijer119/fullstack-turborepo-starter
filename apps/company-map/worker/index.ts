@@ -4,6 +4,7 @@ import { loadKrxStocks } from "./load-krx";
 import { analyzeAllStocks } from "./analyze-loop";
 import { runNcavScreening } from "./ncav-loop";
 import { tradeSyncTick } from "./trade-sync-loop";
+import { priceChangeLoop } from "./price-change-loop";
 
 const TWO_MINUTES_MS = 120_000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -77,4 +78,7 @@ if (process.argv.includes("--once")) {
   })();
 } else {
   backgroundUpdate();
+  priceChangeLoop().catch((err) =>
+    console.error("[worker] price-change loop crashed:", err),
+  );
 }
