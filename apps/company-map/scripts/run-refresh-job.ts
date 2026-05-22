@@ -6,13 +6,14 @@ config({ path: path.resolve(__dirname, "..", ".env") });
 import { spawnSync } from "node:child_process";
 import { db } from "../worker/db";
 
-type Kind = "krx_stocks" | "vip_holdings" | "operating_income" | "trade";
+type Kind = "krx_stocks" | "vip_holdings" | "operating_income" | "trade" | "price_changes";
 
 const SCRIPTS: Record<Kind, string[]> = {
   krx_stocks: ["scripts/regenerate-krx-stocks.ts", "scripts/smoke-load-krx.ts"],
   vip_holdings: ["scripts/refresh-vip-holdings.ts"],
   operating_income: ["scripts/refresh-operating-income.ts"],
   trade: ["scripts/ingest-trade.ts"],
+  price_changes: ["scripts/refresh-price-changes.ts"],
 };
 
 (async () => {
