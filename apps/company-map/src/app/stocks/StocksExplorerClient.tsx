@@ -16,6 +16,11 @@ import {
 import { formatMarcap } from "@/lib/format-marcap";
 import { formatStockRatio, ratioColorClass } from "@/lib/format-ratio";
 import { computeGrowth, formatGrowth, growthColorClass } from "@/lib/format-growth";
+import {
+  addTagToStock,
+  removeTagFromStock,
+  type TagView,
+} from "@/actions/tags";
 
 export interface StocksExplorerView {
   market: MarketFilter;
@@ -26,6 +31,7 @@ export interface StocksExplorerView {
   pbrMax: number | null;
   analyzedOnly: boolean;
   vipOnly: boolean;
+  tagIds: number[];
   sort: StocksSort;
   page: number;
   pageSize: number;
@@ -35,6 +41,7 @@ interface Props {
   rows: StocksExplorerRow[];
   total: number;
   view: StocksExplorerView;
+  allTags: TagView[];
 }
 
 function buildQuery(view: Partial<StocksExplorerView>): string {
@@ -47,6 +54,7 @@ function buildQuery(view: Partial<StocksExplorerView>): string {
   if (view.pbrMax != null) qs.set("pbrMax", String(view.pbrMax));
   if (view.analyzedOnly) qs.set("analyzed", "1");
   if (view.vipOnly) qs.set("vip", "1");
+  if (view.tagIds && view.tagIds.length > 0) qs.set("tags", view.tagIds.join(","));
   if (view.sort && view.sort !== "marcap_desc") qs.set("sort", view.sort);
   if (view.page && view.page > 1) qs.set("page", String(view.page));
   return qs.toString();
@@ -90,7 +98,7 @@ function titleForGrowth(
   return `${base} 기준 (최신: ${reportLabel})`;
 }
 
-export function StocksExplorerClient({ rows, total, view }: Props) {
+export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [filterOpen, setFilterOpen] = useState(
@@ -99,7 +107,8 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
       view.perMax != null ||
       view.pbrMax != null ||
       view.analyzedOnly ||
-      view.vipOnly,
+      view.vipOnly ||
+      view.tagIds.length > 0,
   );
 
   // 폼 로컬 상태 (제출 전까지는 URL 미반영)
@@ -118,6 +127,7 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
   );
   const [analyzedOnly, setAnalyzedOnly] = useState(view.analyzedOnly);
   const [vipOnly, setVipOnly] = useState(view.vipOnly);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>(view.tagIds);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [vipDetails, setVipDetails] = useState<Record<string, VipHoldingDetailRow[]>>({});
   const [vipLoading, setVipLoading] = useState<Set<string>>(new Set());
@@ -165,6 +175,7 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
       pbrMax: pbrMax ? Number(pbrMax) : null,
       analyzedOnly,
       vipOnly,
+      tagIds: selectedTagIds,
       page: 1,
     });
   };
@@ -177,6 +188,7 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
     setPbrMax("");
     setAnalyzedOnly(false);
     setVipOnly(false);
+    setSelectedTagIds([]);
     startTransition(() => router.replace("/stocks"));
   };
 
@@ -319,6 +331,38 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
             />
             <span>VIP 보유 종목만</span>
           </label>
+          {allTags.length > 0 && (
+            <div className="md:col-span-2 lg:col-span-3">
+              <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                태그 (모두 포함):
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {allTags.map((t) => {
+                  const active = selectedTagIds.includes(t.id);
+                  return (
+                    <button
+                      type="button"
+                      key={t.id}
+                      onClick={() => {
+                        setSelectedTagIds(
+                          active
+                            ? selectedTagIds.filter((id) => id !== t.id)
+                            : [...selectedTagIds, t.id],
+                        );
+                      }}
+                      className={`rounded px-2 py-0.5 text-xs ${
+                        active
+                          ? "bg-blue-600 text-white"
+                          : "border border-gray-300 hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      {t.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-end gap-2 md:col-span-2 lg:col-span-3">
             <button
               type="button"
@@ -364,6 +408,7 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
               <th className="p-2 font-medium text-right">안전마진</th>
               <th className="p-2 font-medium text-right">VIP</th>
               <th className="p-2 font-medium text-right">YoY</th>
+              <th className="p-2 font-medium">Tag</th>
             </tr>
           </thead>
           <tbody>
@@ -424,10 +469,13 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
                       </td>
                     );
                   })()}
+                  <td className="p-2">
+                    <TagCell stockCode={r.code} tags={r.tags} allTags={allTags} />
+                  </td>
                 </tr>
                 {expanded.has(r.code) && (
                   <tr key={r.code + "-expand"} className="bg-blue-50/40 dark:bg-blue-950/20">
-                    <td colSpan={10} className="p-3">
+                    <td colSpan={11} className="p-3">
                       <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
                         브이아이피자산운용 보유 공시 (최근 6개월)
                       </div>
@@ -465,7 +513,7 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={10} className="p-6 text-center text-gray-500">
+                <td colSpan={11} className="p-6 text-center text-gray-500">
                   조건에 맞는 종목이 없습니다.
                 </td>
               </tr>
@@ -513,6 +561,110 @@ export function StocksExplorerClient({ rows, total, view }: Props) {
             다음
           </Link>
         </div>
+      )}
+    </div>
+  );
+}
+
+function TagCell({
+  stockCode,
+  tags: initialTags,
+  allTags,
+}: {
+  stockCode: string;
+  tags: TagView[];
+  allTags: TagView[];
+}) {
+  const [tags, setTags] = useState(initialTags);
+  const [editing, setEditing] = useState(false);
+  const [input, setInput] = useState("");
+
+  const onAdd = async () => {
+    const name = input.trim();
+    if (!name) {
+      setEditing(false);
+      return;
+    }
+    const created = await addTagToStock(stockCode, name);
+    if (created && !tags.find((t) => t.id === created.id)) {
+      setTags([...tags, created]);
+    }
+    setInput("");
+    setEditing(false);
+  };
+
+  const onRemove = async (id: number) => {
+    setTags(tags.filter((t) => t.id !== id));
+    await removeTagFromStock(stockCode, id);
+  };
+
+  const suggestions = input
+    ? allTags
+        .filter((t) => t.name.startsWith(input) && !tags.find((tt) => tt.id === t.id))
+        .slice(0, 5)
+    : [];
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {tags.map((t) => (
+        <span
+          key={t.id}
+          className="inline-flex items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs dark:bg-gray-800"
+        >
+          {t.name}
+          <button
+            type="button"
+            onClick={() => onRemove(t.id)}
+            className="text-gray-400 hover:text-red-600"
+            aria-label={`${t.name} 제거`}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      {editing ? (
+        <div className="relative">
+          <input
+            type="text"
+            autoFocus
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onAdd();
+              else if (e.key === "Escape") {
+                setInput("");
+                setEditing(false);
+              }
+            }}
+            onBlur={onAdd}
+            className="w-24 rounded border border-gray-300 px-1.5 py-0.5 text-xs dark:border-gray-700 dark:bg-gray-900"
+            placeholder="태그명"
+          />
+          {suggestions.length > 0 && (
+            <ul className="absolute left-0 top-full z-10 mt-1 w-32 rounded border border-gray-200 bg-white shadow dark:border-gray-700 dark:bg-gray-900">
+              {suggestions.map((s) => (
+                <li
+                  key={s.id}
+                  className="cursor-pointer px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setInput(s.name);
+                  }}
+                >
+                  {s.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="text-xs text-gray-400 hover:text-blue-600"
+        >
+          + 태그
+        </button>
       )}
     </div>
   );

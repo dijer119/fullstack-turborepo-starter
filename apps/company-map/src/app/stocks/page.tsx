@@ -5,6 +5,7 @@ import {
 } from "@/actions/stocks-explorer";
 import { StocksExplorerClient, type StocksExplorerView } from "./StocksExplorerClient";
 import { listRefreshStates } from "@/actions/refresh-jobs";
+import { listTags } from "@/actions/tags";
 import { RefreshMenu } from "./RefreshMenu";
 
 export const metadata = { title: "전종목 조회 — Company Map" };
@@ -32,6 +33,11 @@ export default async function StocksPage({
   const rawPage = Number(sp.page ?? "1");
   const page = Number.isFinite(rawPage) && rawPage >= 1 ? Math.floor(rawPage) : 1;
 
+  const tagIds = (sp.tags ?? "")
+    .split(",")
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isFinite(n) && n > 0);
+
   const view: StocksExplorerView = {
     market,
     search: sp.search ?? "",
@@ -41,6 +47,7 @@ export default async function StocksPage({
     pbrMax: parseOptionalNumber(sp.pbrMax),
     analyzedOnly: sp.analyzed === "1",
     vipOnly: sp.vip === "1",
+    tagIds,
     sort,
     page,
     pageSize: 50,
@@ -48,6 +55,7 @@ export default async function StocksPage({
 
   const { rows, total } = await getStocksExplorer(view);
   const refreshStates = await listRefreshStates();
+  const allTags = await listTags();
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-4 py-6">
@@ -60,7 +68,7 @@ export default async function StocksPage({
         </div>
         <RefreshMenu initialStates={refreshStates} />
       </header>
-      <StocksExplorerClient rows={rows} total={total} view={view} />
+      <StocksExplorerClient rows={rows} total={total} view={view} allTags={allTags} />
     </main>
   );
 }
