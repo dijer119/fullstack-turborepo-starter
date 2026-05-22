@@ -75,4 +75,20 @@ describe("extractOpIncome", () => {
       }),
     ).toEqual({ thstrm: -1_500_000_000n, frmtrm: 2_000_000_000n });
   });
+
+  it("matches 영업이익(손실) used by banks/금융지주", () => {
+    expect(
+      extractOpIncome({
+        status: "000",
+        list: [
+          {
+            account_nm: "영업이익(손실)",
+            fs_nm: "연결재무제표",
+            thstrm_amount: "2,727,566,000,000",
+            frmtrm_amount: "1,500,000,000,000",
+          },
+        ],
+      }),
+    ).toEqual({ thstrm: 2_727_566_000_000n, frmtrm: 1_500_000_000_000n });
+  });
 });

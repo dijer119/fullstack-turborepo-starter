@@ -41,8 +41,10 @@ export function extractOpIncome(
   if (r.status !== "000") return null;
   const list = r.list ?? [];
 
+  // 은행·금융지주는 손익계산서 항목명이 "영업이익(손실)"로 들어옴.
+  const OP_INCOME_NAMES = new Set(["영업이익", "영업이익(손실)"]);
   const candidates = list
-    .filter((item) => item.account_nm === "영업이익")
+    .filter((item) => OP_INCOME_NAMES.has(item.account_nm ?? ""))
     .map((item) => {
       const isConsolidated = item.fs_nm === "연결재무제표" || item.fs_div === "CFS";
       return {
