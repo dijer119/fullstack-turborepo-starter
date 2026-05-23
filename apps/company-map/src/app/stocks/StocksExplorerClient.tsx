@@ -86,6 +86,8 @@ const SORT_OPTIONS: Array<{ value: StocksSort; label: string }> = [
   { value: "marcap_desc", label: "시가총액 ↓" },
   { value: "name_asc", label: "종목명 ↑" },
   { value: "safetyMargin_desc", label: "안전마진 ↓ (분석된 종목)" },
+  { value: "dividendYield_desc", label: "배당% ↓ (분석된 종목)" },
+  { value: "yoy_desc", label: "영업이익 YoY ↓" },
 ];
 
 function titleForGrowth(

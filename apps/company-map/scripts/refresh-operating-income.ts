@@ -99,6 +99,14 @@ const REPORT_PRIORITY: Record<ReprtCode, number> = {
     if (collected.length > 0) {
       const latest = collected[0];
       const prev = collected.length > 1 ? collected[1] : null;
+      // 정렬용 yoyPct 미리 계산. frmtrm=0 또는 null이면 null.
+      // 흑전(base<0, curr>0)은 큰 양수, 적전(base>0, curr<0)은 큰 음수로 자연 정렬.
+      const base = Number(latest.frmtrm);
+      const curr = Number(latest.thstrm);
+      const yoyPct =
+        Number.isFinite(base) && base !== 0 && Number.isFinite(curr)
+          ? ((curr - base) / Math.abs(base)) * 100
+          : null;
       await db.financialSnapshot.upsert({
         where: { code: m.code },
         create: {
@@ -108,6 +116,7 @@ const REPORT_PRIORITY: Record<ReprtCode, number> = {
           opIncome: latest.thstrm,
           opIncomeYoyBase: latest.frmtrm,
           opIncomePrevReport: prev?.thstrm ?? null,
+          opIncomeYoyPct: yoyPct,
         },
         update: {
           latestBsnsYear: latest.bsnsYear,
@@ -115,6 +124,7 @@ const REPORT_PRIORITY: Record<ReprtCode, number> = {
           opIncome: latest.thstrm,
           opIncomeYoyBase: latest.frmtrm,
           opIncomePrevReport: prev?.thstrm ?? null,
+          opIncomeYoyPct: yoyPct,
           fetchedAt: new Date(),
         },
       });

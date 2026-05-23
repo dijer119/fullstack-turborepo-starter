@@ -5,7 +5,12 @@ import type { TagView } from "./tags";
 import { db } from "@/lib/db";
 
 export type MarketFilter = "ALL" | "KOSPI" | "KOSDAQ";
-export type StocksSort = "marcap_desc" | "name_asc" | "safetyMargin_desc";
+export type StocksSort =
+  | "marcap_desc"
+  | "name_asc"
+  | "safetyMargin_desc"
+  | "dividendYield_desc"
+  | "yoy_desc";
 
 export interface StocksExplorerParams {
   market?: MarketFilter;
@@ -64,12 +69,16 @@ export async function getStocksExplorer(
     Math.max(1, Math.floor(params.pageSize ?? DEFAULT_PAGE_SIZE)),
   );
 
-  // PER/PBR 또는 safetyMargin 정렬 시 자동으로 analyzed 종목만 필터링.
+  // PER/PBR 또는 safetyMargin/dividendYield 정렬 시 자동으로 analyzed 종목만 필터링.
   const needsAnalysis =
     params.analyzedOnly === true ||
     params.perMax != null ||
     params.pbrMax != null ||
-    sort === "safetyMargin_desc";
+    sort === "safetyMargin_desc" ||
+    sort === "dividendYield_desc";
+
+  // YoY 정렬은 financialSnapshot의 yoyPct가 채워진 row만 의미 있음.
+  const needsFinancialSnapshot = sort === "yoy_desc";
 
   const where: Prisma.StockMasterWhereInput = {};
   if (market !== "ALL") where.market = market;
@@ -108,6 +117,10 @@ export async function getStocksExplorer(
     }));
   }
 
+  if (needsFinancialSnapshot) {
+    where.financialSnapshot = { is: { opIncomeYoyPct: { not: null } } };
+  }
+
   // SQLite의 NULLS LAST 지원이 불안정해 분기 처리.
   // marcap_desc: marcap이 nullable이라 raw SQL로 NULL을 끝에 강제.
   // safetyMargin_desc: analyzed only이므로 NULL 없음 → 안전.
@@ -121,6 +134,18 @@ export async function getStocksExplorer(
     case "safetyMargin_desc":
       orderBy = [
         { analysis: { safetyMargin: "desc" } },
+        { marcap: "desc" },
+      ];
+      break;
+    case "dividendYield_desc":
+      orderBy = [
+        { analysis: { dividendYield: "desc" } },
+        { marcap: "desc" },
+      ];
+      break;
+    case "yoy_desc":
+      orderBy = [
+        { financialSnapshot: { opIncomeYoyPct: "desc" } },
         { marcap: "desc" },
       ];
       break;

@@ -27,7 +27,10 @@ export default async function StocksPage({
   const market: MarketFilter =
     sp.market === "KOSPI" || sp.market === "KOSDAQ" ? sp.market : "ALL";
   const sort: StocksSort =
-    sp.sort === "name_asc" || sp.sort === "safetyMargin_desc"
+    sp.sort === "name_asc" ||
+    sp.sort === "safetyMargin_desc" ||
+    sp.sort === "dividendYield_desc" ||
+    sp.sort === "yoy_desc"
       ? sp.sort
       : "marcap_desc";
   const rawPage = Number(sp.page ?? "1");
