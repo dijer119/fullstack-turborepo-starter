@@ -66,6 +66,7 @@ model StockMaster {
   opIncomeHistory       OperatingIncomeHistory[]
   tags                  StockTag[]
   priceChange           PriceChange?
+  memo                  StockMemo?
 
   @@index([name])
   @@index([market])
@@ -230,4 +231,14 @@ model PriceChange {
   master  StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@map("price_changes")
+}
+
+model StockMemo {
+  code      String   @id
+  text      String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  master    StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+
+  @@map("stock_memos")
 }
