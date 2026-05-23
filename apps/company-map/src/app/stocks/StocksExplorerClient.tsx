@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Filter, ChevronDown, ChevronUp, ExternalLink, FileText } from "lucide-react";
@@ -700,8 +700,18 @@ function MemoButton({
   const [loading, setLoading] = useState(false);
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
+  // popover 위치(viewport 기준). 부모 overflow-x-auto에 갇히지 않게 fixed 사용.
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+  const POPOVER_W = 288; // w-72 = 18rem = 288px
 
   const openPopover = async () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      // 오른쪽 화면 밖으로 벗어나면 좌측 정렬을 button.right - width로 보정.
+      const left = Math.min(rect.left, window.innerWidth - POPOVER_W - 8);
+      setPos({ top: rect.bottom + 4, left: Math.max(8, left) });
+    }
     setOpen(true);
     setLoading(true);
     try {
@@ -715,6 +725,7 @@ function MemoButton({
   const closePopover = () => {
     setOpen(false);
     setText("");
+    setPos(null);
   };
 
   const onSave = async () => {
@@ -724,14 +735,16 @@ function MemoButton({
       setHasMemo(r.hasMemo);
       setOpen(false);
       setText("");
+      setPos(null);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="relative">
+    <>
       <button
+        ref={btnRef}
         type="button"
         onClick={openPopover}
         aria-label={hasMemo ? "메모 편집" : "메모 추가"}
@@ -743,15 +756,16 @@ function MemoButton({
       >
         <FileText size={14} fill={hasMemo ? "currentColor" : "none"} />
       </button>
-      {open && (
+      {open && pos && (
         <>
           <div
-            className="fixed inset-0 z-10"
+            className="fixed inset-0 z-30"
             onClick={closePopover}
             aria-hidden
           />
           <div
-            className="absolute left-0 top-full z-20 mt-1 w-72 rounded-md border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+            className="fixed z-40 w-72 rounded-md border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+            style={{ top: pos.top, left: pos.left }}
             onClick={(e) => e.stopPropagation()}
           >
             {loading ? (
@@ -798,6 +812,6 @@ function MemoButton({
           </div>
         </>
       )}
-    </div>
+    </>
   );
 }
