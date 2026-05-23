@@ -395,7 +395,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
       </div>
 
       {/* 표 */}
-      <div className="overflow-x-auto">
+      <div>
         <table className="w-full text-sm border-separate border-spacing-0">
           <thead>
             <tr className="text-left">
