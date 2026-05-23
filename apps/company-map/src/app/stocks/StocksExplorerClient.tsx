@@ -397,20 +397,20 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
       {/* 표 */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-separate border-spacing-0">
-          <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900">
+          <thead>
             <tr className="text-left">
-              <th className="p-2 font-medium">종목명</th>
-              <th className="p-2 font-medium">코드</th>
-              <th className="p-2 font-medium text-right">시가총액</th>
-              <th className="p-2 font-medium text-right">현재가</th>
-              <th className="p-2 font-medium text-right">PER</th>
-              <th className="p-2 font-medium text-right">PBR</th>
-              <th className="p-2 font-medium text-right">배당%</th>
-              <th className="p-2 font-medium text-right">안전마진</th>
-              <th className="p-2 font-medium text-right">3M</th>
-              <th className="p-2 font-medium text-right">VIP</th>
-              <th className="p-2 font-medium text-right">YoY</th>
-              <th className="p-2 font-medium">Tag</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">종목명</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">코드</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">시가총액</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">현재가</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">PER</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">PBR</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">배당%</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">안전마진</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">3M</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">VIP</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">YoY</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">Tag</th>
             </tr>
           </thead>
           <tbody>
