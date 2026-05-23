@@ -43,6 +43,7 @@ export interface StocksExplorerRow {
   latestReprtCode: string | null;
   tags: TagView[];
   pctChange3M: number | null;
+  hasMemo: boolean;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -145,6 +146,7 @@ export async function getStocksExplorer(
         financialSnapshot: true,
         tags: { include: { tag: true } },
         priceChange: true,
+        memo: { select: { code: true } },
       },
       orderBy,
       skip: (page - 1) * pageSize,
@@ -180,6 +182,7 @@ export async function getStocksExplorer(
     latestReprtCode: m.financialSnapshot?.latestReprtCode ?? null,
     tags: m.tags.map((t) => ({ id: t.tag.id, name: t.tag.name })),
     pctChange3M: m.priceChange?.pctChange ?? null,
+    hasMemo: m.memo != null,
   }));
 
   return { rows, total };
