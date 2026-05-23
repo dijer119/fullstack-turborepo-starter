@@ -397,7 +397,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
       {/* 표 */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
-          <thead className="bg-gray-50 dark:bg-gray-900">
+          <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900">
             <tr className="text-left">
               <th className="p-2 font-medium">종목명</th>
               <th className="p-2 font-medium">코드</th>
