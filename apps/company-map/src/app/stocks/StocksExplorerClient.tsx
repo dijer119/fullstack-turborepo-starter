@@ -3,7 +3,7 @@
 import React, { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Filter, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { Filter, ChevronDown, ChevronUp, ExternalLink, FileText } from "lucide-react";
 import type {
   MarketFilter,
   StocksExplorerRow,
@@ -21,6 +21,7 @@ import {
   removeTagFromStock,
   type TagView,
 } from "@/actions/tags";
+import { getMemoByCode, setMemo } from "@/actions/memos";
 
 export interface StocksExplorerView {
   market: MarketFilter;
@@ -419,14 +420,17 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                   className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900/50"
                 >
                   <td className="p-2 font-medium">
-                    <a
-                      href={`https://finance.naver.com/item/main.naver?code=${r.code}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline dark:text-blue-400"
-                    >
-                      {r.name}
-                    </a>
+                    <div className="flex items-center gap-1.5">
+                      <MemoButton stockCode={r.code} initialHasMemo={r.hasMemo} />
+                      <a
+                        href={`https://finance.naver.com/item/main.naver?code=${r.code}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        {r.name}
+                      </a>
+                    </div>
                   </td>
                   <td className="p-2 font-mono text-gray-500">{r.code}</td>
                   <td className="p-2 text-right">{formatMarcap(r.marcap)}</td>
@@ -679,6 +683,120 @@ function TagCell({
         >
           + 태그
         </button>
+      )}
+    </div>
+  );
+}
+
+function MemoButton({
+  stockCode,
+  initialHasMemo,
+}: {
+  stockCode: string;
+  initialHasMemo: boolean;
+}) {
+  const [hasMemo, setHasMemo] = useState(initialHasMemo);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const openPopover = async () => {
+    setOpen(true);
+    setLoading(true);
+    try {
+      const t = await getMemoByCode(stockCode);
+      setText(t ?? "");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const closePopover = () => {
+    setOpen(false);
+    setText("");
+  };
+
+  const onSave = async () => {
+    setSaving(true);
+    try {
+      const r = await setMemo(stockCode, text);
+      setHasMemo(r.hasMemo);
+      setOpen(false);
+      setText("");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={openPopover}
+        aria-label={hasMemo ? "메모 편집" : "메모 추가"}
+        className={`inline-flex items-center justify-center rounded p-0.5 transition ${
+          hasMemo
+            ? "text-blue-600 hover:text-blue-700 dark:text-blue-400"
+            : "text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400"
+        }`}
+      >
+        <FileText size={14} fill={hasMemo ? "currentColor" : "none"} />
+      </button>
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-10"
+            onClick={closePopover}
+            aria-hidden
+          />
+          <div
+            className="absolute left-0 top-full z-20 mt-1 w-72 rounded-md border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {loading ? (
+              <div className="text-xs text-gray-500">불러오는 중…</div>
+            ) : (
+              <>
+                <textarea
+                  autoFocus
+                  rows={4}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      void onSave();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      closePopover();
+                    }
+                  }}
+                  placeholder="메모 입력…"
+                  className="w-full resize-y rounded border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
+                />
+                <div className="mt-1 flex items-center justify-end gap-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={closePopover}
+                    className="rounded border border-gray-300 px-2 py-0.5 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                    disabled={saving}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onSave}
+                    className="rounded bg-blue-600 px-2 py-0.5 text-white hover:bg-blue-700 disabled:opacity-60"
+                    disabled={saving}
+                  >
+                    저장 ⌘↵
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
