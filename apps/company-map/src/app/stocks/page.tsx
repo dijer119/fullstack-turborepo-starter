@@ -50,6 +50,7 @@ export default async function StocksPage({
     pbrMax: parseOptionalNumber(sp.pbrMax),
     analyzedOnly: sp.analyzed === "1",
     vipOnly: sp.vip === "1",
+    memoOnly: sp.memo === "1",
     tagIds,
     sort,
     page,

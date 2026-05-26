@@ -67,6 +67,7 @@ model StockMaster {
   tags                  StockTag[]
   priceChange           PriceChange?
   memo                  StockMemo?
+  override              StockOverride?
 
   @@index([name])
   @@index([market])
@@ -242,4 +243,14 @@ model StockMemo {
   master    StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@map("stock_memos")
+}
+
+model StockOverride {
+  code      String   @id
+  manualRoe Float?   @map("manual_roe")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  master    StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+
+  @@map("stock_overrides")
 }

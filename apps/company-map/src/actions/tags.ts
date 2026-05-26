@@ -7,9 +7,12 @@ export interface TagView {
   name: string;
 }
 
-/** 모든 tag를 name asc로 반환. 자동완성 + 필터 패널 chip 목록용. */
+/** 사용 종목이 1개 이상인 tag만 name asc로 반환. 필터 패널 chip 목록용. */
 export async function listTags(): Promise<TagView[]> {
-  const rows = await db.tag.findMany({ orderBy: { name: "asc" } });
+  const rows = await db.tag.findMany({
+    where: { stocks: { some: {} } },
+    orderBy: { name: "asc" },
+  });
   return rows.map((r) => ({ id: r.id, name: r.name }));
 }
 

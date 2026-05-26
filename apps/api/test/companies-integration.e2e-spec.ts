@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma-clients/api';
 
 describe('Companies Integration Test (Real DB)', () => {
   let prisma: PrismaClient;

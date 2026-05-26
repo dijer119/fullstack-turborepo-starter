@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>ROE 컬럼 + 수동 입력 — Implementation Plan</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 980px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+    pre { background: #f4f4f4; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 3px; }
+    pre code { background: none; padding: 0; }
+    h2 { border-bottom: 1px solid #ddd; padding-bottom: 0.3rem; margin-top: 2rem; }
+    h3 { color: #2c5282; }
+    .task { background: #fafafa; padding: 1rem 1.5rem; border-left: 3px solid #2c5282; margin: 1rem 0; border-radius: 4px; }
+    .step { margin: 0.6rem 0; }
+    .files { color: #555; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+<h1>ROE 컬럼 + 수동 입력 Implementation Plan</h1>
+
+<blockquote>
+<p><strong>For agentic workers:</strong> 본 plan은 inline 실행 전제로 작성. CLAUDE.md "사소한 작업은 판단력 사용" 지침에 따라 TDD 형식 대신 단계별 구현 + 수동 검증 패턴 사용. <code>☐</code>는 미완료, <code>☑</code>는 완료.</p>
+</blockquote>
+
+<p><strong>Goal:</strong> <code>/stocks</code> 페이지에 ROE 컬럼 추가 (자동 추정 표시 + inline 수동 입력), 서준식 계산이 수동값 우선 사용.</p>
+
+<p><strong>Architecture:</strong> 신규 <code>StockOverride</code> 1:1 옵셔널 테이블에 manualRoe 저장. <code>stocks-explorer</code> 액션이 override를 JOIN, <code>StocksExplorerRow</code>에 <code>manualRoe</code> 노출. 클라이언트는 inline-edit 셀로 <code>setManualRoe</code> server action 호출. 서준식 함수는 <code>manualRoe ?? autoRoe</code> 우선순위.</p>
+
+<p><strong>Tech Stack:</strong> Next.js 16 App Router, Prisma 6 + SQLite, React 19 (useTransition).</p>
+
+<hr>
+
+<h2>변경 파일 목록</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+  <thead><tr><th>파일</th><th>상태</th><th>책임</th></tr></thead>
+  <tbody>
+    <tr><td><code>prisma/schema.prisma</code></td><td>수정</td><td>StockOverride 모델 추가 + StockMaster relation</td></tr>
+    <tr><td><code>prisma/migrations/&lt;ts&gt;_add_stock_overrides/migration.sql</code></td><td>신규</td><td>마이그레이션 SQL (Prisma가 자동 생성)</td></tr>
+    <tr><td><code>src/actions/stock-overrides.ts</code></td><td>신규</td><td><code>setManualRoe(code, roe | null)</code> server action</td></tr>
+    <tr><td><code>src/actions/stocks-explorer.ts</code></td><td>수정</td><td>override JOIN, StocksExplorerRow.manualRoe 추가</td></tr>
+    <tr><td><code>src/app/stocks/RoeCell.tsx</code></td><td>신규</td><td>inline-edit ROE 셀 클라이언트 컴포넌트</td></tr>
+    <tr><td><code>src/app/stocks/StocksExplorerClient.tsx</code></td><td>수정</td><td>ROE 컬럼 헤더 + 셀 통합, seojunsik 함수 시그니처 변경</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>Task 1 — Prisma schema + migration</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>prisma/schema.prisma</code> (이미 수정됨, 검증만), <code>prisma/migrations/&lt;ts&gt;_add_stock_overrides/migration.sql</code> (신규)</p>
+
+<div class="step">☐ <strong>Step 1.1:</strong> schema.prisma에 <code>StockOverride</code> 모델과 <code>StockMaster.override</code> 관계가 이미 들어있는지 확인. 직전 세션에서 추가됨.</div>
+
+<pre><code>grep -n "StockOverride\|override " /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/prisma/schema.prisma</code></pre>
+
+<p>Expected: 2개 이상 hit (model 정의 + relation).</p>
+
+<div class="step">☐ <strong>Step 1.2:</strong> 마이그레이션 생성 + DB 반영 + Prisma client 재생성.</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map
+npx prisma migrate dev --name add_stock_overrides --skip-seed</code></pre>
+
+<p>Expected: "Your database is now in sync" + Prisma Client generated.</p>
+
+<div class="step">☐ <strong>Step 1.3:</strong> 테이블 생성 검증.</div>
+
+<pre><code>sqlite3 data/company-map.db ".schema stock_overrides"</code></pre>
+
+<p>Expected: <code>CREATE TABLE</code> 구문에 <code>code TEXT PRIMARY KEY, manual_roe REAL, updated_at DATETIME</code>.</p>
+
+<div class="step">☐ <strong>Step 1.4:</strong> Prisma client에 StockOverride 타입 존재 확인.</div>
+
+<pre><code>grep -c "StockOverride" /Users/dijer/dev/workspace/fullstack-turborepo-starter/node_modules/@prisma-clients/company-map/index.d.ts</code></pre>
+
+<p>Expected: 0보다 큰 정수.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 2 — Server action: setManualRoe</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/actions/stock-overrides.ts</code> (신규)</p>
+
+<div class="step">☐ <strong>Step 2.1:</strong> 파일 생성 — 전체 내용:</div>
+
+<pre><code>"use server";
+
+import { db } from "@/lib/db";
+import { revalidatePath } from "next/cache";
+
+/**
+ * 수동 ROE 설정. roe=null이면 row 삭제 (자동 추정으로 복귀).
+ * 값은 % 단위 (예: 9.98 = 9.98%). 음수 허용 (적자 ROE).
+ */
+export async function setManualRoe(
+  code: string,
+  roe: number | null,
+): Promise&lt;void&gt; {
+  if (!/^\d{6}$/.test(code)) return;
+
+  if (roe === null) {
+    await db.stockOverride.deleteMany({ where: { code } });
+  } else {
+    if (!Number.isFinite(roe)) return;
+    await db.stockOverride.upsert({
+      where: { code },
+      create: { code, manualRoe: roe },
+      update: { manualRoe: roe },
+    });
+  }
+  revalidatePath("/stocks");
+}</code></pre>
+
+<div class="step">☐ <strong>Step 2.2:</strong> tsc 통과 확인.</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 3 — stocks-explorer에 manualRoe 노출</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/actions/stocks-explorer.ts</code></p>
+
+<div class="step">☐ <strong>Step 3.1:</strong> <code>StocksExplorerRow</code> 인터페이스에 <code>manualRoe</code> 추가. <code>hasMemo: boolean</code> 줄 다음에:</div>
+
+<pre><code>  manualRoe: number | null;</code></pre>
+
+<div class="step">☐ <strong>Step 3.2:</strong> <code>db.stockMaster.findMany</code>의 <code>include</code>에 <code>override: true</code> 추가. <code>memo: { select: { code: true } }</code> 줄 다음에:</div>
+
+<pre><code>        override: true,</code></pre>
+
+<div class="step">☐ <strong>Step 3.3:</strong> row 매핑부 (<code>rows: StocksExplorerRow[] = masters.map(...)</code> 내부) 마지막 필드에 추가. <code>hasMemo: m.memo != null,</code> 줄 다음에:</div>
+
+<pre><code>    manualRoe: m.override?.manualRoe ?? null,</code></pre>
+
+<div class="step">☐ <strong>Step 3.4:</strong> tsc 통과 확인.</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 4 — RoeCell 클라이언트 컴포넌트</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/app/stocks/RoeCell.tsx</code> (신규)</p>
+
+<p>책임 분리: ROE 셀의 inline edit + 표시 로직을 컴포넌트로 격리. <code>StocksExplorerClient.tsx</code>는 이미 비대 (650+ lines)라서 분리.</p>
+
+<div class="step">☐ <strong>Step 4.1:</strong> 파일 생성 — 전체 내용:</div>
+
+<pre><code>"use client";
+
+import { useState, useRef, useEffect, useTransition } from "react";
+import { setManualRoe } from "@/actions/stock-overrides";
+
+interface Props {
+  code: string;
+  manualRoe: number | null;   // 사용자 입력값 (% 단위, 예: 9.98)
+  autoRoe: number | null;     // PBR/PER 자동 추정 (% 단위)
+}
+
+function formatPct(v: number | null): string {
+  if (v == null) return "—";
+  return `${v.toFixed(2)}%`;
+}
+
+export function RoeCell({ code, manualRoe, autoRoe }: Props) {
+  const [editing, setEditing] = useState(false);
+  const [optimistic, setOptimistic] = useState&lt;number | null&gt;(manualRoe);
+  const [pending, startTransition] = useTransition();
+  const inputRef = useRef&lt;HTMLInputElement | null&gt;(null);
+
+  // 외부에서 manualRoe가 바뀌면 동기화 (서버 액션 후 revalidate).
+  useEffect(() =&gt; {
+    setOptimistic(manualRoe);
+  }, [manualRoe]);
+
+  useEffect(() =&gt; {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const display = optimistic ?? autoRoe;
+  const isManual = optimistic != null;
+
+  const commit = (raw: string) =&gt; {
+    const trimmed = raw.trim();
+    let next: number | null;
+    if (trimmed === "") {
+      next = null;
+    } else {
+      const parsed = Number(trimmed);
+      if (!Number.isFinite(parsed)) {
+        setEditing(false);
+        return;
+      }
+      next = parsed;
+    }
+    setOptimistic(next);
+    setEditing(false);
+    startTransition(async () =&gt; {
+      try {
+        await setManualRoe(code, next);
+      } catch (err) {
+        console.error("[roe] failed to save", code, err);
+        setOptimistic(manualRoe);   // rollback
+      }
+    });
+  };
+
+  if (editing) {
+    return (
+      &lt;td className="p-2 text-right"&gt;
+        &lt;input
+          ref={inputRef}
+          type="number"
+          step="0.01"
+          defaultValue={optimistic ?? ""}
+          placeholder={autoRoe != null ? autoRoe.toFixed(2) : ""}
+          disabled={pending}
+          onBlur={(e) =&gt; commit(e.target.value)}
+          onKeyDown={(e) =&gt; {
+            if (e.key === "Enter") commit((e.target as HTMLInputElement).value);
+            else if (e.key === "Escape") setEditing(false);
+          }}
+          className="w-20 rounded border border-blue-400 bg-white px-1 py-0.5 text-right text-sm dark:bg-gray-900"
+        /&gt;
+      &lt;/td&gt;
+    );
+  }
+
+  return (
+    &lt;td
+      onClick={() =&gt; setEditing(true)}
+      title={isManual ? "수동 입력 (클릭해서 수정)" : "PBR/PER 추정 (클릭해서 수동 입력)"}
+      className={`p-2 text-right cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30 ${
+        display == null
+          ? "text-gray-400"
+          : isManual
+            ? "font-semibold text-blue-600 dark:text-blue-400"
+            : "text-gray-600 dark:text-gray-400"
+      }`}
+    &gt;
+      {formatPct(display)}
+    &lt;/td&gt;
+  );
+}</code></pre>
+
+<div class="step">☐ <strong>Step 4.2:</strong> tsc 통과 확인.</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 5 — StocksExplorerClient에 ROE 컬럼 통합</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/app/stocks/StocksExplorerClient.tsx</code></p>
+
+<div class="step">☐ <strong>Step 5.1:</strong> 파일 상단 import 추가:</div>
+
+<pre><code>import { RoeCell } from "./RoeCell";</code></pre>
+
+<div class="step">☐ <strong>Step 5.2:</strong> seojunsikValue / seojunsikIndex 함수 시그니처 변경 — manualRoe 파라미터를 prepend. 두 함수 모두 동일 패턴:</div>
+
+<pre><code>// 서준식 적정주가: BPS × (1+ROE)^10 / 1.12^10. 목표수익률 12%, 10년.
+// effectiveRoe = manualRoe (%) ?? PBR/PER (소수 비율).
+function seojunsikValue(
+  manualRoe: number | null,
+  currentPrice: number | null,
+  per: number | null,
+  pbr: number | null,
+): number | null {
+  if (currentPrice == null || pbr == null) return null;
+  if (currentPrice &lt;= 0 || pbr &lt;= 0) return null;
+  const roe =
+    manualRoe != null
+      ? manualRoe / 100
+      : per != null && per &gt; 0
+        ? pbr / per
+        : null;
+  if (roe == null) return null;
+  const bps = currentPrice / pbr;
+  return (bps * Math.pow(1 + roe, 10)) / Math.pow(1.12, 10);
+}
+
+// 서준식 지수: 연간 복리 기대수익률 = (10년승수)^(1/10) - 1
+function seojunsikIndex(
+  manualRoe: number | null,
+  currentPrice: number | null,
+  per: number | null,
+  pbr: number | null,
+): number | null {
+  if (currentPrice == null || pbr == null) return null;
+  if (currentPrice &lt;= 0 || pbr &lt;= 0) return null;
+  const roe =
+    manualRoe != null
+      ? manualRoe / 100
+      : per != null && per &gt; 0
+        ? pbr / per
+        : null;
+  if (roe == null) return null;
+  const bps = currentPrice / pbr;
+  const multiple = (bps * Math.pow(1 + roe, 10)) / currentPrice;
+  if (multiple &lt;= 0) return null;
+  return (Math.pow(multiple, 1 / 10) - 1) * 100;
+}</code></pre>
+
+<div class="step">☐ <strong>Step 5.3:</strong> thead에 ROE 헤더 추가 (PBR과 배당% 사이에):</div>
+
+<pre><code>              &lt;th
+                className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900"
+                title="ROE — PBR/PER 자동 추정. 셀 클릭으로 수동 입력 (% 단위, 예: 9.98)"
+              &gt;
+                ROE
+              &lt;/th&gt;</code></pre>
+
+<p>위치: <code>&lt;th&gt;PBR&lt;/th&gt;</code> 다음 줄, <code>&lt;th&gt;배당%&lt;/th&gt;</code> 이전 줄.</p>
+
+<div class="step">☐ <strong>Step 5.4:</strong> tbody에 RoeCell 삽입 — PBR <code>&lt;td&gt;</code> 다음, 배당% <code>&lt;td&gt;</code> 이전:</div>
+
+<pre><code>                  {(() =&gt; {
+                    const autoRoe =
+                      r.per != null && r.pbr != null && r.per &gt; 0 && r.pbr &gt; 0
+                        ? (r.pbr / r.per) * 100
+                        : null;
+                    return (
+                      &lt;RoeCell
+                        code={r.code}
+                        manualRoe={r.manualRoe}
+                        autoRoe={autoRoe}
+                      /&gt;
+                    );
+                  })()}</code></pre>
+
+<div class="step">☐ <strong>Step 5.5:</strong> seojunsikValue / seojunsikIndex 호출부 모두 r.manualRoe 인자 추가. 두 군데:</div>
+
+<pre><code>// (변경 전) const sv = seojunsikValue(r.currentPrice, r.per, r.pbr);
+const sv = seojunsikValue(r.manualRoe, r.currentPrice, r.per, r.pbr);
+
+// (변경 전) const idx = seojunsikIndex(r.currentPrice, r.per, r.pbr);
+const idx = seojunsikIndex(r.manualRoe, r.currentPrice, r.per, r.pbr);</code></pre>
+
+<div class="step">☐ <strong>Step 5.6:</strong> colSpan 14 → 15 갱신 (ROE 컬럼 추가로).</div>
+
+<pre><code>sed -i '' 's/colSpan={14}/colSpan={15}/g' /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/src/app/stocks/StocksExplorerClient.tsx</code></pre>
+
+<div class="step">☐ <strong>Step 5.7:</strong> tsc 통과 확인.</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 6 — 통합 검증</h2>
+
+<div class="task">
+
+<div class="step">☐ <strong>Step 6.1:</strong> dev server가 5/25 이후 재시작됐는지 확인 (Prisma client schema 갱신 반영). 필요 시 사용자에게 요청.</div>
+
+<pre><code>ps -o pid,lstart -p $(lsof -nP -iTCP:3004 -sTCP:LISTEN -t 2&gt;/dev/null) 2&gt;/dev/null</code></pre>
+
+<p>Expected: lstart가 마이그레이션 시각 이후.</p>
+
+<div class="step">☐ <strong>Step 6.2:</strong> 페이지 응답 검증 — 200 + ROE 헤더 + 자동값 노출.</div>
+
+<pre><code>curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://localhost:3004/stocks?sort=safetyMargin_desc"
+curl -s "http://localhost:3004/stocks?sort=safetyMargin_desc" | grep -oE "&gt;ROE&lt;" | head -3</code></pre>
+
+<p>Expected: <code>HTTP 200</code> + ROE 헤더 1개 이상.</p>
+
+<div class="step">☐ <strong>Step 6.3:</strong> 수동 입력 동작 검증 — 직접 DB 조작으로 row 삽입 후 페이지 응답에 파란색 굵게 표시되는지.</div>
+
+<pre><code>sqlite3 /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/data/company-map.db \
+  "INSERT OR REPLACE INTO stock_overrides (code, manual_roe, updated_at) VALUES ('005930', 12.5, datetime('now'));"
+
+# 페이지에 005930 행 ROE에 12.50% + text-blue 클래스 노출 확인
+curl -s "http://localhost:3004/stocks?search=005930" | grep -oE 'text-blue-600[^"]*"[^&gt;]*&gt;12\.50%' | head -2</code></pre>
+
+<p>Expected: 매치 1개 이상.</p>
+
+<div class="step">☐ <strong>Step 6.4:</strong> 수동값이 서준식 계산에 반영되는지 확인 — 삼성전자(005930) 정도 ROE를 극단값으로 바꾸면 서준식 지수도 크게 변해야.</div>
+
+<pre><code>sqlite3 /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/data/company-map.db \
+  "UPDATE stock_overrides SET manual_roe = 50, updated_at = datetime('now') WHERE code = '005930';"
+
+# 서준식 지수가 자동 추정 대비 큰 양수로 변경됨 (50% ROE로 10년 복리)
+curl -s "http://localhost:3004/stocks?search=005930"  | grep -oE 'title="12%[^"]*"[^&gt;]*&gt;[+\-][0-9.]+%' | head -1</code></pre>
+
+<p>Expected: 큰 양수 (수십~수백 %).</p>
+
+<div class="step">☐ <strong>Step 6.5:</strong> 정리 — 테스트로 넣은 override 삭제.</div>
+
+<pre><code>sqlite3 /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/data/company-map.db \
+  "DELETE FROM stock_overrides WHERE code = '005930';"</code></pre>
+
+</div>
+
+<hr>
+
+<h2>Self-Review</h2>
+
+<p><strong>Spec coverage:</strong></p>
+<ul>
+  <li>StockOverride 테이블 → Task 1 ✓</li>
+  <li>setManualRoe action → Task 2 ✓</li>
+  <li>StocksExplorerRow.manualRoe → Task 3 ✓</li>
+  <li>ROE 컬럼 위치 (PBR 옆) → Task 5.3, 5.4 ✓</li>
+  <li>표시 규칙 (수동=파랑 굵게, 자동=회색, 없음=—) → Task 4.1 (RoeCell) ✓</li>
+  <li>Inline edit (클릭→input, Enter/blur 저장, 빈값=삭제, Esc 취소) → Task 4.1 ✓</li>
+  <li>서준식 계산 manualRoe 우선 → Task 5.2, 5.5 ✓</li>
+</ul>
+
+<p><strong>Placeholder scan:</strong> 모든 step에 실제 코드/명령 포함. TBD/TODO 없음. ✓</p>
+
+<p><strong>Type consistency:</strong> manualRoe 시그니처 일관 — DB와 API는 % 단위 (예: 9.98), 계산식에서만 /100. RoeCell의 autoRoe도 % 단위로 통일 (Task 5.4에서 `(pbr/per)*100` 으로 전달). ✓</p>
+
+<hr>
+
+<p><strong>Execution:</strong> 본 plan은 inline 실행 권장 (작업 규모 작음, 6개 task). 사용자 확인 후 진행.</p>
+
+</body>
+</html>

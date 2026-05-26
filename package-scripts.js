@@ -3,6 +3,7 @@ const path = require("path");
 const apiPath = path.resolve(__dirname, "apps/api");
 const webPath = path.resolve(__dirname, "apps/web");
 const todoPath = path.resolve(__dirname, "apps/todo");
+const companyMapPath = path.resolve(__dirname, "apps/company-map");
 
 const ciApiPath = path.resolve(__dirname, "out/apps/api");
 const ciWebPath = path.resolve(__dirname, "out/apps/web");
@@ -40,7 +41,11 @@ module.exports = {
       },
     },
     prisma: {
-      generate: `cd ${apiPath} && npx prisma generate`,
+      generate: {
+        default: `nps prisma.generate.api prisma.generate.companyMap`,
+        api: `cd ${apiPath} && npx prisma generate`,
+        companyMap: `cd ${companyMapPath} && npx prisma generate`,
+      },
       studio: `cd ${apiPath} && npx prisma studio`,
       migrate: {
         dev: `cd ${apiPath} && npx prisma migrate dev`,

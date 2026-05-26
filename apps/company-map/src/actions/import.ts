@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma-clients/company-map";
 import { db } from "@/lib/db";
 
 export type ImportRow = {

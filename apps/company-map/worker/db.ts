@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma-clients/company-map";
 
 /** Worker-only Prisma client. Avoids the `server-only` import in `src/lib/db.ts`
  *  which is reserved for Next.js server components / actions. */

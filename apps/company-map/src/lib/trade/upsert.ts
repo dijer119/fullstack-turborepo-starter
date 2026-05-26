@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma-clients/company-map";
 import { fetchTradeRaw, type RawTradeItem } from "./customs-api";
 import { getCategory, type CategoryKey } from "./categories";
 

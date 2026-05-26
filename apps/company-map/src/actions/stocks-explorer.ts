@@ -25,6 +25,7 @@ export interface StocksExplorerParams {
   page?: number;
   pageSize?: number;
   vipOnly?: boolean;
+  memoOnly?: boolean;
   tagIds?: number[];
 }
 
@@ -49,6 +50,7 @@ export interface StocksExplorerRow {
   tags: TagView[];
   pctChange3M: number | null;
   hasMemo: boolean;
+  manualRoe: number | null;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -109,6 +111,10 @@ export async function getStocksExplorer(
 
   if (params.vipOnly) {
     where.vipHoldings = { some: {} };
+  }
+
+  if (params.memoOnly) {
+    where.memo = { isNot: null };
   }
 
   if (params.tagIds && params.tagIds.length > 0) {
@@ -172,6 +178,7 @@ export async function getStocksExplorer(
         tags: { include: { tag: true } },
         priceChange: true,
         memo: { select: { code: true } },
+        override: true,
       },
       orderBy,
       skip: (page - 1) * pageSize,
@@ -208,6 +215,7 @@ export async function getStocksExplorer(
     tags: m.tags.map((t) => ({ id: t.tag.id, name: t.tag.name })),
     pctChange3M: m.priceChange?.pctChange ?? null,
     hasMemo: m.memo != null,
+    manualRoe: m.override?.manualRoe ?? null,
   }));
 
   return { rows, total };

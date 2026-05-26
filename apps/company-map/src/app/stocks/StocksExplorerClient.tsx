@@ -22,6 +22,7 @@ import {
   type TagView,
 } from "@/actions/tags";
 import { getMemoByCode, setMemo } from "@/actions/memos";
+import { RoeCell } from "./RoeCell";
 
 export interface StocksExplorerView {
   market: MarketFilter;
@@ -32,6 +33,7 @@ export interface StocksExplorerView {
   pbrMax: number | null;
   analyzedOnly: boolean;
   vipOnly: boolean;
+  memoOnly: boolean;
   tagIds: number[];
   sort: StocksSort;
   page: number;
@@ -55,6 +57,7 @@ function buildQuery(view: Partial<StocksExplorerView>): string {
   if (view.pbrMax != null) qs.set("pbrMax", String(view.pbrMax));
   if (view.analyzedOnly) qs.set("analyzed", "1");
   if (view.vipOnly) qs.set("vip", "1");
+  if (view.memoOnly) qs.set("memo", "1");
   if (view.tagIds && view.tagIds.length > 0) qs.set("tags", view.tagIds.join(","));
   if (view.sort && view.sort !== "marcap_desc") qs.set("sort", view.sort);
   if (view.page && view.page > 1) qs.set("page", String(view.page));
@@ -74,6 +77,49 @@ function num(v: number | null, digits = 1): string {
 function price(v: number | null): string {
   if (v == null) return "—";
   return v.toLocaleString();
+}
+
+// 서준식 적정주가: BPS × (1+ROE)^10 / 1.12^10. 목표수익률 12%, 10년.
+// effectiveRoe = manualRoe (%) ?? PBR/PER (소수 비율).
+function seojunsikValue(
+  manualRoe: number | null,
+  currentPrice: number | null,
+  per: number | null,
+  pbr: number | null,
+): number | null {
+  if (currentPrice == null || pbr == null) return null;
+  if (currentPrice <= 0 || pbr <= 0) return null;
+  const roe =
+    manualRoe != null
+      ? manualRoe / 100
+      : per != null && per > 0
+        ? pbr / per
+        : null;
+  if (roe == null) return null;
+  const bps = currentPrice / pbr;
+  return (bps * Math.pow(1 + roe, 10)) / Math.pow(1.12, 10);
+}
+
+// 서준식 지수: 연간 복리 기대수익률 = (10년승수)^(1/10) - 1
+function seojunsikIndex(
+  manualRoe: number | null,
+  currentPrice: number | null,
+  per: number | null,
+  pbr: number | null,
+): number | null {
+  if (currentPrice == null || pbr == null) return null;
+  if (currentPrice <= 0 || pbr <= 0) return null;
+  const roe =
+    manualRoe != null
+      ? manualRoe / 100
+      : per != null && per > 0
+        ? pbr / per
+        : null;
+  if (roe == null) return null;
+  const bps = currentPrice / pbr;
+  const multiple = (bps * Math.pow(1 + roe, 10)) / currentPrice;
+  if (multiple <= 0) return null;
+  return (Math.pow(multiple, 1 / 10) - 1) * 100;
 }
 
 const MARKET_OPTIONS: Array<{ value: MarketFilter; label: string }> = [
@@ -111,6 +157,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
       view.pbrMax != null ||
       view.analyzedOnly ||
       view.vipOnly ||
+      view.memoOnly ||
       view.tagIds.length > 0,
   );
 
@@ -130,6 +177,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
   );
   const [analyzedOnly, setAnalyzedOnly] = useState(view.analyzedOnly);
   const [vipOnly, setVipOnly] = useState(view.vipOnly);
+  const [memoOnly, setMemoOnly] = useState(view.memoOnly);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>(view.tagIds);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [vipDetails, setVipDetails] = useState<Record<string, VipHoldingDetailRow[]>>({});
@@ -178,6 +226,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
       pbrMax: pbrMax ? Number(pbrMax) : null,
       analyzedOnly,
       vipOnly,
+      memoOnly,
       tagIds: selectedTagIds,
       page: 1,
     });
@@ -191,6 +240,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
     setPbrMax("");
     setAnalyzedOnly(false);
     setVipOnly(false);
+    setMemoOnly(false);
     setSelectedTagIds([]);
     startTransition(() => router.replace("/stocks"));
   };
@@ -334,6 +384,14 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
             />
             <span>VIP 보유 종목만</span>
           </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={memoOnly}
+              onChange={(e) => setMemoOnly(e.target.checked)}
+            />
+            <span>메모 있는 종목만</span>
+          </label>
           {allTags.length > 0 && (
             <div className="md:col-span-2 lg:col-span-3">
               <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
@@ -397,18 +455,36 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
       </div>
 
       {/* 표 */}
-      <div>
+      <div className="overflow-x-auto">
         <table className="w-full text-sm border-separate border-spacing-0">
           <thead>
             <tr className="text-left">
-              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">종목명</th>
+              <th className="sticky top-0 left-0 z-20 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">종목명</th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">코드</th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">시가총액</th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">현재가</th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">PER</th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">PBR</th>
+              <th
+                className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900"
+                title="ROE — PBR/PER 자동 추정. 셀 클릭으로 수동 입력 (% 단위, 예: 9.98)"
+              >
+                ROE
+              </th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">배당%</th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">안전마진</th>
+              <th
+                className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900"
+                title="서준식 적정주가: BPS × (1+ROE)^10 ÷ 1.12^10. ROE=PBR/PER로 추정, 목표수익률 12%, 10년"
+              >
+                서준식
+              </th>
+              <th
+                className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900"
+                title="서준식 지수 = (10년승수)^(1/10) - 1. 연간 복리 기대수익률 (%). 12% 이상이면 목표 달성"
+              >
+                서준식 지수
+              </th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">3M</th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">VIP</th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">YoY</th>
@@ -419,9 +495,9 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
             {rows.map((r) => (
               <React.Fragment key={r.code}>
                 <tr
-                  className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900/50"
+                  className="group border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900/50"
                 >
-                  <td className="p-2 font-medium">
+                  <td className="sticky left-0 z-10 bg-white p-2 font-medium group-hover:bg-gray-50 dark:bg-gray-950 dark:group-hover:bg-gray-900/50">
                     <div className="flex items-center gap-1.5">
                       <MemoButton stockCode={r.code} initialHasMemo={r.hasMemo} />
                       <a
@@ -439,6 +515,19 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                   <td className="p-2 text-right">{price(r.currentPrice)}</td>
                   <td className="p-2 text-right">{num(r.per)}</td>
                   <td className="p-2 text-right">{num(r.pbr, 2)}</td>
+                  {(() => {
+                    const autoRoe =
+                      r.per != null && r.pbr != null && r.per > 0 && r.pbr > 0
+                        ? (r.pbr / r.per) * 100
+                        : null;
+                    return (
+                      <RoeCell
+                        code={r.code}
+                        manualRoe={r.manualRoe}
+                        autoRoe={autoRoe}
+                      />
+                    );
+                  })()}
                   <td className="p-2 text-right">{num(r.dividendYield, 2)}</td>
                   <td
                     className={`p-2 text-right ${
@@ -451,6 +540,46 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                   >
                     {pct(r.safetyMargin)}
                   </td>
+                  {(() => {
+                    const sv = seojunsikValue(r.manualRoe, r.currentPrice, r.per, r.pbr);
+                    const undervalued =
+                      sv != null && r.currentPrice != null && sv >= r.currentPrice;
+                    return (
+                      <td
+                        className={`p-2 text-right ${
+                          sv == null
+                            ? "text-gray-400"
+                            : undervalued
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-red-600 dark:text-red-400"
+                        }`}
+                        title={
+                          sv != null && r.currentPrice
+                            ? `현재가 ${r.currentPrice.toLocaleString()}원 대비 ${(((sv - r.currentPrice) / r.currentPrice) * 100).toFixed(1)}%`
+                            : "PER/PBR/현재가 필요"
+                        }
+                      >
+                        {price(sv == null ? null : Math.round(sv))}
+                      </td>
+                    );
+                  })()}
+                  {(() => {
+                    const idx = seojunsikIndex(r.manualRoe, r.currentPrice, r.per, r.pbr);
+                    return (
+                      <td
+                        className={`p-2 text-right font-mono ${
+                          idx == null
+                            ? "text-gray-400"
+                            : idx >= 12
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-red-600 dark:text-red-400"
+                        }`}
+                        title="12% 이상 = 목표 수익률 달성"
+                      >
+                        {idx == null ? "—" : `${idx >= 0 ? "+" : ""}${idx.toFixed(1)}%`}
+                      </td>
+                    );
+                  })()}
                   <td
                     className={`p-2 text-right ${
                       r.pctChange3M == null
@@ -495,7 +624,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                 </tr>
                 {expanded.has(r.code) && (
                   <tr key={r.code + "-expand"} className="bg-blue-50/40 dark:bg-blue-950/20">
-                    <td colSpan={12} className="p-3">
+                    <td colSpan={15} className="p-3">
                       <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
                         브이아이피자산운용 보유 공시 (최근 6개월)
                       </div>
@@ -533,7 +662,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={12} className="p-6 text-center text-gray-500">
+                <td colSpan={15} className="p-6 text-center text-gray-500">
                   조건에 맞는 종목이 없습니다.
                 </td>
               </tr>
