@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>종목별 관련 링크(블로그·뉴스) 저장 기능 — 설계</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .meta { color: #718096; font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<h1>종목별 관련 링크(블로그·뉴스) 저장 기능 — 설계</h1>
+<p class="meta">앱: <code>company-map</code> · 작성일: 2026-05-29 · 상태: 설계 승인 대기</p>
+
+<h2>1. 목적 &amp; 범위</h2>
+<p>
+전종목 조회(<code>/stocks</code>)에서 다루는 각 상장 종목에 대해, 사용자가 직접 찾은
+<strong>블로그 글·뉴스 기사 URL을 종목별로 저장</strong>하고 종목 상세 페이지에서 모아 볼 수 있게 한다.
+URL을 붙여넣으면 서버가 OpenGraph 메타데이터(제목·출처·이미지)를 자동 추출해 채운다.
+</p>
+<p><strong>성공 기준:</strong></p>
+<ul>
+  <li>종목 상세 페이지에서 URL을 붙여넣어 링크를 추가하면, 제목·출처·썸네일이 자동으로 채워져 목록에 나타난다.</li>
+  <li>링크의 종류(블로그/뉴스)와 한 줄 메모를 수동으로 편집·삭제할 수 있다.</li>
+  <li>전종목 테이블에서 링크가 하나라도 있는 종목은 표시기(아이콘)로 구분된다.</li>
+  <li>메타 추출이 실패해도 URL 자체는 항상 안전하게 저장된다.</li>
+</ul>
+
+<h3>비범위 (YAGNI)</h3>
+<ul>
+  <li>네이버 뉴스 검색 API 등 <strong>자동 기사 수집</strong> — 이번 범위 아님(수동 저장만).</li>
+  <li>전종목 테이블의 <strong>링크 필터 토글</strong> — 사용자 결정으로 제외(표시기만).</li>
+  <li>백그라운드 워커를 통한 비동기 메타 추출 — 1인용 도구엔 과함.</li>
+</ul>
+
+<h2>2. 접근 방식</h2>
+<p>
+<strong>저장 시 동기 best-effort fetch (접근법 A)</strong>를 채택한다. server action이 URL을 받는 즉시
+<code>fetch</code> + <code>cheerio</code>로 OG 메타를 파싱(5초 타임아웃)하고, 성공하면 채우고 실패/타임아웃이면 URL만 저장한다.
+기존 <code>setMemo</code>류 server action 패턴과 동일하며 새 의존성이 없다(<code>cheerio</code> 기존 사용).
+</p>
+
+<h2>3. 데이터 모델</h2>
+<p><code>prisma/schema.prisma</code>에 신규 모델 <code>StockLink</code>를 추가하고, <code>StockMaster</code>에 <code>links StockLink[]</code> relation을 추가한다.</p>
+<pre><code>model StockLink {
+  id        String   @id @default(uuid())
+  code      String
+  url       String
+  title     String?                      // og:title (자동 추출)
+  siteName  String?  @map("site_name")   // og:site_name (자동 추출)
+  imageUrl  String?  @map("image_url")   // og:image (자동 추출)
+  kind      String   @default("blog")    // "blog" | "news"
+  memo      String?                      // 수동 한 줄 메모
+  createdAt DateTime @default(now()) @map("created_at")
+
+  master    StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+
+  @@unique([code, url])                  // 같은 종목 내 URL 중복 방지 (idempotent)
+  @@index([code, createdAt])
+  @@map("stock_links")
+}</code></pre>
+<p><code>StockMaster</code> 모델에 한 줄 추가:</p>
+<pre><code>  links  StockLink[]</code></pre>
+<p>마이그레이션: <code>yarn workspace company-map prisma migrate dev --name add_stock_links</code></p>
+
+<h2>4. 컴포넌트 &amp; 책임</h2>
+<table>
+  <thead>
+    <tr><th>단위</th><th>역할</th><th>의존</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>src/lib/links/og-meta.ts</code></td>
+      <td>OG 메타 추출 유틸. <code>parseOgMeta(html, url)</code>(순수 함수), <code>fetchOgMeta(url)</code>(fetch+타임아웃 래퍼), <code>inferKind(url)</code>(호스트 휴리스틱).</td>
+      <td>cheerio</td>
+    </tr>
+    <tr>
+      <td><code>src/actions/stock-links.ts</code></td>
+      <td>server actions: <code>listLinksByCode</code>, <code>addLink</code>, <code>updateLink</code>, <code>deleteLink</code>.</td>
+      <td>db, og-meta</td>
+    </tr>
+    <tr>
+      <td><code>src/app/stocks/[code]/RelatedLinksCard.tsx</code></td>
+      <td>상세 페이지 "관련 링크" 섹션(client). URL 입력·추가, 목록 렌더, 종류·메모 편집, 삭제.</td>
+      <td>stock-links actions</td>
+    </tr>
+    <tr>
+      <td><code>src/app/stocks/[code]/page.tsx</code></td>
+      <td>SSR로 초기 링크 로드해 카드에 prop 전달.</td>
+      <td>db</td>
+    </tr>
+    <tr>
+      <td><code>src/app/stocks/[code]/SectionNav.tsx</code></td>
+      <td>"관련 링크" 네비 항목 추가.</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code>src/actions/stocks-explorer.ts</code></td>
+      <td>explorer row에 <code>hasLinks: boolean</code> 집계 추가(<code>hasMemo</code>와 동일 방식).</td>
+      <td>db</td>
+    </tr>
+    <tr>
+      <td><code>src/app/stocks/StocksExplorerClient.tsx</code></td>
+      <td>각 행에 링크 존재 표시기 아이콘(있을 때만 점등, 클릭 시 상세 이동). 비편집.</td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>og-meta 유틸 상세</h3>
+<ul>
+  <li><code>parseOgMeta(html, url)</code> → <code>{ title, siteName, imageUrl }</code>. cheerio로 <code>og:title</code>/<code>og:image</code>/<code>og:site_name</code> 우선, 없으면 <code>&lt;title&gt;</code>·<code>twitter:*</code> 폴백. <strong>순수 함수 — 테스트 대상.</strong></li>
+  <li><code>fetchOgMeta(url)</code> → <code>AbortController</code> 5초 타임아웃으로 HTML 받아 <code>parseOgMeta</code> 호출. 실패 시 빈 메타 <code>{}</code> 반환(throw 금지).</li>
+  <li><code>inferKind(url)</code> → 호스트 휴리스틱. <code>news.naver.com</code>, <code>n.news.naver.com</code>, 주요 언론사 도메인 → <code>"news"</code>, 그 외 → <code>"blog"</code>. <strong>순수 함수 — 테스트 대상.</strong></li>
+</ul>
+
+<h2>5. 데이터 흐름</h2>
+<ol>
+  <li><strong>상세 페이지 진입:</strong> <code>page.tsx</code>가 <code>db.stockLink.findMany({ where: { code }, orderBy: { createdAt: "desc" } })</code>로 링크 로드 → <code>RelatedLinksCard</code>에 prop 전달.</li>
+  <li><strong>링크 추가:</strong> 카드에서 URL 입력 → <code>addLink(code, url)</code> 호출 → 서버가 URL 검증 → <code>fetchOgMeta</code> + <code>inferKind</code> → <code>db.stockLink.create</code>(중복이면 기존 반환) → 생성 row 반환 → 클라이언트가 목록 상단에 추가.</li>
+  <li><strong>편집/삭제:</strong> <code>updateLink(id, {kind, memo})</code> / <code>deleteLink(id)</code> → 클라이언트 상태 갱신.</li>
+  <li><strong>전종목 테이블:</strong> <code>getStocksExplorer</code>가 <code>hasLinks</code>를 집계(예: <code>_count</code> 또는 존재 여부 join) → 클라이언트가 표시기 렌더.</li>
+</ol>
+
+<h2>6. 에러 처리</h2>
+<table>
+  <thead><tr><th>상황</th><th>처리</th></tr></thead>
+  <tbody>
+    <tr><td>코드가 6자리 숫자 아님</td><td>저장 안 하고 에러 객체 반환 (<code>memos.ts</code>와 동일 가드)</td></tr>
+    <tr><td>URL이 http(s) 아님</td><td>저장 안 하고 에러 반환</td></tr>
+    <tr><td>fetch 실패 · 타임아웃 · 비-HTML 응답</td><td>URL + <code>inferKind</code> 결과만 저장, 메타는 null. 절대 throw 안 함</td></tr>
+    <tr><td><code>(code, url)</code> 중복</td><td>기존 row 반환 (idempotent, <code>@@unique</code>로 보장)</td></tr>
+    <tr><td>cheerio 파싱 중 누락 태그</td><td>안전 폴백 체인으로 가능한 필드만 채움</td></tr>
+  </tbody>
+</table>
+
+<h2>7. 테스트 (vitest, 앱 기존 패턴)</h2>
+<ul>
+  <li><code>src/lib/links/og-meta.test.ts</code>
+    <ul>
+      <li><code>parseOgMeta</code>: OG 태그 완비 HTML → 전 필드 추출 / OG 누락 HTML → <code>&lt;title&gt;</code>·twitter 폴백 / 빈 HTML → 모두 null. (네트워크 없이 HTML 문자열로)</li>
+      <li><code>inferKind</code>: 네이버 뉴스 도메인 → <code>"news"</code>, 티스토리·네이버 블로그 → <code>"blog"</code>.</li>
+    </ul>
+  </li>
+</ul>
+<p>네트워크에 의존하는 <code>fetchOgMeta</code>는 파싱 로직을 <code>parseOgMeta</code>로 분리해 테스트 가능하게 한다.</p>
+
+<h2>8. 작업 순서 (개략)</h2>
+<ol>
+  <li>schema에 <code>StockLink</code> 추가 + 마이그레이션 → 검증: <code>prisma generate</code> 성공, DB에 테이블 생성</li>
+  <li><code>og-meta.ts</code> + 테스트 → 검증: vitest 통과</li>
+  <li><code>stock-links.ts</code> server actions → 검증: 추가/조회/삭제 동작</li>
+  <li><code>RelatedLinksCard.tsx</code> + <code>page.tsx</code> + <code>SectionNav.tsx</code> → 검증: 상세 페이지에서 추가/편집/삭제</li>
+  <li><code>stocks-explorer.ts</code> <code>hasLinks</code> + <code>StocksExplorerClient.tsx</code> 표시기 → 검증: 테이블 아이콘 표시</li>
+</ol>
+
+</body>
+</html>
