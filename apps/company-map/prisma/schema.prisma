@@ -69,6 +69,7 @@ model StockMaster {
   memo                  StockMemo?
   override              StockOverride?
   disclosures           Disclosure[]
+  links                 StockLink[]
 
   @@index([name])
   @@index([market])
@@ -272,4 +273,22 @@ model Disclosure {
   @@index([code, rceptDt])
   @@index([category])
   @@map("disclosures")
+}
+
+model StockLink {
+  id        String   @id @default(uuid())
+  code      String
+  url       String
+  title     String?
+  siteName  String?  @map("site_name")
+  imageUrl  String?  @map("image_url")
+  kind      String   @default("blog")
+  memo      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  master    StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+
+  @@unique([code, url])
+  @@index([code, createdAt])
+  @@map("stock_links")
 }
