@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>공시 History Phase 1 — Implementation Plan</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+    pre { background: #f4f4f4; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 3px; }
+    pre code { background: none; padding: 0; }
+    h2 { border-bottom: 1px solid #ddd; padding-bottom: 0.3rem; margin-top: 2rem; }
+    h3 { color: #2c5282; }
+    .task { background: #fafafa; padding: 1rem 1.5rem; border-left: 3px solid #2c5282; margin: 1rem 0; border-radius: 4px; }
+    .step { margin: 0.6rem 0; }
+    .files { color: #555; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+<h1>공시 History Phase 1 — Implementation Plan</h1>
+
+<blockquote>
+<p><strong>For agentic workers:</strong> inline 실행 권장. <code>☐</code>는 미완료, <code>☑</code>는 완료. TDD 형식 대신 단계별 구현 + 수동 검증 (CLAUDE.md "사소한 작업은 판단력").</p>
+</blockquote>
+
+<p><strong>Goal:</strong> 종목별 페이지 <code>/stocks/[code]</code> 신규 — 실적 카테고리(정기보고서) timeline 카드 표시. Lazy fetch + DB 캐시 + 명시적 갱신 버튼.</p>
+
+<p><strong>Architecture:</strong> 신규 <code>Disclosure</code> 테이블에 DART list.json 결과 + 재무 지표(JSON payload) 캐시. server component 페이지가 DB 조회, 없으면 server action으로 lazy fetch. 컴포넌트 4종으로 책임 분리.</p>
+
+<p><strong>Tech Stack:</strong> Next.js 16 App Router (server components + server actions), Prisma 6 + SQLite, DART OpenAPI (list.json + fnlttSinglAcnt.json).</p>
+
+<hr>
+
+<h2>파일 구조</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+  <thead><tr><th>경로</th><th>상태</th><th>책임</th></tr></thead>
+  <tbody>
+    <tr><td><code>prisma/schema.prisma</code></td><td>수정</td><td><code>Disclosure</code> 모델 + StockMaster relation</td></tr>
+    <tr><td><code>prisma/migrations/&lt;ts&gt;_add_disclosures/migration.sql</code></td><td>신규</td><td>자동 생성</td></tr>
+    <tr><td><code>src/lib/dart/list.ts</code></td><td>신규</td><td><code>fetchDartList(corpCode, params)</code> — list.json 클라이언트</td></tr>
+    <tr><td><code>src/lib/dart/financial-extract.ts</code></td><td>신규</td><td><code>extractRevenue</code>, <code>extractNetIncome</code> (영업익 헬퍼와 동일 패턴)</td></tr>
+    <tr><td><code>src/lib/dart/earnings-payload.ts</code></td><td>신규</td><td><code>EarningsPayload</code> 타입 + <code>buildEarningsPayload(corpCode, bsnsYear, reprtCode)</code> 헬퍼</td></tr>
+    <tr><td><code>src/actions/disclosures.ts</code></td><td>신규</td><td><code>fetchDisclosuresForStock(code)</code> server action</td></tr>
+    <tr><td><code>src/app/stocks/[code]/page.tsx</code></td><td>신규</td><td>server component, DB 조회 + lazy fetch trigger</td></tr>
+    <tr><td><code>src/app/stocks/[code]/StockDetailHeader.tsx</code></td><td>신규</td><td>종목 요약 + 갱신/네이버 버튼</td></tr>
+    <tr><td><code>src/app/stocks/[code]/DisclosureTimeline.tsx</code></td><td>신규</td><td>카테고리 라벨 + 카드 리스트</td></tr>
+    <tr><td><code>src/app/stocks/[code]/EarningsCard.tsx</code></td><td>신규</td><td>실적 카드</td></tr>
+    <tr><td><code>src/app/stocks/[code]/RefreshButton.tsx</code></td><td>신규</td><td>"공시 갱신" 클라이언트 버튼</td></tr>
+    <tr><td><code>src/app/stocks/StocksExplorerClient.tsx</code></td><td>수정</td><td>종목명 옆 📋 아이콘 (Link to /stocks/[code])</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>Task 1 — Prisma schema + migration</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>prisma/schema.prisma</code>, <code>prisma/migrations/&lt;ts&gt;_add_disclosures/</code></p>
+
+<div class="step">☐ <strong>Step 1.1:</strong> schema.prisma에 <code>Disclosure</code> 모델 추가. <code>StockOverride</code> 모델 다음 줄에:</div>
+
+<pre><code>model Disclosure {
+  rcpNo      String   @id @map("rcp_no")
+  code       String
+  corpCode   String   @map("corp_code")
+  reportNm   String   @map("report_nm")
+  pblntfTy   String   @map("pblntf_ty")
+  rceptDt    DateTime @map("rcept_dt")
+  category   String
+  payload    String?
+  fetchedAt  DateTime @default(now()) @map("fetched_at")
+
+  master     StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+
+  @@index([code, rceptDt])
+  @@index([category])
+  @@map("disclosures")
+}</code></pre>
+
+<div class="step">☐ <strong>Step 1.2:</strong> <code>StockMaster</code> 모델의 relations 블록에 추가. <code>override StockOverride?</code> 줄 다음에:</div>
+
+<pre><code>  disclosures           Disclosure[]</code></pre>
+
+<div class="step">☐ <strong>Step 1.3:</strong> 마이그레이션 + Prisma client 재생성:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map
+npx prisma migrate dev --name add_disclosures --skip-seed</code></pre>
+
+<p>Expected: "Your database is now in sync" + Prisma Client generated.</p>
+
+<div class="step">☐ <strong>Step 1.4:</strong> 검증:</div>
+
+<pre><code>sqlite3 data/company-map.db ".schema disclosures"
+grep -c "Disclosure" /Users/dijer/dev/workspace/fullstack-turborepo-starter/node_modules/@prisma-clients/company-map/index.d.ts</code></pre>
+
+<p>Expected: 테이블 정의 출력 + grep 결과 &gt; 0.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 2 — DART list.json 클라이언트</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/lib/dart/list.ts</code> (신규)</p>
+
+<p>기존 <code>src/lib/dart/financial.ts</code>의 retry/timeout 패턴을 차용.</p>
+
+<div class="step">☐ <strong>Step 2.1:</strong> 파일 생성:</div>
+
+<pre><code>export interface DartListItem {
+  corp_code: string;
+  corp_name: string;
+  stock_code?: string;
+  report_nm: string;
+  rcept_no: string;
+  rcept_dt: string;       // "YYYYMMDD"
+  rm?: string;
+}
+
+export interface DartListResponse {
+  status?: string;
+  message?: string;
+  page_no?: number;
+  page_count?: number;
+  total_count?: number;
+  total_page?: number;
+  list?: DartListItem[];
+}
+
+function sleep(ms: number): Promise&lt;void&gt; {
+  return new Promise((r) =&gt; setTimeout(r, ms));
+}
+
+function isRetriable(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const m = err.message.toLowerCase();
+  return (
+    m.includes("fetch failed") ||
+    m.includes("timeout") ||
+    m.includes("network") ||
+    m.includes("econnreset") ||
+    m.includes("etimedout")
+  );
+}
+
+/**
+ * DART 공시 목록 호출. corpCode로 한 회사의 공시 검색.
+ * pblntfTy: 공시유형 코드 (A=정기, B=주요사항, C=발행, D=지분, F=감사관련, ...).
+ * 기본 4년치 (오늘 ~ 4년 전).
+ */
+export async function fetchDartList(params: {
+  corpCode: string;
+  pblntfTy?: string;
+  bgnDe?: string;          // YYYYMMDD
+  endDe?: string;          // YYYYMMDD
+  pageNo?: number;
+  pageCount?: number;      // default 100, max 100
+}): Promise&lt;DartListResponse | null&gt; {
+  const apiKey = process.env.DART_API_KEY;
+  if (!apiKey) throw new Error("DART_API_KEY not set");
+  const url = new URL("https://opendart.fss.or.kr/api/list.json");
+  url.searchParams.set("crtfc_key", apiKey);
+  url.searchParams.set("corp_code", params.corpCode);
+  if (params.pblntfTy) url.searchParams.set("pblntf_ty", params.pblntfTy);
+  if (params.bgnDe) url.searchParams.set("bgn_de", params.bgnDe);
+  if (params.endDe) url.searchParams.set("end_de", params.endDe);
+  url.searchParams.set("page_no", String(params.pageNo ?? 1));
+  url.searchParams.set("page_count", String(params.pageCount ?? 100));
+
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; attempt &lt;= MAX_ATTEMPTS; attempt++) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+      if (!resp.ok) return null;
+      return (await resp.json()) as DartListResponse;
+    } catch (err) {
+      if (attempt &lt; MAX_ATTEMPTS && isRetriable(err)) {
+        await sleep(500 * 2 ** (attempt - 1));
+        continue;
+      }
+      console.warn(
+        `[dart] list fetch failed corp=${params.corpCode} (attempt ${attempt}/${MAX_ATTEMPTS}):`,
+        err instanceof Error ? err.message : err,
+      );
+      return null;
+    }
+  }
+  return null;
+}</code></pre>
+
+<div class="step">☐ <strong>Step 2.2:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 3 — 매출/순이익 추출 헬퍼</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/lib/dart/financial-extract.ts</code> (신규)</p>
+
+<p>기존 <code>operating-income.ts</code>의 <code>extractOpIncome</code> 패턴을 그대로 복제 (DRY 위반은 향후 일반화 시 묶음). YAGNI: 일단 두 함수만 추가.</p>
+
+<div class="step">☐ <strong>Step 3.1:</strong> 파일 생성:</div>
+
+<pre><code>interface DartListItem {
+  account_nm?: string;
+  fs_nm?: string;
+  fs_div?: string;
+  thstrm_amount?: string;
+  frmtrm_amount?: string;
+}
+
+interface DartResponse {
+  status?: string;
+  list?: DartListItem[];
+}
+
+function parseAmount(raw: string | undefined): bigint | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/,/g, "").trim();
+  if (cleaned === "" || cleaned === "-") return null;
+  try {
+    return BigInt(cleaned);
+  } catch {
+    return null;
+  }
+}
+
+/** account_nm 후보로 thstrm/frmtrm 추출. 연결 우선 → 별도 fallback. */
+function extractByAccountNames(
+  response: unknown,
+  names: Set&lt;string&gt;,
+): { thstrm: bigint; frmtrm: bigint } | null {
+  const r = response as DartResponse;
+  if (r.status !== "000") return null;
+  const list = r.list ?? [];
+
+  const candidates = list
+    .filter((item) =&gt; names.has(item.account_nm ?? ""))
+    .map((item) =&gt; {
+      const isConsolidated = item.fs_nm === "연결재무제표" || item.fs_div === "CFS";
+      return {
+        priority: isConsolidated ? 0 : 1,
+        thstrm: parseAmount(item.thstrm_amount),
+        frmtrm: parseAmount(item.frmtrm_amount),
+      };
+    })
+    .filter((c) =&gt; c.thstrm !== null && c.frmtrm !== null)
+    .sort((a, b) =&gt; a.priority - b.priority);
+
+  if (candidates.length === 0) return null;
+  const c = candidates[0];
+  return { thstrm: c.thstrm!, frmtrm: c.frmtrm! };
+}
+
+// 일반 산업의 "매출액"과 금융업의 "수익(매출액)" 모두 매칭.
+const REVENUE_NAMES = new Set([
+  "매출액",
+  "수익(매출액)",
+  "영업수익",
+]);
+
+const NET_INCOME_NAMES = new Set([
+  "당기순이익",
+  "당기순이익(손실)",
+]);
+
+export function extractRevenue(response: unknown) {
+  return extractByAccountNames(response, REVENUE_NAMES);
+}
+
+export function extractNetIncome(response: unknown) {
+  return extractByAccountNames(response, NET_INCOME_NAMES);
+}</code></pre>
+
+<div class="step">☐ <strong>Step 3.2:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 4 — EarningsPayload + buildEarningsPayload</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/lib/dart/earnings-payload.ts</code> (신규)</p>
+
+<div class="step">☐ <strong>Step 4.1:</strong> 파일 생성:</div>
+
+<pre><code>import { fetchDartFinancial } from "./financial";
+import { extractOpIncome, type ReprtCode } from "./operating-income";
+import { extractRevenue, extractNetIncome } from "./financial-extract";
+
+export interface EarningsPayload {
+  bsnsYear: number;
+  reprtCode: ReprtCode;
+  reprtLabel: string;            // "26Q1" | "26반기" | "26Q3" | "26사업"
+  // 단위: 원
+  revenue: number | null;
+  opIncome: number | null;
+  netIncome: number | null;
+  // YoY (전년 동기 대비, %)
+  revenueYoyPct: number | null;
+  opIncomeYoyPct: number | null;
+  netIncomeYoyPct: number | null;
+  // QoQ (직전 보고 대비, %) — null이면 직전 보고 없음
+  revenueQoqPct: number | null;
+  opIncomeQoqPct: number | null;
+  netIncomeQoqPct: number | null;
+}
+
+const REPRT_LABEL_MAP: Record&lt;ReprtCode, string&gt; = {
+  "11013": "Q1",
+  "11012": "반기",
+  "11014": "Q3",
+  "11011": "사업",
+};
+
+function shortYearLabel(year: number, reprtCode: ReprtCode): string {
+  const yy = String(year).slice(-2);
+  const suffix = REPRT_LABEL_MAP[reprtCode];
+  return suffix === "사업" ? `${yy}사업` : `${yy}${suffix}`;
+}
+
+function yoyPct(thstrm: bigint | null, frmtrm: bigint | null): number | null {
+  if (thstrm == null || frmtrm == null) return null;
+  const f = Number(frmtrm);
+  if (!Number.isFinite(f) || f === 0) return null;
+  return ((Number(thstrm) - f) / Math.abs(f)) * 100;
+}
+
+/**
+ * 한 보고서의 매출/영업익/순이익 + YoY/QoQ 모두 채워서 payload 반환.
+ * QoQ는 prevReportPayload (직전 reprt) 결과에서 계산. null이면 QoQ는 null.
+ */
+export async function buildEarningsPayload(
+  corpCode: string,
+  bsnsYear: number,
+  reprtCode: ReprtCode,
+  prevReportPayload?: EarningsPayload | null,
+): Promise&lt;EarningsPayload | null&gt; {
+  const resp = await fetchDartFinancial(corpCode, bsnsYear, reprtCode);
+  if (!resp) return null;
+
+  const rev = extractRevenue(resp);
+  const op = extractOpIncome(resp);
+  const net = extractNetIncome(resp);
+  if (!rev && !op && !net) return null;
+
+  const revenueQoqPct =
+    rev && prevReportPayload?.revenue != null
+      ? yoyPct(rev.thstrm, BigInt(prevReportPayload.revenue))
+      : null;
+  const opIncomeQoqPct =
+    op && prevReportPayload?.opIncome != null
+      ? yoyPct(op.thstrm, BigInt(prevReportPayload.opIncome))
+      : null;
+  const netIncomeQoqPct =
+    net && prevReportPayload?.netIncome != null
+      ? yoyPct(net.thstrm, BigInt(prevReportPayload.netIncome))
+      : null;
+
+  return {
+    bsnsYear,
+    reprtCode,
+    reprtLabel: shortYearLabel(bsnsYear, reprtCode),
+    revenue: rev ? Number(rev.thstrm) : null,
+    opIncome: op ? Number(op.thstrm) : null,
+    netIncome: net ? Number(net.thstrm) : null,
+    revenueYoyPct: rev ? yoyPct(rev.thstrm, rev.frmtrm) : null,
+    opIncomeYoyPct: op ? yoyPct(op.thstrm, op.frmtrm) : null,
+    netIncomeYoyPct: net ? yoyPct(net.thstrm, net.frmtrm) : null,
+    revenueQoqPct,
+    opIncomeQoqPct,
+    netIncomeQoqPct,
+  };
+}</code></pre>
+
+<div class="step">☐ <strong>Step 4.2:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 5 — fetchDisclosuresForStock server action</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/actions/disclosures.ts</code> (신규)</p>
+
+<div class="step">☐ <strong>Step 5.1:</strong> 파일 생성:</div>
+
+<pre><code>"use server";
+
+import { db } from "@/lib/db";
+import { fetchDartList } from "@/lib/dart/list";
+import {
+  buildEarningsPayload,
+  type EarningsPayload,
+} from "@/lib/dart/earnings-payload";
+import type { ReprtCode } from "@/lib/dart/operating-income";
+import { revalidatePath } from "next/cache";
+
+const REPORT_NM_TO_REPRT_CODE: Array&lt;{ re: RegExp; code: ReprtCode }&gt; = [
+  { re: /분기보고서/, code: "11013" }, // 1Q or 3Q — month로 구분
+  { re: /반기보고서/, code: "11012" },
+  { re: /사업보고서/, code: "11011" },
+];
+
+/** reportNm + rceptDt month로 reprtCode 결정. 분기보고서는 발행월로 1Q/3Q 분기. */
+function deriveReprtCode(reportNm: string, rceptDt: Date): ReprtCode | null {
+  if (/사업보고서/.test(reportNm)) return "11011";
+  if (/반기보고서/.test(reportNm)) return "11012";
+  if (/분기보고서/.test(reportNm)) {
+    const month = rceptDt.getMonth() + 1; // 1-12
+    // 1분기 보고서는 보통 5월, 3분기는 11월 공시
+    return month &lt;= 8 ? "11013" : "11014";
+  }
+  return null;
+}
+
+/** rceptDt에서 사업연도 추론. 1Q (5월 공시)는 같은 해의 회계연도. */
+function deriveBsnsYear(rceptDt: Date, reprtCode: ReprtCode): number {
+  const y = rceptDt.getFullYear();
+  // 사업보고서는 보통 3월에 공시되며 직전 연도 데이터
+  if (reprtCode === "11011" && rceptDt.getMonth() + 1 &lt;= 4) return y - 1;
+  return y;
+}
+
+const MAX_REPORTS_PER_STOCK = 16; // 최근 4년 × 4 reports
+
+/**
+ * 종목의 정기보고서 공시 + 재무 지표 fetch & upsert. 이미 있는 rcpNo는 payload 갱신.
+ * 4년치, 최대 16건.
+ */
+export async function fetchDisclosuresForStock(code: string): Promise&lt;{
+  inserted: number;
+  updated: number;
+  failed: number;
+}&gt; {
+  if (!/^\d{6}$/.test(code)) return { inserted: 0, updated: 0, failed: 0 };
+
+  const master = await db.stockMaster.findUnique({ where: { code } });
+  if (!master?.corpCode) return { inserted: 0, updated: 0, failed: 0 };
+  const corpCode = master.corpCode;
+
+  const now = new Date();
+  const bgnDe = `${now.getFullYear() - 4}0101`;
+  const endDe = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+
+  const resp = await fetchDartList({
+    corpCode,
+    pblntfTy: "A",
+    bgnDe,
+    endDe,
+    pageCount: 100,
+  });
+
+  if (!resp || resp.status !== "000" || !resp.list) {
+    return { inserted: 0, updated: 0, failed: 1 };
+  }
+
+  // 정기보고서만 + 시간 desc + 최대 16건
+  const reports = resp.list
+    .filter((it) =&gt; REPORT_NM_TO_REPRT_CODE.some((p) =&gt; p.re.test(it.report_nm)))
+    .slice(0, MAX_REPORTS_PER_STOCK)
+    .map((it) =&gt; ({
+      rcpNo: it.rcept_no,
+      reportNm: it.report_nm,
+      rceptDt: new Date(
+        `${it.rcept_dt.slice(0, 4)}-${it.rcept_dt.slice(4, 6)}-${it.rcept_dt.slice(6, 8)}`,
+      ),
+    }));
+
+  // 시간 asc 정렬로 prev payload 누적해서 QoQ 계산
+  reports.sort((a, b) =&gt; a.rceptDt.getTime() - b.rceptDt.getTime());
+
+  let inserted = 0;
+  let updated = 0;
+  let failed = 0;
+  let prevPayload: EarningsPayload | null = null;
+
+  for (const r of reports) {
+    const reprtCode = deriveReprtCode(r.reportNm, r.rceptDt);
+    if (!reprtCode) {
+      failed++;
+      continue;
+    }
+    const bsnsYear = deriveBsnsYear(r.rceptDt, reprtCode);
+    const payload = await buildEarningsPayload(corpCode, bsnsYear, reprtCode, prevPayload);
+    if (!payload) {
+      failed++;
+      continue;
+    }
+    prevPayload = payload;
+
+    const existing = await db.disclosure.findUnique({ where: { rcpNo: r.rcpNo } });
+    await db.disclosure.upsert({
+      where: { rcpNo: r.rcpNo },
+      create: {
+        rcpNo: r.rcpNo,
+        code,
+        corpCode,
+        reportNm: r.reportNm,
+        pblntfTy: "A",
+        rceptDt: r.rceptDt,
+        category: "실적",
+        payload: JSON.stringify(payload),
+      },
+      update: {
+        payload: JSON.stringify(payload),
+        fetchedAt: new Date(),
+      },
+    });
+    if (existing) updated++;
+    else inserted++;
+  }
+
+  revalidatePath(`/stocks/${code}`);
+  return { inserted, updated, failed };
+}</code></pre>
+
+<div class="step">☐ <strong>Step 5.2:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 6 — 페이지 + 컴포넌트들</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> 5개 신규</p>
+
+<div class="step">☐ <strong>Step 6.1:</strong> <code>src/app/stocks/[code]/page.tsx</code> 생성:</div>
+
+<pre><code>import { notFound } from "next/navigation";
+import Link from "next/link";
+import { db } from "@/lib/db";
+import { fetchDisclosuresForStock } from "@/actions/disclosures";
+import type { EarningsPayload } from "@/lib/dart/earnings-payload";
+import { StockDetailHeader } from "./StockDetailHeader";
+import { DisclosureTimeline } from "./DisclosureTimeline";
+
+export const dynamic = "force-dynamic";
+
+export default async function StockDetailPage({
+  params,
+}: {
+  params: Promise&lt;{ code: string }&gt;;
+}) {
+  const { code } = await params;
+  if (!/^\d{6}$/.test(code)) notFound();
+
+  const master = await db.stockMaster.findUnique({
+    where: { code },
+    include: { analysis: true, priceChange: true, override: true },
+  });
+  if (!master) notFound();
+
+  let disclosures = await db.disclosure.findMany({
+    where: { code, category: "실적" },
+    orderBy: { rceptDt: "desc" },
+  });
+
+  // Lazy seed — 데이터 없으면 1회 자동 fetch
+  if (disclosures.length === 0 && master.corpCode) {
+    await fetchDisclosuresForStock(code);
+    disclosures = await db.disclosure.findMany({
+      where: { code, category: "실적" },
+      orderBy: { rceptDt: "desc" },
+    });
+  }
+
+  const earnings = disclosures.map((d) =&gt; ({
+    rcpNo: d.rcpNo,
+    reportNm: d.reportNm,
+    rceptDt: d.rceptDt,
+    payload: d.payload ? (JSON.parse(d.payload) as EarningsPayload) : null,
+  }));
+
+  return (
+    &lt;main className="mx-auto max-w-4xl space-y-6 px-4 py-6"&gt;
+      &lt;Link href="/stocks" className="text-sm text-blue-600 hover:underline dark:text-blue-400"&gt;
+        ← 전종목 조회
+      &lt;/Link&gt;
+      &lt;StockDetailHeader
+        code={master.code}
+        name={master.name}
+        market={master.market}
+        currentPrice={master.priceChange?.currentPrice ?? master.analysis?.currentPrice ?? null}
+        marcap={
+          master.priceChange?.marcap != null
+            ? Number(master.priceChange.marcap)
+            : master.marcap != null
+              ? Number(master.marcap)
+              : null
+        }
+        per={master.analysis?.per ?? null}
+        pbr={master.analysis?.pbr ?? null}
+        manualRoe={master.override?.manualRoe ?? null}
+      /&gt;
+      &lt;DisclosureTimeline earnings={earnings} /&gt;
+    &lt;/main&gt;
+  );
+}</code></pre>
+
+<div class="step">☐ <strong>Step 6.2:</strong> <code>src/app/stocks/[code]/StockDetailHeader.tsx</code> 생성:</div>
+
+<pre><code>import { formatMarcap } from "@/lib/format-marcap";
+import { RefreshButton } from "./RefreshButton";
+
+interface Props {
+  code: string;
+  name: string;
+  market: string | null;
+  currentPrice: number | null;
+  marcap: number | null;
+  per: number | null;
+  pbr: number | null;
+  manualRoe: number | null;
+}
+
+function effectiveRoePct(
+  manualRoe: number | null,
+  per: number | null,
+  pbr: number | null,
+): number | null {
+  if (manualRoe != null) return manualRoe;
+  if (per != null && pbr != null && per &gt; 0 && pbr &gt; 0) return (pbr / per) * 100;
+  return null;
+}
+
+export function StockDetailHeader({
+  code, name, market, currentPrice, marcap, per, pbr, manualRoe,
+}: Props) {
+  const roe = effectiveRoePct(manualRoe, per, pbr);
+  return (
+    &lt;header className="space-y-2"&gt;
+      &lt;div className="flex items-center gap-3"&gt;
+        &lt;h1 className="text-2xl font-bold"&gt;{name}&lt;/h1&gt;
+        &lt;span className="font-mono text-sm text-gray-500"&gt;{code}&lt;/span&gt;
+        {market && (
+          &lt;span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400"&gt;
+            {market}
+          &lt;/span&gt;
+        )}
+      &lt;/div&gt;
+      &lt;div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600 dark:text-gray-400"&gt;
+        &lt;span&gt;현재가 &lt;b className="text-gray-900 dark:text-gray-100"&gt;{currentPrice != null ? currentPrice.toLocaleString() : "—"}&lt;/b&gt;원&lt;/span&gt;
+        &lt;span&gt;시총 &lt;b className="text-gray-900 dark:text-gray-100"&gt;{formatMarcap(marcap)}&lt;/b&gt;&lt;/span&gt;
+        &lt;span&gt;PER &lt;b className="text-gray-900 dark:text-gray-100"&gt;{per != null ? per.toFixed(1) : "—"}&lt;/b&gt;&lt;/span&gt;
+        &lt;span&gt;PBR &lt;b className="text-gray-900 dark:text-gray-100"&gt;{pbr != null ? pbr.toFixed(2) : "—"}&lt;/b&gt;&lt;/span&gt;
+        &lt;span&gt;ROE &lt;b className="text-gray-900 dark:text-gray-100"&gt;{roe != null ? `${roe.toFixed(2)}%` : "—"}&lt;/b&gt;&lt;/span&gt;
+      &lt;/div&gt;
+      &lt;div className="flex items-center gap-2 pt-2"&gt;
+        &lt;RefreshButton code={code} /&gt;
+        &lt;a
+          href={`https://finance.naver.com/item/main.naver?code=${code}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-900"
+        &gt;
+          네이버 금융 ↗
+        &lt;/a&gt;
+      &lt;/div&gt;
+    &lt;/header&gt;
+  );
+}</code></pre>
+
+<div class="step">☐ <strong>Step 6.3:</strong> <code>src/app/stocks/[code]/RefreshButton.tsx</code> 생성:</div>
+
+<pre><code>"use client";
+
+import { useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { fetchDisclosuresForStock } from "@/actions/disclosures";
+
+export function RefreshButton({ code }: { code: string }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  const handle = () =&gt; {
+    startTransition(async () =&gt; {
+      try {
+        await fetchDisclosuresForStock(code);
+        router.refresh();
+      } catch (err) {
+        console.error("[disclosures] refresh failed", err);
+      }
+    });
+  };
+
+  return (
+    &lt;button
+      type="button"
+      onClick={handle}
+      disabled={pending}
+      className="rounded border border-blue-500 bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-60"
+    &gt;
+      {pending ? "갱신 중…" : "공시 갱신"}
+    &lt;/button&gt;
+  );
+}</code></pre>
+
+<div class="step">☐ <strong>Step 6.4:</strong> <code>src/app/stocks/[code]/EarningsCard.tsx</code> 생성:</div>
+
+<pre><code>import type { EarningsPayload } from "@/lib/dart/earnings-payload";
+
+interface Props {
+  reportNm: string;
+  rceptDt: Date;
+  payload: EarningsPayload | null;
+}
+
+function formatAmount(v: number | null): string {
+  if (v == null) return "—";
+  const abs = Math.abs(v);
+  if (abs &gt;= 1e12) return `${(v / 1e12).toFixed(1)}조`;
+  if (abs &gt;= 1e8) return `${Math.round(v / 1e8).toLocaleString()}억`;
+  return v.toLocaleString();
+}
+
+function formatPct(v: number | null): string {
+  if (v == null) return "—";
+  return `${v &gt;= 0 ? "+" : ""}${v.toFixed(0)}%`;
+}
+
+function pctColorClass(v: number | null): string {
+  if (v == null) return "text-gray-400";
+  if (v &gt; 0) return "text-green-400";
+  if (v &lt; 0) return "text-red-400";
+  return "text-gray-300";
+}
+
+function formatRceptDt(d: Date): string {
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yy}.${mm}.${dd} ${hh}:${mi}`;
+}
+
+export function EarningsCard({ reportNm, rceptDt, payload }: Props) {
+  return (
+    &lt;article className="rounded-lg bg-indigo-900/80 p-5 text-gray-100 shadow"&gt;
+      &lt;h3 className="text-lg font-bold"&gt;{reportNm}&lt;/h3&gt;
+      {payload && (
+        &lt;p className="mt-1 text-sm text-gray-300"&gt;
+          {payload.bsnsYear}.{payload.reprtCode === "11013" ? "03" : payload.reprtCode === "11012" ? "06" : payload.reprtCode === "11014" ? "09" : "12"} ({payload.reprtLabel}, 연결/별도 우선)
+        &lt;/p&gt;
+      )}
+      &lt;div className="mt-3 space-y-1 text-sm"&gt;
+        &lt;div&gt;매출액: &lt;b&gt;{payload ? formatAmount(payload.revenue) : "—"}&lt;/b&gt;&lt;/div&gt;
+        &lt;div&gt;영업익: &lt;b&gt;{payload ? formatAmount(payload.opIncome) : "—"}&lt;/b&gt;&lt;/div&gt;
+        &lt;div&gt;순이익: &lt;b&gt;{payload ? formatAmount(payload.netIncome) : "—"}&lt;/b&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      {payload && (
+        &lt;div className="mt-3 space-y-1 font-mono text-sm"&gt;
+          &lt;div&gt;
+            YoY: &lt;span className={pctColorClass(payload.revenueYoyPct)}&gt;{formatPct(payload.revenueYoyPct)}&lt;/span&gt;
+            &lt;span className="mx-1"&gt;/&lt;/span&gt;
+            &lt;span className={pctColorClass(payload.opIncomeYoyPct)}&gt;{formatPct(payload.opIncomeYoyPct)}&lt;/span&gt;
+            &lt;span className="mx-1"&gt;/&lt;/span&gt;
+            &lt;span className={pctColorClass(payload.netIncomeYoyPct)}&gt;{formatPct(payload.netIncomeYoyPct)}&lt;/span&gt;
+          &lt;/div&gt;
+          &lt;div&gt;
+            QoQ: &lt;span className={pctColorClass(payload.revenueQoqPct)}&gt;{formatPct(payload.revenueQoqPct)}&lt;/span&gt;
+            &lt;span className="mx-1"&gt;/&lt;/span&gt;
+            &lt;span className={pctColorClass(payload.opIncomeQoqPct)}&gt;{formatPct(payload.opIncomeQoqPct)}&lt;/span&gt;
+            &lt;span className="mx-1"&gt;/&lt;/span&gt;
+            &lt;span className={pctColorClass(payload.netIncomeQoqPct)}&gt;{formatPct(payload.netIncomeQoqPct)}&lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      )}
+      &lt;p className="mt-4 text-xs text-gray-400"&gt;{formatRceptDt(rceptDt)}&lt;/p&gt;
+    &lt;/article&gt;
+  );
+}</code></pre>
+
+<div class="step">☐ <strong>Step 6.5:</strong> <code>src/app/stocks/[code]/DisclosureTimeline.tsx</code> 생성:</div>
+
+<pre><code>import type { EarningsPayload } from "@/lib/dart/earnings-payload";
+import { EarningsCard } from "./EarningsCard";
+
+interface EarningsItem {
+  rcpNo: string;
+  reportNm: string;
+  rceptDt: Date;
+  payload: EarningsPayload | null;
+}
+
+interface Props {
+  earnings: EarningsItem[];
+}
+
+export function DisclosureTimeline({ earnings }: Props) {
+  return (
+    &lt;section&gt;
+      &lt;div className="flex items-center gap-2 mb-3"&gt;
+        &lt;span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500 text-white text-xs"&gt;📌&lt;/span&gt;
+        &lt;h2 className="text-lg font-semibold"&gt;실적&lt;/h2&gt;
+      &lt;/div&gt;
+      {earnings.length === 0 ? (
+        &lt;p className="text-sm text-gray-500"&gt;공시가 없습니다. "공시 갱신"으로 가져오세요.&lt;/p&gt;
+      ) : (
+        &lt;div className="space-y-3"&gt;
+          {earnings.map((e) =&gt; (
+            &lt;EarningsCard
+              key={e.rcpNo}
+              reportNm={e.reportNm}
+              rceptDt={e.rceptDt}
+              payload={e.payload}
+            /&gt;
+          ))}
+        &lt;/div&gt;
+      )}
+    &lt;/section&gt;
+  );
+}</code></pre>
+
+<div class="step">☐ <strong>Step 6.6:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 7 — 종목명 옆 📋 진입 아이콘</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/app/stocks/StocksExplorerClient.tsx</code></p>
+
+<div class="step">☐ <strong>Step 7.1:</strong> 종목명 셀 (line 500 부근, <code>&lt;MemoButton/&gt;</code> 옆)에 Link 아이콘 추가. <code>MemoButton</code> 다음 줄:</div>
+
+<pre><code>                      &lt;Link
+                        href={`/stocks/${r.code}`}
+                        className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                        title="공시 history"
+                      &gt;
+                        &lt;FileText size={14} /&gt;
+                      &lt;/Link&gt;</code></pre>
+
+<p><code>Link</code>와 <code>FileText</code>는 이미 import 되어 있음 (StocksExplorerClient.tsx 상단 import 확인).</p>
+
+<div class="step">☐ <strong>Step 7.2:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 8 — 통합 검증</h2>
+
+<div class="task">
+
+<div class="step">☐ <strong>Step 8.1:</strong> dev server (3004 포트) 동작 확인. 마이그레이션 이후 시작된 process여야 함.</div>
+
+<pre><code>ps -o pid,lstart -p $(lsof -nP -iTCP:3004 -sTCP:LISTEN -t)</code></pre>
+
+<p>Expected: 마이그레이션 시각 이후 시작. 아니면 사용자에게 재시작 요청.</p>
+
+<div class="step">☐ <strong>Step 8.2:</strong> 페이지 200 응답 확인:</div>
+
+<pre><code>curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://localhost:3004/stocks/005930"
+curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://localhost:3004/stocks/000000"</code></pre>
+
+<p>Expected: 005930 → 200, 000000 → 404.</p>
+
+<div class="step">☐ <strong>Step 8.3:</strong> 페이지에 실적 카드 노출 확인 (최초 fetch는 수 초 걸림):</div>
+
+<pre><code>curl -s "http://localhost:3004/stocks/005930" | grep -oE "분기보고서|반기보고서|사업보고서" | head -5
+curl -s "http://localhost:3004/stocks/005930" | grep -oE "매출액: |영업익: |순이익: " | head -5</code></pre>
+
+<p>Expected: 보고서 종류 노출 + 재무 라벨 노출.</p>
+
+<div class="step">☐ <strong>Step 8.4:</strong> DB에 disclosures 저장 확인:</div>
+
+<pre><code>sqlite3 /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/data/company-map.db \
+  "SELECT COUNT(*), category FROM disclosures WHERE code='005930' GROUP BY category;"</code></pre>
+
+<p>Expected: 1~16건, category='실적'.</p>
+
+<div class="step">☐ <strong>Step 8.5:</strong> /stocks 목록에 진입 아이콘 동작:</div>
+
+<pre><code>curl -s "http://localhost:3004/stocks" | grep -oE 'href="/stocks/005930"' | head -2</code></pre>
+
+<p>Expected: 매치 1개 이상.</p>
+
+<div class="step">☐ <strong>Step 8.6 (수동):</strong> 브라우저에서 <code>http://localhost:3004/stocks/005930</code> 열어 카드 디자인 + 색상 + YoY/QoQ 부호 확인.</div>
+
+</div>
+
+<hr>
+
+<h2>Self-Review</h2>
+
+<p><strong>Spec coverage:</strong></p>
+<ul>
+  <li>Disclosure 모델 → Task 1 ✓</li>
+  <li>DART list.json 클라이언트 → Task 2 ✓</li>
+  <li>매출/순이익 추출 헬퍼 → Task 3 ✓</li>
+  <li>EarningsPayload + buildEarningsPayload → Task 4 ✓</li>
+  <li>fetchDisclosuresForStock server action (lazy + refresh) → Task 5 ✓</li>
+  <li>/stocks/[code] 페이지 + 컴포넌트 5종 → Task 6 ✓</li>
+  <li>종목명 옆 📋 진입 아이콘 → Task 7 ✓</li>
+  <li>카테고리 매핑 (실적만) → Task 5의 reportNm regex 매칭 ✓</li>
+  <li>표시 규칙 (금액, 색상, NULL) → EarningsCard ✓</li>
+  <li>검증 기준 → Task 8 ✓</li>
+</ul>
+
+<p><strong>Placeholder scan:</strong> 모든 step에 실제 코드/명령. TBD 없음. ✓</p>
+
+<p><strong>Type consistency:</strong></p>
+<ul>
+  <li>EarningsPayload — Task 4에서 정의, Task 5·6에서 동일 시그니처 ✓</li>
+  <li>ReprtCode — operating-income.ts에서 export, Task 4·5에서 import ✓</li>
+  <li>fetchDartList params — Task 2에서 정의, Task 5에서 매칭 ✓</li>
+</ul>
+
+</body>
+</html>

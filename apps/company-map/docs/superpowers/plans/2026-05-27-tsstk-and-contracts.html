@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>자사주 + 계약 카테고리 — Implementation Plan</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+    pre { background: #f4f4f4; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 3px; }
+    pre code { background: none; padding: 0; }
+    h2 { border-bottom: 1px solid #ddd; padding-bottom: 0.3rem; margin-top: 2rem; }
+    h3 { color: #2c5282; }
+    .task { background: #fafafa; padding: 1rem 1.5rem; border-left: 3px solid #2c5282; margin: 1rem 0; border-radius: 4px; }
+    .step { margin: 0.6rem 0; }
+    .note { background: #fffae6; padding: 0.6rem; border-left: 3px solid #d69e2e; margin: 0.8rem 0; }
+  </style>
+</head>
+<body>
+
+<h1>자사주 + 계약 Implementation Plan</h1>
+
+<blockquote><strong>For agentic workers:</strong> inline 실행. <code>☐</code>는 미완료. 수동 검증 위주.</blockquote>
+
+<p><strong>Goal:</strong> 자사주 공시를 지분 카테고리에 통합 + 계약 공시를 새 "계약" 카테고리로 추가, SectionNav 4섹션.</p>
+
+<p><strong>Architecture:</strong> <code>pblntf_ty=B</code> list를 두 함수가 각자 호출 (단순함 우선). 계약은 cnctSlsCnclSDcsn 상세 API로 ContractPayload 추출, alotMatter/elestock 동일 패턴으로 실제 응답 확인 단계 포함.</p>
+
+<p><strong>Tech Stack:</strong> Next.js 16, Prisma 6, DART OpenAPI.</p>
+
+<div class="note">
+<p><strong>응답 필드명 위험:</strong> 계약 상세 API endpoint와 응답 필드명은 추정. Task 6에서 실제 응답 콘솔 출력으로 확인 후 보정.</p>
+</div>
+
+<hr>
+
+<h2>파일 구조</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+  <thead><tr><th>파일</th><th>상태</th><th>책임</th></tr></thead>
+  <tbody>
+    <tr><td><code>src/lib/dart/disclosure-payloads.ts</code></td><td>수정</td><td>DisclosureCategory에 "계약" 추가 + ContractPayload</td></tr>
+    <tr><td><code>src/lib/dart/contract-supply.ts</code></td><td>신규</td><td>fetchContractSupply + buildContractMap (rcpNo → ContractPayload)</td></tr>
+    <tr><td><code>src/actions/disclosures.ts</code></td><td>수정</td><td>fetchOwnership에 B-자기주식 통합, fetchContracts 신규, fetchDisclosuresForStock 4함수 순차</td></tr>
+    <tr><td><code>src/app/stocks/[code]/ContractCard.tsx</code></td><td>신규</td><td>cyan 카드, NULL 행 숨김</td></tr>
+    <tr><td><code>src/app/stocks/[code]/DisclosureTimeline.tsx</code></td><td>수정</td><td>계약 섹션 추가 (id="contracts")</td></tr>
+    <tr><td><code>src/app/stocks/[code]/SectionNav.tsx</code></td><td>수정</td><td>4번째 "계약" 항목</td></tr>
+    <tr><td><code>src/app/stocks/[code]/page.tsx</code></td><td>수정</td><td>contracts row 분리/전달</td></tr>
+    <tr><td><code>scripts/test-contract-supply.ts</code></td><td>신규</td><td>실제 응답 확인 디버그 스크립트</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>Task 1 — Payload 타입 확장</h2>
+
+<div class="task">
+
+<p><strong>Files:</strong> <code>src/lib/dart/disclosure-payloads.ts</code></p>
+
+<div class="step">☐ <strong>Step 1.1:</strong> DisclosureCategory + ContractPayload 추가. 기존 OwnershipPayload·DividendPayload 그대로:</div>
+
+<pre><code>export type DisclosureCategory = "실적" | "배당" | "지분" | "계약";
+
+export interface ContractPayload {
+  contractDate: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  contractContent: string | null;
+  counterparty: string | null;
+  supplyRegion: string | null;
+  amount: number | null;
+  recentSalesRatio: number | null;
+}</code></pre>
+
+<p>나머지 (ElestockDetail, MajorstockDetail, OwnershipPayload, DividendPayload 등)는 기존 유지. ContractPayload만 파일 끝에 추가.</p>
+
+<div class="step">☐ <strong>Step 1.2:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+</div>
+
+<hr>
+
+<h2>Task 2 — contract-supply.ts (DART 클라이언트)</h2>
+
+<div class="task">
+
+<p><strong>Files:</strong> <code>src/lib/dart/contract-supply.ts</code> (신규)</p>
+
+<div class="step">☐ <strong>Step 2.1:</strong> 파일 생성:</div>
+
+<pre><code>import type { ContractPayload } from "./disclosure-payloads";
+
+interface ContractItem {
+  rcept_no?: string;
+  ctr_dd?: string;          // 계약일 YYYYMMDD
+  ctr_prd_bgn_dd?: string;  // 계약기간 시작
+  ctr_prd_end_dd?: string;  // 계약기간 종료
+  ctr_cn?: string;          // 계약 내용
+  cn?: string;
+  cnt_pa_nm?: string;       // 상대방
+  ctr_pa_nm?: string;
+  spy_aro_nm?: string;      // 공급지역
+  regn?: string;
+  spy_amt?: string;         // 계약금액
+  ctr_amt?: string;
+  rce_sl_amt_rat?: string;  // 최근매출액 대비 %
+  [k: string]: string | undefined;
+}
+
+interface ContractResponse {
+  status?: string;
+  message?: string;
+  list?: ContractItem[];
+}
+
+function sleep(ms: number): Promise&lt;void&gt; {
+  return new Promise((r) =&gt; setTimeout(r, ms));
+}
+
+function isRetriable(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const m = err.message.toLowerCase();
+  return (
+    m.includes("fetch failed") ||
+    m.includes("timeout") ||
+    m.includes("network") ||
+    m.includes("econnreset") ||
+    m.includes("etimedout")
+  );
+}
+
+function parseNum(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/,/g, "").trim();
+  if (cleaned === "" || cleaned === "-") return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatYmd(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const digits = raw.replace(/[^\d]/g, "");
+  if (digits.length &lt; 8) return null;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+}
+
+export async function fetchContractSupply(params: {
+  corpCode: string;
+  bgnDe: string;
+  endDe: string;
+}): Promise&lt;ContractResponse | null&gt; {
+  const apiKey = process.env.DART_API_KEY;
+  if (!apiKey) throw new Error("DART_API_KEY not set");
+  const url = new URL("https://opendart.fss.or.kr/api/cnctSlsCnclSDcsn.json");
+  url.searchParams.set("crtfc_key", apiKey);
+  url.searchParams.set("corp_code", params.corpCode);
+  url.searchParams.set("bgn_de", params.bgnDe);
+  url.searchParams.set("end_de", params.endDe);
+
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; attempt &lt;= MAX_ATTEMPTS; attempt++) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+      if (!resp.ok) return null;
+      return (await resp.json()) as ContractResponse;
+    } catch (err) {
+      if (attempt &lt; MAX_ATTEMPTS && isRetriable(err)) {
+        await sleep(500 * 2 ** (attempt - 1));
+        continue;
+      }
+      console.warn(
+        `[dart] contract-supply fetch failed corp=${params.corpCode}:`,
+        err instanceof Error ? err.message : err,
+      );
+      return null;
+    }
+  }
+  return null;
+}
+
+export async function buildContractMap(params: {
+  corpCode: string;
+  bgnDe: string;
+  endDe: string;
+}): Promise&lt;Map&lt;string, ContractPayload&gt;&gt; {
+  const resp = await fetchContractSupply(params);
+  const map = new Map&lt;string, ContractPayload&gt;();
+  if (!resp || resp.status !== "000" || !resp.list) return map;
+
+  for (const item of resp.list) {
+    if (!item.rcept_no) continue;
+    const payload: ContractPayload = {
+      contractDate: formatYmd(item.ctr_dd),
+      startDate: formatYmd(item.ctr_prd_bgn_dd),
+      endDate: formatYmd(item.ctr_prd_end_dd),
+      contractContent: item.ctr_cn ?? item.cn ?? null,
+      counterparty: item.cnt_pa_nm ?? item.ctr_pa_nm ?? null,
+      supplyRegion: item.spy_aro_nm ?? item.regn ?? null,
+      amount: parseNum(item.spy_amt ?? item.ctr_amt),
+      recentSalesRatio: parseNum(item.rce_sl_amt_rat),
+    };
+    map.set(item.rcept_no, payload);
+  }
+  return map;
+}</code></pre>
+
+<div class="step">☐ <strong>Step 2.2:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+</div>
+
+<hr>
+
+<h2>Task 3 — disclosures.ts 확장 (자사주 + 계약 fetch)</h2>
+
+<div class="task">
+
+<p><strong>Files:</strong> <code>src/actions/disclosures.ts</code></p>
+
+<div class="step">☐ <strong>Step 3.1:</strong> import 추가:</div>
+
+<pre><code>import { buildContractMap } from "@/lib/dart/contract-supply";
+import type {
+  OwnershipDetail,
+  OwnershipPayload,
+} from "@/lib/dart/disclosure-payloads";</code></pre>
+
+<p>(<code>OwnershipPayload</code>은 이미 indirect import. 명시 가능.)</p>
+
+<div class="step">☐ <strong>Step 3.2:</strong> 자기주식 키워드 정규식 상수 + 계약 정규식 상수 추가 (파일 상단 상수 영역):</div>
+
+<pre><code>const TSSTK_REGEX = /자기주식|자사주/;
+const CONTRACT_REGEX = /단일판매[ㆍ··.]?공급계약|공급계약체결|판매계약체결/;</code></pre>
+
+<div class="step">☐ <strong>Step 3.3:</strong> <code>fetchOwnership</code>를 D 호출 + B 호출(자기주식 row 필터) 통합 형태로 교체. 전체 함수:</div>
+
+<pre><code>async function fetchOwnership(code: string, corpCode: string): Promise&lt;FetchStats&gt; {
+  const { bgnDe, endDe } = todayDateRange();
+
+  // D: 임원·주요주주, 주식대량보유, 자기주식 일부
+  const respD = await fetchDartList({
+    corpCode,
+    pblntfTy: "D",
+    bgnDe,
+    endDe,
+    pageCount: 100,
+  });
+  // B: 자기주식 결정 (취득/처분/소각 등)
+  const respB = await fetchDartList({
+    corpCode,
+    pblntfTy: "B",
+    bgnDe,
+    endDe,
+    pageCount: 100,
+  });
+
+  const [elestockMap, majorMap] = await Promise.all([
+    buildElestockMap({ corpCode, bgnDe, endDe }),
+    buildMajorstockMap({ corpCode, bgnDe, endDe }),
+  ]);
+
+  type Row = { rcpNo: string; reportNm: string; rceptDt: Date; pblntfTy: string };
+  const rows: Row[] = [];
+
+  if (respD?.status === "000" && respD.list) {
+    for (const it of respD.list) {
+      rows.push({
+        rcpNo: it.rcept_no,
+        reportNm: it.report_nm,
+        pblntfTy: "D",
+        rceptDt: new Date(
+          `${it.rcept_dt.slice(0, 4)}-${it.rcept_dt.slice(4, 6)}-${it.rcept_dt.slice(6, 8)}`,
+        ),
+      });
+    }
+  }
+  if (respB?.status === "000" && respB.list) {
+    for (const it of respB.list) {
+      if (!TSSTK_REGEX.test(it.report_nm)) continue;
+      rows.push({
+        rcpNo: it.rcept_no,
+        reportNm: it.report_nm,
+        pblntfTy: "B",
+        rceptDt: new Date(
+          `${it.rcept_dt.slice(0, 4)}-${it.rcept_dt.slice(4, 6)}-${it.rcept_dt.slice(6, 8)}`,
+        ),
+      });
+    }
+  }
+
+  // rceptDt desc 정렬 후 16건 제한
+  rows.sort((a, b) =&gt; b.rceptDt.getTime() - a.rceptDt.getTime());
+  const limited = rows.slice(0, MAX_REPORTS_PER_STOCK);
+
+  let inserted = 0;
+  let updated = 0;
+  for (const r of limited) {
+    const base = classifyOwnership(r.reportNm);
+    let detail: OwnershipDetail | null = null;
+    if (base.reportType === "임원·주요주주") {
+      detail = elestockMap.get(r.rcpNo) ?? null;
+    } else if (base.reportType === "주식대량보유") {
+      detail = majorMap.get(r.rcpNo) ?? null;
+    }
+    const payload: OwnershipPayload = { ...base, detail };
+
+    const existing = await db.disclosure.findUnique({ where: { rcpNo: r.rcpNo } });
+    await db.disclosure.upsert({
+      where: { rcpNo: r.rcpNo },
+      create: {
+        rcpNo: r.rcpNo,
+        code,
+        corpCode,
+        reportNm: r.reportNm,
+        pblntfTy: r.pblntfTy,
+        rceptDt: r.rceptDt,
+        category: "지분",
+        payload: JSON.stringify(payload),
+      },
+      update: {
+        payload: JSON.stringify(payload),
+        fetchedAt: new Date(),
+      },
+    });
+    if (existing) updated++;
+    else inserted++;
+  }
+  return { inserted, updated, failed: 0 };
+}</code></pre>
+
+<div class="step">☐ <strong>Step 3.4:</strong> <code>fetchContracts</code> 함수 신규 추가 (fetchDividends 다음 위치):</div>
+
+<pre><code>async function fetchContracts(code: string, corpCode: string): Promise&lt;FetchStats&gt; {
+  const { bgnDe, endDe } = todayDateRange();
+  const resp = await fetchDartList({
+    corpCode,
+    pblntfTy: "B",
+    bgnDe,
+    endDe,
+    pageCount: 100,
+  });
+  if (!resp || resp.status !== "000" || !resp.list) {
+    return { inserted: 0, updated: 0, failed: 1 };
+  }
+
+  const contractMap = await buildContractMap({ corpCode, bgnDe, endDe });
+
+  const rows = resp.list
+    .filter((it) =&gt; CONTRACT_REGEX.test(it.report_nm))
+    .slice(0, MAX_REPORTS_PER_STOCK)
+    .map((it) =&gt; ({
+      rcpNo: it.rcept_no,
+      reportNm: it.report_nm,
+      rceptDt: new Date(
+        `${it.rcept_dt.slice(0, 4)}-${it.rcept_dt.slice(4, 6)}-${it.rcept_dt.slice(6, 8)}`,
+      ),
+    }));
+
+  let inserted = 0;
+  let updated = 0;
+  for (const r of rows) {
+    const payload = contractMap.get(r.rcpNo) ?? {
+      contractDate: null,
+      startDate: null,
+      endDate: null,
+      contractContent: null,
+      counterparty: null,
+      supplyRegion: null,
+      amount: null,
+      recentSalesRatio: null,
+    };
+
+    const existing = await db.disclosure.findUnique({ where: { rcpNo: r.rcpNo } });
+    await db.disclosure.upsert({
+      where: { rcpNo: r.rcpNo },
+      create: {
+        rcpNo: r.rcpNo,
+        code,
+        corpCode,
+        reportNm: r.reportNm,
+        pblntfTy: "B",
+        rceptDt: r.rceptDt,
+        category: "계약",
+        payload: JSON.stringify(payload),
+      },
+      update: {
+        payload: JSON.stringify(payload),
+        fetchedAt: new Date(),
+      },
+    });
+    if (existing) updated++;
+    else inserted++;
+  }
+  return { inserted, updated, failed: 0 };
+}</code></pre>
+
+<div class="step">☐ <strong>Step 3.5:</strong> <code>fetchDisclosuresForStock</code>의 for-loop에 <code>fetchContracts</code> 추가. 기존:</div>
+
+<pre><code>  for (const fn of [fetchEarnings, fetchOwnership, fetchDividends]) {</code></pre>
+
+<p>로 → 다음으로 교체:</p>
+
+<pre><code>  for (const fn of [fetchEarnings, fetchOwnership, fetchDividends, fetchContracts]) {</code></pre>
+
+<div class="step">☐ <strong>Step 3.6:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+</div>
+
+<hr>
+
+<h2>Task 4 — ContractCard</h2>
+
+<div class="task">
+
+<p><strong>Files:</strong> <code>src/app/stocks/[code]/ContractCard.tsx</code> (신규)</p>
+
+<div class="step">☐ <strong>Step 4.1:</strong> 파일 생성:</div>
+
+<pre><code>import type { ContractPayload } from "@/lib/dart/disclosure-payloads";
+
+interface Props {
+  reportNm: string;
+  rceptDt: Date;
+  payload: ContractPayload | null;
+}
+
+function formatRceptDt(d: Date): string {
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yy}.${mm}.${dd} ${hh}:${mi}`;
+}
+
+function formatYmd(s: string | null): string {
+  if (!s) return "—";
+  return s.replace(/-/g, ".");
+}
+
+function formatAmount(v: number | null): string {
+  if (v == null) return "—";
+  const abs = Math.abs(v);
+  if (abs &gt;= 1e12) return `${(v / 1e12).toFixed(1)}조`;
+  if (abs &gt;= 1e8) {
+    const eok = Math.floor(v / 1e8);
+    const remManwon = Math.floor((v - eok * 1e8) / 1e4);
+    if (remManwon &gt; 0) return `${eok.toLocaleString()}억 ${remManwon.toLocaleString()}만원`;
+    return `${eok.toLocaleString()}억`;
+  }
+  if (abs &gt;= 1e4) return `${Math.round(v / 1e4).toLocaleString()}만원`;
+  return `${v.toLocaleString()}원`;
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  if (value == null || value === "" || value === "—") return null;
+  return (
+    &lt;div&gt;
+      {label}: &lt;b&gt;{value}&lt;/b&gt;
+    &lt;/div&gt;
+  );
+}
+
+export function ContractCard({ reportNm, rceptDt, payload }: Props) {
+  const p = payload;
+  const period =
+    p?.startDate && p.endDate
+      ? `${formatYmd(p.startDate)} - ${formatYmd(p.endDate)}`
+      : null;
+
+  return (
+    &lt;article className="rounded-lg bg-cyan-900/80 p-5 text-gray-100 shadow"&gt;
+      &lt;h3 className="text-lg font-bold"&gt;{reportNm}&lt;/h3&gt;
+      {p && (
+        &lt;div className="mt-3 space-y-1 text-sm"&gt;
+          &lt;Row label="계약일" value={p.contractDate ? formatYmd(p.contractDate) : null} /&gt;
+          &lt;Row label="계약기간" value={period} /&gt;
+          &lt;Row label="계약내용" value={p.contractContent} /&gt;
+          &lt;Row label="계약상대방" value={p.counterparty} /&gt;
+          &lt;Row label="공급지역" value={p.supplyRegion} /&gt;
+          &lt;Row label="계약금액" value={p.amount != null ? formatAmount(p.amount) : null} /&gt;
+          &lt;Row
+            label="최근매출액대비"
+            value={p.recentSalesRatio != null ? `${p.recentSalesRatio.toFixed(2)}%` : null}
+          /&gt;
+        &lt;/div&gt;
+      )}
+      &lt;p className="mt-4 text-xs text-gray-300"&gt;{formatRceptDt(rceptDt)}&lt;/p&gt;
+    &lt;/article&gt;
+  );
+}</code></pre>
+
+<div class="step">☐ <strong>Step 4.2:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+</div>
+
+<hr>
+
+<h2>Task 5 — DisclosureTimeline + page.tsx + SectionNav</h2>
+
+<div class="task">
+
+<p><strong>Files:</strong> 3개 수정</p>
+
+<div class="step">☐ <strong>Step 5.1:</strong> DisclosureTimeline.tsx에 ContractItem 타입 + props 추가. 상단 import에 추가:</div>
+
+<pre><code>import type { ContractPayload } from "@/lib/dart/disclosure-payloads";
+import { ContractCard } from "./ContractCard";</code></pre>
+
+<p>그리고 인터페이스 + Props 수정:</p>
+
+<pre><code>export interface ContractItem extends BaseItem {
+  payload: ContractPayload | null;
+}
+
+interface Props {
+  earnings: EarningsItem[];
+  dividends: DividendItem[];
+  ownership: OwnershipItem[];
+  contracts: ContractItem[];
+}</code></pre>
+
+<p>그리고 component body에 props 받기 + Section 추가:</p>
+
+<pre><code>export function DisclosureTimeline({ earnings, dividends, ownership, contracts }: Props) {
+  return (
+    &lt;div className="space-y-8"&gt;
+      &lt;Section id="earnings" pinBg="bg-indigo-500" label="실적" empty={earnings.length === 0}&gt;
+        {earnings.map((e) =&gt; (
+          &lt;EarningsCard key={e.rcpNo} reportNm={e.reportNm} rceptDt={e.rceptDt} payload={e.payload} /&gt;
+        ))}
+      &lt;/Section&gt;
+      &lt;Section id="dividends" pinBg="bg-emerald-500" label="배당" empty={dividends.length === 0}&gt;
+        {dividends.map((d) =&gt; (
+          &lt;DividendCard key={d.rcpNo} reportNm={d.reportNm} rceptDt={d.rceptDt} payload={d.payload} /&gt;
+        ))}
+      &lt;/Section&gt;
+      &lt;Section id="ownership" pinBg="bg-amber-500" label="지분" empty={ownership.length === 0}&gt;
+        {ownership.map((o) =&gt; (
+          &lt;OwnershipCard key={o.rcpNo} rcpNo={o.rcpNo} reportNm={o.reportNm} rceptDt={o.rceptDt} payload={o.payload} /&gt;
+        ))}
+      &lt;/Section&gt;
+      &lt;Section id="contracts" pinBg="bg-cyan-500" label="계약" empty={contracts.length === 0}&gt;
+        {contracts.map((c) =&gt; (
+          &lt;ContractCard key={c.rcpNo} reportNm={c.reportNm} rceptDt={c.rceptDt} payload={c.payload} /&gt;
+        ))}
+      &lt;/Section&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+<div class="step">☐ <strong>Step 5.2:</strong> SectionNav.tsx의 ITEMS에 contracts 추가:</div>
+
+<pre><code>const ITEMS: Item[] = [
+  { id: "earnings", label: "실적", dotClass: "bg-indigo-500" },
+  { id: "dividends", label: "배당", dotClass: "bg-emerald-500" },
+  { id: "ownership", label: "지분", dotClass: "bg-amber-500" },
+  { id: "contracts", label: "계약", dotClass: "bg-cyan-500" },
+];</code></pre>
+
+<div class="step">☐ <strong>Step 5.3:</strong> page.tsx 수정. import 추가 + contracts row 분리:</div>
+
+<pre><code>import type {
+  OwnershipPayload,
+  DividendPayload,
+  ContractPayload,
+} from "@/lib/dart/disclosure-payloads";</code></pre>
+
+<p>그리고 ownership 매핑 다음에 contracts 매핑 추가:</p>
+
+<pre><code>  const contracts = allDisclosures
+    .filter((d) =&gt; d.category === "계약")
+    .map((d) =&gt; ({
+      rcpNo: d.rcpNo,
+      reportNm: d.reportNm,
+      rceptDt: d.rceptDt,
+      payload: d.payload ? (JSON.parse(d.payload) as ContractPayload) : null,
+    }));</code></pre>
+
+<p>DisclosureTimeline 호출부에 <code>contracts</code> prop 추가:</p>
+
+<pre><code>&lt;DisclosureTimeline
+  earnings={earnings}
+  dividends={dividends}
+  ownership={ownership}
+  contracts={contracts}
+/&gt;</code></pre>
+
+<div class="step">☐ <strong>Step 5.4:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+</div>
+
+<hr>
+
+<h2>Task 6 — 응답 필드 검증 + 보정</h2>
+
+<div class="task">
+
+<p><strong>Files:</strong> <code>scripts/test-contract-supply.ts</code> (신규)</p>
+
+<div class="step">☐ <strong>Step 6.1:</strong> 스크립트 생성:</div>
+
+<pre><code>import { config } from "dotenv";
+import path from "node:path";
+config({ path: path.resolve(__dirname, "..", ".env.local") });
+config({ path: path.resolve(__dirname, "..", ".env") });
+
+import { fetchContractSupply, buildContractMap } from "../src/lib/dart/contract-supply";
+
+const corpCode = process.argv[2] ?? "00126380"; // 삼성전자 기본
+
+(async () =&gt; {
+  console.log("=== contract-supply raw ===");
+  const r = await fetchContractSupply({
+    corpCode,
+    bgnDe: "20220101",
+    endDe: "20260527",
+  });
+  console.log("status:", r?.status, "msg:", r?.message, "count:", r?.list?.length);
+  if (r?.list && r.list.length &gt; 0) {
+    console.log("keys:", Object.keys(r.list[0]));
+    console.log("sample:", JSON.stringify(r.list[0], null, 2));
+  }
+
+  console.log("\n=== buildContractMap ===");
+  const m = await buildContractMap({ corpCode, bgnDe: "20220101", endDe: "20260527" });
+  console.log("size:", m.size);
+  const first = [...m.values()][0];
+  console.log("sample payload:", first);
+
+  process.exit(0);
+})();</code></pre>
+
+<div class="step">☐ <strong>Step 6.2:</strong> 실행 (삼성전자에 계약 공시 없을 가능성 — 다른 종목 시도):</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsx scripts/test-contract-supply.ts 00126380 2&gt;&1 | head -40
+# 결과가 0건이면 corpCode 변경 시도. 단일판매·공급계약 자주 있는 회사 예: 두산에너빌리티 (corpCode=00164742), HD현대중공업, 삼성중공업 등.</code></pre>
+
+<div class="step">☐ <strong>Step 6.3:</strong> 출력의 <code>sample row keys</code> 확인 후 Task 2의 <code>ContractItem</code> 필드명을 실제 응답에 맞춰 수정. 의심되는 변경 후보:</div>
+<ul>
+  <li><code>ctr_cn</code> ↔ <code>cnts</code> ↔ <code>itm_nm</code></li>
+  <li><code>cnt_pa_nm</code> ↔ <code>ctr_pa</code> ↔ <code>cntpa</code></li>
+  <li><code>spy_amt</code> ↔ <code>contract_amt</code> ↔ <code>cnt_amt</code></li>
+  <li><code>rce_sl_amt_rat</code> ↔ <code>recent_sal_rt</code> ↔ <code>sl_amt_rt</code></li>
+</ul>
+
+<p>실제 응답에 따라 ContractItem과 buildContractMap의 매핑을 보정. status가 013 (조회 자료 없음)이면 다른 종목 시도.</p>
+
+<div class="step">☐ <strong>Step 6.4:</strong> 보정 후 tsc + 같은 스크립트 재실행해서 payload sample이 정상 값으로 채워지는지 확인.</div>
+
+</div>
+
+<hr>
+
+<h2>Task 7 — 통합 검증</h2>
+
+<div class="task">
+
+<div class="step">☐ <strong>Step 7.1:</strong> 자기주식·계약 row가 fetch되도록 005930 + 다른 종목 1개 갱신. 페이지에서 "공시 갱신" 버튼 클릭 (가장 단순). 또는 worker/db 기반 임시 스크립트:</div>
+
+<pre><code>cat &gt; /tmp/refresh.ts &lt;&lt;'EOF'
+import { config } from "dotenv";
+import path from "node:path";
+config({ path: path.resolve("/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/.env.local") });
+config({ path: path.resolve("/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/.env") });
+import { db } from "/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/worker/db";
+import { fetchDartList } from "/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/src/lib/dart/list";
+import { buildContractMap } from "/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/src/lib/dart/contract-supply";
+const code = process.argv[2] ?? "005930";
+const TSSTK_REGEX = /자기주식|자사주/;
+const CONTRACT_REGEX = /단일판매[ㆍ··.]?공급계약|공급계약체결|판매계약체결/;
+
+(async () =&gt; {
+  const m = await db.stockMaster.findUnique({ where: { code } });
+  if (!m?.corpCode) return;
+  const corpCode = m.corpCode;
+  const now = new Date();
+  const bgnDe = `${now.getFullYear() - 4}0101`;
+  const endDe = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+
+  const respB = await fetchDartList({ corpCode, pblntfTy: "B", bgnDe, endDe, pageCount: 100 });
+  console.log("B count:", respB?.list?.length);
+  const tsstk = (respB?.list ?? []).filter(it =&gt; TSSTK_REGEX.test(it.report_nm));
+  const contracts = (respB?.list ?? []).filter(it =&gt; CONTRACT_REGEX.test(it.report_nm));
+  console.log(`tsstk: ${tsstk.length}, contracts: ${contracts.length}`);
+  console.log("contract sample:", contracts.slice(0, 3).map(c =&gt; c.report_nm));
+
+  const cMap = await buildContractMap({ corpCode, bgnDe, endDe });
+  console.log("contractMap size:", cMap.size);
+  process.exit(0);
+})();
+EOF
+cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsx /tmp/refresh.ts 005930</code></pre>
+
+<p>또는 사용자가 페이지에서 "공시 갱신" 클릭.</p>
+
+<div class="step">☐ <strong>Step 7.2:</strong> DB 카테고리별 카운트:</div>
+
+<pre><code>sqlite3 /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/data/company-map.db \
+  "SELECT category, COUNT(*) FROM disclosures WHERE code='005930' GROUP BY category;"</code></pre>
+
+<p>Expected: 4개 카테고리 — 실적/배당/지분/계약.</p>
+
+<div class="step">☐ <strong>Step 7.3:</strong> 페이지 응답에 4 섹션 라벨 + 계약 카드 컨텐츠:</div>
+
+<pre><code>curl -s "http://localhost:3004/stocks/005930" &gt; /tmp/od3.html
+grep -oE '&lt;h2[^&gt;]*&gt;[^&lt;]+&lt;/h2&gt;' /tmp/od3.html | head -10
+grep -oE '계약일|계약기간|계약내용|계약상대방|공급지역|계약금액|최근매출액대비' /tmp/od3.html | sort | uniq -c</code></pre>
+
+<p>Expected: h2에 "실적"·"배당"·"지분"·"계약" 모두. 계약 카드 라벨 일부 매치.</p>
+
+<div class="step">☐ <strong>Step 7.4:</strong> SectionNav 4개 항목 확인:</div>
+
+<pre><code>grep -oE 'href="#(earnings|dividends|ownership|contracts)"' /tmp/od3.html | sort | uniq -c</code></pre>
+
+<p>Expected: 4개 anchor 모두 매치.</p>
+
+<div class="step">☐ <strong>Step 7.5 (수동):</strong> 브라우저에서 005930 페이지 — SectionNav 4 항목, 자기주식 row가 지분 카드에 보이는지, 계약 섹션에 카드 노출 확인.</div>
+
+</div>
+
+<hr>
+
+<h2>Self-Review</h2>
+
+<p><strong>Spec coverage:</strong></p>
+<ul>
+  <li>DisclosureCategory에 "계약" 추가 → Task 1 ✓</li>
+  <li>ContractPayload → Task 1 ✓</li>
+  <li>contract-supply.ts 클라이언트 → Task 2 ✓</li>
+  <li>fetchOwnership에 B-자기주식 통합 → Task 3.3 ✓</li>
+  <li>fetchContracts 신규 → Task 3.4 ✓</li>
+  <li>fetchDisclosuresForStock 4함수 순차 → Task 3.5 ✓</li>
+  <li>ContractCard cyan + NULL 행 숨김 → Task 4 ✓</li>
+  <li>DisclosureTimeline 4섹션 + Section id="contracts" → Task 5.1 ✓</li>
+  <li>SectionNav 4 항목 → Task 5.2 ✓</li>
+  <li>page.tsx contracts 분리 → Task 5.3 ✓</li>
+  <li>응답 필드 보정 단계 → Task 6 ✓</li>
+  <li>검증 → Task 7 ✓</li>
+</ul>
+
+<p><strong>Placeholder scan:</strong> 모든 step에 실제 코드/명령. ✓</p>
+
+<p><strong>Type consistency:</strong></p>
+<ul>
+  <li>ContractPayload — Task 1 정의, Task 2·4·5 동일 import. ✓</li>
+  <li>fetchContractSupply / buildContractMap 시그니처 — Task 2 정의, Task 3·6 동일 호출. ✓</li>
+  <li>ContractItem (DisclosureTimeline의) vs ContractPayload — 별개 (Item은 row 래퍼). ✓</li>
+  <li>regex 상수 TSSTK_REGEX / CONTRACT_REGEX — Task 3 정의, 일관 사용. ✓</li>
+</ul>
+
+</body>
+</html>

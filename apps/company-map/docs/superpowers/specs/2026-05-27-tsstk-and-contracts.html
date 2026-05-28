@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>자사주(지분 통합) + 계약 카테고리 — Design Spec</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+    h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+    h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+    h3 { color: #2c5282; margin-top: 1.5rem; }
+    pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+    table th { background: #edf2f7; text-align: left; }
+    table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+    ul, ol { padding-left: 1.5rem; }
+    li { margin: 0.2rem 0; }
+    blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+
+<h1>자사주(지분 통합) + 계약 카테고리</h1>
+
+<p><strong>Date:</strong> 2026-05-27</p>
+<p><strong>Scope:</strong> ① <code>pblntf_ty=B</code>(주요사항보고) 중 자기주식 관련 공시를 <strong>지분</strong> 카테고리에 통합. ② "단일판매·공급계약체결" 등 계약 공시를 <strong>새 카테고리 "계약"</strong>으로 추가.</p>
+
+<h2>Goals</h2>
+<ul>
+  <li>자사주 취득/처분/소각 결정 → 지분 카테고리에 노출 (제목 + DART 링크 fallback).</li>
+  <li>계약 공시 → 신규 "계약" 섹션 + ContractCard (계약일·기간·내용·상대방·지역·금액·매출액 대비).</li>
+  <li>SectionNav에 "계약" 추가, 4 섹션 navigation.</li>
+</ul>
+
+<h2>Non-Goals</h2>
+<ul>
+  <li>자사주 상세 API 호출 (취득결정·처분결정·신탁 등 4-5개 endpoint 복잡) — 후속.</li>
+  <li>모든 주요사항보고(합병·분할·증자 등) 분류 — 후속.</li>
+  <li>계약 외 영업 공시 (공급·취득 등) 세분화 — 후속.</li>
+</ul>
+
+<h2>Data Model</h2>
+
+<h3>DisclosureCategory 확장</h3>
+<pre><code>export type DisclosureCategory = "실적" | "배당" | "지분" | "계약";</code></pre>
+
+<h3>ContractPayload</h3>
+<pre><code>export interface ContractPayload {
+  contractDate: string | null;       // 계약일 "YYYY-MM-DD"
+  startDate: string | null;          // 계약기간 시작
+  endDate: string | null;            // 계약기간 종료
+  contractContent: string | null;    // 계약 내용 (예: "Valve remote control system외 판매계약")
+  counterparty: string | null;       // 계약상대방
+  supplyRegion: string | null;       // 공급지역
+  amount: number | null;             // 계약금액 (원)
+  recentSalesRatio: number | null;   // 최근매출액대비 %
+}</code></pre>
+
+<h3>OwnershipPayload — 변경 없음</h3>
+<p>자사주는 기존 <code>reportType: "자기주식"</code>, <code>detail: null</code>로 저장. 카드는 기존 OwnershipCard의 자기주식 분기(제목+링크) 그대로.</p>
+
+<h2>DART API</h2>
+
+<h3>list.json (pblntf_ty=B) — 자사주 + 계약 공통 호출</h3>
+<p><code>fetchOwnership</code>·<code>fetchContracts</code> 각각 별도 호출하지 않고, B는 한 번 호출해서 두 함수가 공유. 또는 둘 다 호출하되 캐싱.</p>
+<p>구현 단순화 우선: <strong>fetchOwnership에서 B 호출 → 자기주식 row 추출 (지분 카테고리로 저장). fetchContracts에서 B 호출 → 계약 row 추출 (계약 카테고리로 저장).</strong> 같은 corpCode·기간이라 DART 응답 동일. 코드 중복 허용 (DRY 우선보다 단순함).</p>
+
+<h3>자기주식 row 매칭</h3>
+<p><code>report_nm</code>에 "자기주식" 포함 또는 "자사주" 포함. <code>classifyOwnership</code>의 기존 자기주식 매칭 그대로 사용.</p>
+
+<h3>계약 row 매칭</h3>
+<p><code>report_nm</code>에 "단일판매" OR "공급계약" OR "판매계약체결" 포함.</p>
+
+<h3>단일판매·공급계약 상세 API</h3>
+<p>OpenDART 추정 endpoint: <code>https://opendart.fss.or.kr/api/cnctSlsCnclSDcsn.json</code> (Phase 2 alotMatter 사례처럼 추정. 정확한 응답은 구현 시 확인 단계 포함).</p>
+<p>추정 응답 필드:</p>
+<ul>
+  <li><code>ctr_prd_bgn_dd</code>, <code>ctr_prd_end_dd</code>: 계약기간 시작·종료</li>
+  <li><code>ctr_cn</code> / <code>cn</code>: 계약 내용</li>
+  <li><code>cnt_pa_nm</code> / <code>ctr_pa_nm</code>: 상대방</li>
+  <li><code>spy_aro_nm</code> / <code>regn</code>: 공급지역</li>
+  <li><code>spy_amt</code> / <code>ctr_amt</code>: 계약금액</li>
+  <li><code>rce_sl_amt_rat</code>: 최근매출액 대비 %</li>
+  <li><code>ctr_dd</code>: 계약일</li>
+</ul>
+<p>응답 필드명 빗나갈 가능성 → Task에 응답 확인 단계 포함.</p>
+
+<h2>fetch 흐름</h2>
+
+<pre><code>fetchDisclosuresForStock(code):
+  try fetchEarnings
+  try fetchOwnership   // 변경: D + B(자기주식 필터) 합쳐서 지분 카테고리에 저장
+  try fetchDividends
+  try fetchContracts   // 신규: B(계약 필터) → ContractPayload → 계약 카테고리</code></pre>
+
+<h2>UI</h2>
+
+<h3>ContractCard</h3>
+<p>배경 <code>bg-cyan-900/80</code>. 이미지 패턴:</p>
+<pre><code>┌────────────────────────────────────┐
+│ 단일판매·공급계약체결                │
+│                                    │
+│ 계약일: 2026.03.17                  │
+│ 계약기간: 2026.03.17 - 2029.03.30   │
+│                                    │
+│ 계약내용: Valve remote control...   │
+│ 계약상대방: SINOKING ENGINEERING... │
+│ 공급지역: 중국                      │
+│                                    │
+│ 계약금액: 182억 8,112만원            │
+│ 최근매출액대비: 17.54%              │
+│                                    │
+│ 2026.03.17 16:56                   │
+└────────────────────────────────────┘</code></pre>
+<p>NULL 필드는 그 행 자체를 숨김 (모두 옵셔널).</p>
+<p>계약금액 포맷: 1조 이상="X.X조", 1억 이상="X억 Y,YYY만원", 1만 이상="X,XXX만원", 그 미만="X원".</p>
+
+<h3>DisclosureTimeline</h3>
+<p>섹션 4개로 확장: 실적/배당/지분/계약. 계약 핀 색 <code>bg-cyan-500</code>. id=<code>contracts</code>.</p>
+
+<h3>SectionNav</h3>
+<p>4번째 항목 추가. dotClass=<code>bg-cyan-500</code>, label="계약".</p>
+
+<h2>변경 파일</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+  <thead><tr><th>경로</th><th>상태</th><th>책임</th></tr></thead>
+  <tbody>
+    <tr><td><code>src/lib/dart/disclosure-payloads.ts</code></td><td>수정</td><td>DisclosureCategory 확장 + ContractPayload 추가</td></tr>
+    <tr><td><code>src/lib/dart/contract-supply.ts</code></td><td>신규</td><td>fetchContractSupply + extractContractPayload (Map by rcpNo)</td></tr>
+    <tr><td><code>src/actions/disclosures.ts</code></td><td>수정</td><td>fetchOwnership에 B 호출 + 자기주식 row 통합, fetchContracts 신규</td></tr>
+    <tr><td><code>src/app/stocks/[code]/ContractCard.tsx</code></td><td>신규</td><td>cyan 카드</td></tr>
+    <tr><td><code>src/app/stocks/[code]/DisclosureTimeline.tsx</code></td><td>수정</td><td>4 섹션 (계약 추가)</td></tr>
+    <tr><td><code>src/app/stocks/[code]/SectionNav.tsx</code></td><td>수정</td><td>4 항목</td></tr>
+    <tr><td><code>src/app/stocks/[code]/page.tsx</code></td><td>수정</td><td>contracts row 분리/전달</td></tr>
+  </tbody>
+</table>
+
+<h2>검증 기준</h2>
+<ul>
+  <li>tsc EXIT=0. 마이그레이션 불필요.</li>
+  <li>"공시 갱신" → 종목당 추가 ≈ 1~2초 (계약 상세 row × N).</li>
+  <li>005930 지분 카테고리에 자기주식 row 노출 (취득결정/처분결정/소각 등).</li>
+  <li>005930 또는 계약 공시가 있는 종목 페이지에 계약 카드 노출, 계약일/기간/금액/상대방 채워짐.</li>
+  <li>SectionNav 4개 항목 노출, 계약 섹션으로 스크롤 동작.</li>
+  <li>계약 상세 API 실패 시 ContractPayload 모든 필드 null → 카드는 제목+공시일+DART 링크만.</li>
+</ul>
+
+<h2>Out of Scope / Open Questions</h2>
+<ul>
+  <li>계약 상세 API endpoint와 응답 필드명은 구현 단계에서 실제 응답 검증 (Phase 2 alotMatter·elestock 패턴).</li>
+  <li>자사주 상세 (취득·처분·소각 결정 별 결정 사유·수량 등) — 별도 Phase.</li>
+  <li>계약이 너무 많은 종목 (예: SI 회사)은 max 16건 제한으로 잘림.</li>
+</ul>
+
+</body>
+</html>

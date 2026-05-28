@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>공시 History Phase 2 — Implementation Plan</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+    pre { background: #f4f4f4; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 3px; }
+    pre code { background: none; padding: 0; }
+    h2 { border-bottom: 1px solid #ddd; padding-bottom: 0.3rem; margin-top: 2rem; }
+    h3 { color: #2c5282; }
+    .task { background: #fafafa; padding: 1rem 1.5rem; border-left: 3px solid #2c5282; margin: 1rem 0; border-radius: 4px; }
+    .step { margin: 0.6rem 0; }
+    .files { color: #555; font-size: 0.9rem; }
+    .note { background: #fffae6; padding: 0.6rem; border-left: 3px solid #d69e2e; margin: 0.8rem 0; }
+  </style>
+</head>
+<body>
+
+<h1>공시 History Phase 2 — Implementation Plan</h1>
+
+<blockquote>
+<p><strong>For agentic workers:</strong> inline 실행. <code>☐</code>는 미완료. TDD 형식 대신 단계별 구현 + 수동 검증 (CLAUDE.md).</p>
+</blockquote>
+
+<p><strong>Goal:</strong> 종목 페이지에 배당·지분 카테고리 카드 추가. 기존 실적 카드 유지.</p>
+
+<p><strong>Architecture:</strong> 기존 <code>Disclosure</code> 테이블 재활용 (category 다양화). <code>fetchDisclosuresForStock</code>가 3개 카테고리(A/B는 변경 — 아래 note 참조, D) 순차 처리, try/catch로 격리. 카드 컴포넌트는 카테고리별 분리.</p>
+
+<div class="note">
+<p><strong>Spec과 차이 — 배당 API endpoint:</strong> spec은 <code>cashDvdndPaymntDcsn</code> 가정이었지만 OpenDART에 해당 endpoint 없음. 안정적 대안인 <code>alotMatter.json</code> (배당에 관한 사항)을 사용. 사업보고서 기반 배당 데이터로 동일한 표시 데이터(주당·시가배당률·배당기준일) 확보 가능. 결과 표시는 spec과 동일.</p>
+<p>이에 따라 list.json(pblntf_ty=B) 호출 불필요. 배당은 alotMatter.json 1종 API로 수집. <strong>총 종목당 API ≈ list 2회(A, D) + fnltt 16회(실적) + alotMatter 최대 4회(연도별) ≈ 22 calls</strong>.</p>
+</div>
+
+<p><strong>Tech Stack:</strong> Next.js 16, Prisma 6 + SQLite, DART OpenAPI.</p>
+
+<hr>
+
+<h2>파일 구조</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+  <thead><tr><th>파일</th><th>상태</th><th>책임</th></tr></thead>
+  <tbody>
+    <tr><td><code>src/lib/dart/alotMatter.ts</code></td><td>신규</td><td>alotMatter.json 호출 + 응답 파싱 + <code>DividendPayload[]</code> 추출</td></tr>
+    <tr><td><code>src/lib/dart/ownership-classify.ts</code></td><td>신규</td><td>report_nm → reportType 분류, <code>OwnershipPayload</code> 생성</td></tr>
+    <tr><td><code>src/lib/dart/disclosure-payloads.ts</code></td><td>신규</td><td>3 카테고리 payload 타입 한곳에 모음 (EarningsPayload 외에)</td></tr>
+    <tr><td><code>src/actions/disclosures.ts</code></td><td>수정</td><td>3 카테고리 순차 처리, try/catch 격리, 각 카테고리별 16건 제한</td></tr>
+    <tr><td><code>src/app/stocks/[code]/OwnershipCard.tsx</code></td><td>신규</td><td>호박색 카드</td></tr>
+    <tr><td><code>src/app/stocks/[code]/DividendCard.tsx</code></td><td>신규</td><td>에메랄드 카드</td></tr>
+    <tr><td><code>src/app/stocks/[code]/DisclosureTimeline.tsx</code></td><td>수정</td><td>3개 섹션</td></tr>
+    <tr><td><code>src/app/stocks/[code]/page.tsx</code></td><td>수정</td><td>카테고리별 row 분리해서 timeline에 전달</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>Task 1 — Payload 타입 + ownership classifier</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/lib/dart/disclosure-payloads.ts</code>, <code>src/lib/dart/ownership-classify.ts</code> (모두 신규)</p>
+
+<div class="step">☐ <strong>Step 1.1:</strong> disclosure-payloads.ts 생성:</div>
+
+<pre><code>export type DisclosureCategory = "실적" | "배당" | "지분";
+
+export interface OwnershipPayload {
+  pblntfDetailTy?: string;
+  reportType: "주식대량보유" | "임원·주요주주" | "자기주식" | "기타";
+}
+
+export interface DividendPayload {
+  divPerShare: number | null;
+  dividendYieldPct: number | null;
+  recordDate: string | null;            // "YYYY-MM-DD"
+  dividendType: "현금" | "주식" | "기타";
+}</code></pre>
+
+<div class="step">☐ <strong>Step 1.2:</strong> ownership-classify.ts 생성:</div>
+
+<pre><code>import type { OwnershipPayload } from "./disclosure-payloads";
+
+export function classifyOwnership(reportNm: string): OwnershipPayload {
+  if (/주식등의대량보유상황보고서/.test(reportNm)) {
+    return { reportType: "주식대량보유" };
+  }
+  if (/임원[··.]?주요주주특정증권등소유상황보고서/.test(reportNm)) {
+    return { reportType: "임원·주요주주" };
+  }
+  if (/자기주식/.test(reportNm)) {
+    return { reportType: "자기주식" };
+  }
+  return { reportType: "기타" };
+}</code></pre>
+
+<div class="step">☐ <strong>Step 1.3:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 2 — alotMatter.json 클라이언트</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/lib/dart/alotMatter.ts</code> (신규)</p>
+
+<p>OpenDART <code>https://opendart.fss.or.kr/api/alotMatter.json</code>. 응답은 사업보고서/반기/분기 단위. <code>se</code> 필드로 항목명 (현금배당금총액·주당 현금배당금·시가배당률 등), <code>thstrm</code> 등으로 값.</p>
+
+<p>실제 응답 필드는 OpenDART 문서 기준. 호출은 종목당 연도별 1회 (사업보고서 = reprt_code 11011).</p>
+
+<div class="step">☐ <strong>Step 2.1:</strong> 파일 생성:</div>
+
+<pre><code>import type { DividendPayload } from "./disclosure-payloads";
+
+interface AlotMatterItem {
+  se?: string;                  // "주당 현금배당금(원)" 등
+  stock_knd?: string;           // "보통주" 등
+  thstrm?: string;              // 당기 값
+  rcept_no?: string;            // 접수번호 (rcpNo)
+  bsns_year?: string;
+  reprt_code?: string;
+}
+
+interface AlotMatterResponse {
+  status?: string;
+  message?: string;
+  list?: AlotMatterItem[];
+}
+
+function sleep(ms: number): Promise&lt;void&gt; {
+  return new Promise((r) =&gt; setTimeout(r, ms));
+}
+
+function isRetriable(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const m = err.message.toLowerCase();
+  return (
+    m.includes("fetch failed") ||
+    m.includes("timeout") ||
+    m.includes("network") ||
+    m.includes("econnreset") ||
+    m.includes("etimedout")
+  );
+}
+
+function parseNum(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/,/g, "").trim();
+  if (cleaned === "" || cleaned === "-") return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+export async function fetchAlotMatter(params: {
+  corpCode: string;
+  bsnsYear: number;
+  reprtCode: string;
+}): Promise&lt;AlotMatterResponse | null&gt; {
+  const apiKey = process.env.DART_API_KEY;
+  if (!apiKey) throw new Error("DART_API_KEY not set");
+  const url = new URL("https://opendart.fss.or.kr/api/alotMatter.json");
+  url.searchParams.set("crtfc_key", apiKey);
+  url.searchParams.set("corp_code", params.corpCode);
+  url.searchParams.set("bsns_year", String(params.bsnsYear));
+  url.searchParams.set("reprt_code", params.reprtCode);
+
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; attempt &lt;= MAX_ATTEMPTS; attempt++) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+      if (!resp.ok) return null;
+      return (await resp.json()) as AlotMatterResponse;
+    } catch (err) {
+      if (attempt &lt; MAX_ATTEMPTS && isRetriable(err)) {
+        await sleep(500 * 2 ** (attempt - 1));
+        continue;
+      }
+      console.warn(
+        `[dart] alotMatter fetch failed corp=${params.corpCode} year=${params.bsnsYear}:`,
+        err instanceof Error ? err.message : err,
+      );
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * 사업보고서 한 건 응답에서 보통주 기준 배당 정보 추출.
+ * "주당 현금배당금(원)", "시가배당률(%)", "현금배당기준일" 항목 매칭.
+ * 실패 / 보통주 없음 → null.
+ */
+export function extractDividendPayload(
+  response: AlotMatterResponse | null,
+): DividendPayload | null {
+  if (!response || response.status !== "000" || !response.list) return null;
+
+  const commonItems = response.list.filter(
+    (it) =&gt; (it.stock_knd ?? "").includes("보통주"),
+  );
+  // 보통주 row가 없으면 stock_knd가 비어있을 수 있음 — 그 경우 전체 list 사용.
+  const items = commonItems.length &gt; 0 ? commonItems : response.list;
+
+  const findThstrm = (label: RegExp): string | undefined =&gt;
+    items.find((it) =&gt; label.test(it.se ?? ""))?.thstrm;
+
+  const divPerShare = parseNum(findThstrm(/주당.*현금배당금/));
+  const dividendYieldPct = parseNum(findThstrm(/시가배당률/));
+  const recordRaw = findThstrm(/현금배당.*기준일|배당.*기준일/);
+  const recordDate =
+    recordRaw && /\d{4}/.test(recordRaw)
+      ? recordRaw.replace(/[^\d]/g, "").replace(/^(\d{4})(\d{2})(\d{2}).*/, "$1-$2-$3")
+      : null;
+
+  if (divPerShare == null && dividendYieldPct == null && recordDate == null) {
+    return null;
+  }
+  return {
+    divPerShare,
+    dividendYieldPct,
+    recordDate,
+    dividendType: "현금",
+  };
+}</code></pre>
+
+<div class="step">☐ <strong>Step 2.2:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+</div>
+
+<hr>
+
+<h2>Task 3 — disclosures.ts 확장 (3 카테고리)</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/actions/disclosures.ts</code></p>
+
+<p>3 카테고리 순차 처리. 각 카테고리는 별도 함수로 분리해 try/catch로 격리.</p>
+
+<div class="step">☐ <strong>Step 3.1:</strong> 파일 상단 import 추가:</div>
+
+<pre><code>import { classifyOwnership } from "@/lib/dart/ownership-classify";
+import { fetchAlotMatter, extractDividendPayload } from "@/lib/dart/alotMatter";</code></pre>
+
+<div class="step">☐ <strong>Step 3.2:</strong> 기존 함수 body를 3 단계로 재구성. 기존 함수 전체 교체:</div>
+
+<pre><code>const MAX_REPORTS_PER_STOCK = 16;
+const DIVIDEND_YEARS_LOOKBACK = 4;
+
+interface FetchStats {
+  inserted: number;
+  updated: number;
+  failed: number;
+}
+
+function emptyStats(): FetchStats {
+  return { inserted: 0, updated: 0, failed: 0 };
+}
+
+function mergeStats(a: FetchStats, b: FetchStats): FetchStats {
+  return {
+    inserted: a.inserted + b.inserted,
+    updated: a.updated + b.updated,
+    failed: a.failed + b.failed,
+  };
+}
+
+async function fetchEarnings(code: string, corpCode: string): Promise&lt;FetchStats&gt; {
+  // 기존 로직 (실적): list.json pblntf_ty=A → 정기보고서 필터 → buildEarningsPayload → upsert
+  // (현재 함수 body의 실적 부분을 그대로 이쪽으로 옮김. 변경 없음.)
+}
+
+async function fetchOwnership(code: string, corpCode: string): Promise&lt;FetchStats&gt; {
+  const now = new Date();
+  const bgnDe = `${now.getFullYear() - 4}0101`;
+  const endDe = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+
+  const resp = await fetchDartList({
+    corpCode,
+    pblntfTy: "D",
+    bgnDe,
+    endDe,
+    pageCount: 100,
+  });
+  if (!resp || resp.status !== "000" || !resp.list) {
+    return { inserted: 0, updated: 0, failed: 1 };
+  }
+
+  const rows = resp.list
+    .slice(0, MAX_REPORTS_PER_STOCK)
+    .map((it) =&gt; ({
+      rcpNo: it.rcept_no,
+      reportNm: it.report_nm,
+      rceptDt: new Date(
+        `${it.rcept_dt.slice(0, 4)}-${it.rcept_dt.slice(4, 6)}-${it.rcept_dt.slice(6, 8)}`,
+      ),
+    }));
+
+  let inserted = 0;
+  let updated = 0;
+  for (const r of rows) {
+    const payload = classifyOwnership(r.reportNm);
+    const existing = await db.disclosure.findUnique({ where: { rcpNo: r.rcpNo } });
+    await db.disclosure.upsert({
+      where: { rcpNo: r.rcpNo },
+      create: {
+        rcpNo: r.rcpNo,
+        code,
+        corpCode,
+        reportNm: r.reportNm,
+        pblntfTy: "D",
+        rceptDt: r.rceptDt,
+        category: "지분",
+        payload: JSON.stringify(payload),
+      },
+      update: {
+        payload: JSON.stringify(payload),
+        fetchedAt: new Date(),
+      },
+    });
+    if (existing) updated++;
+    else inserted++;
+  }
+  return { inserted, updated, failed: 0 };
+}
+
+async function fetchDividends(code: string, corpCode: string): Promise&lt;FetchStats&gt; {
+  const now = new Date();
+  const stats = emptyStats();
+  // 연도별 사업보고서 alotMatter 1회씩
+  for (let i = 0; i &lt; DIVIDEND_YEARS_LOOKBACK; i++) {
+    const bsnsYear = now.getFullYear() - 1 - i;  // 사업보고서는 직전 연도부터
+    const resp = await fetchAlotMatter({
+      corpCode,
+      bsnsYear,
+      reprtCode: "11011",  // 사업보고서
+    });
+    const payload = extractDividendPayload(resp);
+    if (!payload) continue;
+
+    // alotMatter 응답에 rcept_no 있으면 사용, 없으면 합성 키.
+    const rcpNo =
+      resp?.list?.[0]?.rcept_no ?? `alotMatter-${code}-${bsnsYear}-11011`;
+    const reportNm = `${bsnsYear}년 현금배당`;
+    const rceptDt = new Date(`${bsnsYear + 1}-03-31`);  // 사업보고서 통상 공시
+
+    const existing = await db.disclosure.findUnique({ where: { rcpNo } });
+    await db.disclosure.upsert({
+      where: { rcpNo },
+      create: {
+        rcpNo,
+        code,
+        corpCode,
+        reportNm,
+        pblntfTy: "alotMatter",
+        rceptDt,
+        category: "배당",
+        payload: JSON.stringify(payload),
+      },
+      update: {
+        payload: JSON.stringify(payload),
+        fetchedAt: new Date(),
+      },
+    });
+    if (existing) stats.updated++;
+    else stats.inserted++;
+  }
+  return stats;
+}
+
+export async function fetchDisclosuresForStock(code: string): Promise&lt;FetchStats&gt; {
+  if (!/^\d{6}$/.test(code)) return emptyStats();
+  const master = await db.stockMaster.findUnique({ where: { code } });
+  if (!master?.corpCode) return emptyStats();
+  const corpCode = master.corpCode;
+
+  let total = emptyStats();
+  for (const fn of [fetchEarnings, fetchOwnership, fetchDividends]) {
+    try {
+      total = mergeStats(total, await fn(code, corpCode));
+    } catch (err) {
+      console.error(`[disclosures] ${fn.name} failed for ${code}:`, err);
+      total.failed++;
+    }
+  }
+  return total;
+}</code></pre>
+
+<div class="step">☐ <strong>Step 3.3:</strong> <code>fetchEarnings</code> body 옮기기. 기존 함수의 list.json(A) → buildEarningsPayload → upsert 로직을 <code>fetchEarnings</code> 함수 body로 이동. category="실적" 그대로 유지. 정확한 코드:</div>
+
+<pre><code>async function fetchEarnings(code: string, corpCode: string): Promise&lt;FetchStats&gt; {
+  const now = new Date();
+  const bgnDe = `${now.getFullYear() - 4}0101`;
+  const endDe = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+
+  const resp = await fetchDartList({
+    corpCode,
+    pblntfTy: "A",
+    bgnDe,
+    endDe,
+    pageCount: 100,
+  });
+  if (!resp || resp.status !== "000" || !resp.list) {
+    return { inserted: 0, updated: 0, failed: 1 };
+  }
+
+  const reports = resp.list
+    .filter((it) =&gt; PERIODIC_REPORT_REGEX.test(it.report_nm))
+    .slice(0, MAX_REPORTS_PER_STOCK)
+    .map((it) =&gt; ({
+      rcpNo: it.rcept_no,
+      reportNm: it.report_nm,
+      rceptDt: new Date(
+        `${it.rcept_dt.slice(0, 4)}-${it.rcept_dt.slice(4, 6)}-${it.rcept_dt.slice(6, 8)}`,
+      ),
+    }));
+
+  reports.sort((a, b) =&gt; a.rceptDt.getTime() - b.rceptDt.getTime());
+
+  let inserted = 0;
+  let updated = 0;
+  let failed = 0;
+  let prevPayload: EarningsPayload | null = null;
+
+  for (const r of reports) {
+    const reprtCode = deriveReprtCode(r.reportNm, r.rceptDt);
+    if (!reprtCode) {
+      failed++;
+      continue;
+    }
+    const bsnsYear = deriveBsnsYear(r.rceptDt, reprtCode);
+    const payload = await buildEarningsPayload(corpCode, bsnsYear, reprtCode, prevPayload);
+    if (!payload) {
+      failed++;
+      continue;
+    }
+    prevPayload = payload;
+
+    const existing = await db.disclosure.findUnique({ where: { rcpNo: r.rcpNo } });
+    await db.disclosure.upsert({
+      where: { rcpNo: r.rcpNo },
+      create: {
+        rcpNo: r.rcpNo,
+        code,
+        corpCode,
+        reportNm: r.reportNm,
+        pblntfTy: "A",
+        rceptDt: r.rceptDt,
+        category: "실적",
+        payload: JSON.stringify(payload),
+      },
+      update: {
+        payload: JSON.stringify(payload),
+        fetchedAt: new Date(),
+      },
+    });
+    if (existing) updated++;
+    else inserted++;
+  }
+  return { inserted, updated, failed };
+}</code></pre>
+
+<div class="step">☐ <strong>Step 3.4:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 4 — OwnershipCard + DividendCard</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/app/stocks/[code]/OwnershipCard.tsx</code>, <code>src/app/stocks/[code]/DividendCard.tsx</code> (모두 신규)</p>
+
+<div class="step">☐ <strong>Step 4.1:</strong> OwnershipCard.tsx 생성:</div>
+
+<pre><code>import type { OwnershipPayload } from "@/lib/dart/disclosure-payloads";
+
+interface Props {
+  rcpNo: string;
+  reportNm: string;
+  rceptDt: Date;
+  payload: OwnershipPayload | null;
+}
+
+function formatRceptDt(d: Date): string {
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yy}.${mm}.${dd}`;
+}
+
+export function OwnershipCard({ rcpNo, reportNm, rceptDt, payload }: Props) {
+  const dartUrl = `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${rcpNo}`;
+  return (
+    &lt;article className="rounded-lg bg-amber-900/80 p-5 text-gray-100 shadow"&gt;
+      {payload && (
+        &lt;span className="inline-block rounded bg-amber-700/80 px-2 py-0.5 text-xs font-medium"&gt;
+          {payload.reportType}
+        &lt;/span&gt;
+      )}
+      &lt;h3 className="mt-2 text-base font-bold"&gt;{reportNm}&lt;/h3&gt;
+      &lt;a
+        href={dartUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 inline-block text-xs text-amber-200 hover:underline"
+      &gt;
+        DART 원본 ↗
+      &lt;/a&gt;
+      &lt;p className="mt-3 text-xs text-gray-300"&gt;{formatRceptDt(rceptDt)}&lt;/p&gt;
+    &lt;/article&gt;
+  );
+}</code></pre>
+
+<div class="step">☐ <strong>Step 4.2:</strong> DividendCard.tsx 생성:</div>
+
+<pre><code>import type { DividendPayload } from "@/lib/dart/disclosure-payloads";
+
+interface Props {
+  reportNm: string;
+  rceptDt: Date;
+  payload: DividendPayload | null;
+}
+
+function formatRceptDt(d: Date): string {
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yy}.${mm}.${dd}`;
+}
+
+function formatRecordDate(s: string | null): string {
+  if (!s) return "—";
+  return s.replace(/-/g, ".");
+}
+
+export function DividendCard({ reportNm, rceptDt, payload }: Props) {
+  return (
+    &lt;article className="rounded-lg bg-emerald-900/80 p-5 text-gray-100 shadow"&gt;
+      &lt;h3 className="text-lg font-bold"&gt;{reportNm}&lt;/h3&gt;
+      {payload && (
+        &lt;div className="mt-3 space-y-1 text-sm"&gt;
+          &lt;div&gt;
+            주당 배당금:{" "}
+            &lt;b&gt;{payload.divPerShare != null ? `${payload.divPerShare.toLocaleString()}원` : "—"}&lt;/b&gt;
+          &lt;/div&gt;
+          &lt;div&gt;
+            시가배당률:{" "}
+            &lt;b&gt;{payload.dividendYieldPct != null ? `${payload.dividendYieldPct.toFixed(2)}%` : "—"}&lt;/b&gt;
+          &lt;/div&gt;
+          &lt;div&gt;
+            배당기준일: &lt;b&gt;{formatRecordDate(payload.recordDate)}&lt;/b&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      )}
+      &lt;p className="mt-4 text-xs text-gray-300"&gt;{formatRceptDt(rceptDt)}&lt;/p&gt;
+    &lt;/article&gt;
+  );
+}</code></pre>
+
+<div class="step">☐ <strong>Step 4.3:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+</div>
+
+<hr>
+
+<h2>Task 5 — DisclosureTimeline + page.tsx 수정</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/app/stocks/[code]/DisclosureTimeline.tsx</code>, <code>src/app/stocks/[code]/page.tsx</code></p>
+
+<div class="step">☐ <strong>Step 5.1:</strong> DisclosureTimeline.tsx 전체 교체:</div>
+
+<pre><code>import type {
+  EarningsPayload,
+} from "@/lib/dart/earnings-payload";
+import type {
+  OwnershipPayload,
+  DividendPayload,
+} from "@/lib/dart/disclosure-payloads";
+import { EarningsCard } from "./EarningsCard";
+import { OwnershipCard } from "./OwnershipCard";
+import { DividendCard } from "./DividendCard";
+
+interface BaseItem {
+  rcpNo: string;
+  reportNm: string;
+  rceptDt: Date;
+}
+export interface EarningsItem extends BaseItem {
+  payload: EarningsPayload | null;
+}
+export interface OwnershipItem extends BaseItem {
+  payload: OwnershipPayload | null;
+}
+export interface DividendItem extends BaseItem {
+  payload: DividendPayload | null;
+}
+
+interface Props {
+  earnings: EarningsItem[];
+  dividends: DividendItem[];
+  ownership: OwnershipItem[];
+}
+
+function Section({
+  pinBg,
+  label,
+  empty,
+  children,
+}: {
+  pinBg: string;
+  label: string;
+  empty: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    &lt;section&gt;
+      &lt;div className="mb-3 flex items-center gap-2"&gt;
+        &lt;span
+          className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs text-white ${pinBg}`}
+        &gt;
+          📌
+        &lt;/span&gt;
+        &lt;h2 className="text-lg font-semibold"&gt;{label}&lt;/h2&gt;
+      &lt;/div&gt;
+      {empty ? (
+        &lt;p className="text-sm text-gray-500"&gt;공시 없음&lt;/p&gt;
+      ) : (
+        &lt;div className="space-y-3"&gt;{children}&lt;/div&gt;
+      )}
+    &lt;/section&gt;
+  );
+}
+
+export function DisclosureTimeline({ earnings, dividends, ownership }: Props) {
+  return (
+    &lt;div className="space-y-8"&gt;
+      &lt;Section pinBg="bg-indigo-500" label="실적" empty={earnings.length === 0}&gt;
+        {earnings.map((e) =&gt; (
+          &lt;EarningsCard
+            key={e.rcpNo}
+            reportNm={e.reportNm}
+            rceptDt={e.rceptDt}
+            payload={e.payload}
+          /&gt;
+        ))}
+      &lt;/Section&gt;
+      &lt;Section pinBg="bg-emerald-500" label="배당" empty={dividends.length === 0}&gt;
+        {dividends.map((d) =&gt; (
+          &lt;DividendCard
+            key={d.rcpNo}
+            reportNm={d.reportNm}
+            rceptDt={d.rceptDt}
+            payload={d.payload}
+          /&gt;
+        ))}
+      &lt;/Section&gt;
+      &lt;Section pinBg="bg-amber-500" label="지분" empty={ownership.length === 0}&gt;
+        {ownership.map((o) =&gt; (
+          &lt;OwnershipCard
+            key={o.rcpNo}
+            rcpNo={o.rcpNo}
+            reportNm={o.reportNm}
+            rceptDt={o.rceptDt}
+            payload={o.payload}
+          /&gt;
+        ))}
+      &lt;/Section&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+<div class="step">☐ <strong>Step 5.2:</strong> page.tsx의 disclosures 분리 로직 수정. 기존:</div>
+
+<pre><code>  const earnings = disclosures.map((d) =&gt; ({
+    rcpNo: d.rcpNo,
+    reportNm: d.reportNm,
+    rceptDt: d.rceptDt,
+    payload: d.payload ? (JSON.parse(d.payload) as EarningsPayload) : null,
+  }));</code></pre>
+
+<p>로 교체:</p>
+
+<pre><code>  const allDisclosures = await db.disclosure.findMany({
+    where: { code },
+    orderBy: { rceptDt: "desc" },
+  });
+
+  if (allDisclosures.length === 0 && master.corpCode) {
+    await fetchDisclosuresForStock(code);
+  }
+  const refreshed = allDisclosures.length === 0 && master.corpCode
+    ? await db.disclosure.findMany({ where: { code }, orderBy: { rceptDt: "desc" } })
+    : allDisclosures;
+
+  const earnings = refreshed
+    .filter((d) =&gt; d.category === "실적")
+    .map((d) =&gt; ({
+      rcpNo: d.rcpNo,
+      reportNm: d.reportNm,
+      rceptDt: d.rceptDt,
+      payload: d.payload ? (JSON.parse(d.payload) as EarningsPayload) : null,
+    }));
+
+  const dividends = refreshed
+    .filter((d) =&gt; d.category === "배당")
+    .map((d) =&gt; ({
+      rcpNo: d.rcpNo,
+      reportNm: d.reportNm,
+      rceptDt: d.rceptDt,
+      payload: d.payload ? (JSON.parse(d.payload) as DividendPayload) : null,
+    }));
+
+  const ownership = refreshed
+    .filter((d) =&gt; d.category === "지분")
+    .map((d) =&gt; ({
+      rcpNo: d.rcpNo,
+      reportNm: d.reportNm,
+      rceptDt: d.rceptDt,
+      payload: d.payload ? (JSON.parse(d.payload) as OwnershipPayload) : null,
+    }));</code></pre>
+
+<p>page.tsx 기존 disclosures 변수와 그 fetch 블록 제거. import에 <code>OwnershipPayload</code>, <code>DividendPayload</code> 추가.</p>
+
+<div class="step">☐ <strong>Step 5.3:</strong> page.tsx 상단 import 변경:</div>
+
+<pre><code>import type {
+  OwnershipPayload,
+  DividendPayload,
+} from "@/lib/dart/disclosure-payloads";</code></pre>
+
+<p>및 <code>&lt;DisclosureTimeline earnings={earnings} /&gt;</code>를 <code>&lt;DisclosureTimeline earnings={earnings} dividends={dividends} ownership={ownership} /&gt;</code>로 수정.</p>
+
+<div class="step">☐ <strong>Step 5.4:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 6 — 통합 검증</h2>
+
+<div class="task">
+
+<div class="step">☐ <strong>Step 6.1:</strong> dev server 상태 확인. 코드 변경만 있으므로 hot reload로 충분 (스키마 변경 없음).</div>
+
+<pre><code>lsof -nP -iTCP:3004 -sTCP:LISTEN -t 2&gt;/dev/null | head -1</code></pre>
+
+<div class="step">☐ <strong>Step 6.2:</strong> 005930 페이지 + 공시 갱신:</div>
+
+<pre><code># 이전 disclosures 보존, 새 카테고리는 갱신 버튼으로 추가
+curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://localhost:3004/stocks/005930"</code></pre>
+
+<p>Expected: HTTP 200. 단 사용자가 "공시 갱신" 버튼을 한 번 누른 후 배당·지분 데이터 채워짐.</p>
+
+<div class="step">☐ <strong>Step 6.3:</strong> 강제 갱신 (server action 직접 호출 방식):</div>
+
+<pre><code># RefreshButton이 호출하는 server action을 시뮬레이션할 수 없으므로 직접 스크립트:
+cat &gt; /tmp/refresh-005930.ts &lt;&lt;'EOF'
+import { config } from "dotenv";
+import path from "node:path";
+config({ path: path.resolve("/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/.env.local") });
+config({ path: path.resolve("/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/.env") });
+import { fetchDisclosuresForStock } from "/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/src/actions/disclosures";
+(async () =&gt; {
+  const r = await fetchDisclosuresForStock("005930");
+  console.log(r);
+  process.exit(0);
+})();
+EOF
+# 또는 단순히 브라우저로 페이지 진입 후 "공시 갱신" 버튼 클릭 — 가장 안전.</code></pre>
+
+<p>실제 추천: 사용자가 브라우저에서 <code>/stocks/005930</code> 진입 후 "공시 갱신" 버튼 클릭. 그 후 검증 진행.</p>
+
+<div class="step">☐ <strong>Step 6.4:</strong> DB 카테고리별 카운트:</div>
+
+<pre><code>sqlite3 /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/data/company-map.db \
+  "SELECT category, COUNT(*) FROM disclosures WHERE code='005930' GROUP BY category;"</code></pre>
+
+<p>Expected: 실적 ≤16, 배당 1~4, 지분 ≤16.</p>
+
+<div class="step">☐ <strong>Step 6.5:</strong> 페이지 응답에 3개 카테고리 라벨 노출:</div>
+
+<pre><code>curl -s "http://localhost:3004/stocks/005930" | grep -oE "&gt;실적&lt;|&gt;배당&lt;|&gt;지분&lt;" | sort -u</code></pre>
+
+<p>Expected: 3개 라벨 모두 노출.</p>
+
+<div class="step">☐ <strong>Step 6.6:</strong> 카드 컨텐츠 노출:</div>
+
+<pre><code>curl -s "http://localhost:3004/stocks/005930" | grep -oE "주당 배당금|시가배당률|배당기준일|주식대량보유|임원·주요주주|자기주식|DART 원본" | sort -u</code></pre>
+
+<p>Expected: 배당·지분 카드 컨텐츠 일부 매치.</p>
+
+<div class="step">☐ <strong>Step 6.7 (수동):</strong> 브라우저에서 005930 페이지 열어 3가지 색상 카드 시각 확인:</div>
+<ul>
+  <li>인디고 (실적)</li>
+  <li>에메랄드 (배당)</li>
+  <li>호박 (지분) + DART 원본 링크 클릭 시 새 탭으로 dart.fss.or.kr 이동</li>
+</ul>
+
+</div>
+
+<hr>
+
+<h2>Self-Review</h2>
+
+<p><strong>Spec coverage:</strong></p>
+<ul>
+  <li>Disclosure 테이블 재활용 (마이그레이션 X) → 명시 ✓</li>
+  <li>OwnershipPayload + DividendPayload 정의 → Task 1 ✓</li>
+  <li>ownership-classify → Task 1 ✓</li>
+  <li>alotMatter API (spec의 cashDvdndPaymntDcsn 대체) → Task 2 + note에 명시 ✓</li>
+  <li>3 카테고리 try/catch 격리 → Task 3 ✓</li>
+  <li>카드 컴포넌트 2종 + 색상 → Task 4 ✓</li>
+  <li>DisclosureTimeline 3 섹션 → Task 5 ✓</li>
+  <li>lazy seed 조건 (한 카테고리 비어도 전체 검사 후만 fetch) → page.tsx 새 로직: <code>allDisclosures.length === 0</code> 시에만 fetch ✓</li>
+  <li>검증 → Task 6 ✓</li>
+</ul>
+
+<p><strong>Placeholder scan:</strong> 모든 step에 실제 코드. note는 "spec과 차이" 명시이며 placeholder 아님. ✓</p>
+
+<p><strong>Type consistency:</strong></p>
+<ul>
+  <li>DividendPayload / OwnershipPayload — Task 1에서 정의, Task 2·3·4·5에서 동일 import path. ✓</li>
+  <li>FetchStats / mergeStats / emptyStats — Task 3 내부에서 정의/사용 일관. ✓</li>
+  <li>DisclosureTimeline props (earnings, dividends, ownership) — Task 5에서 정의, page.tsx에서 동일. ✓</li>
+</ul>
+
+</body>
+</html>

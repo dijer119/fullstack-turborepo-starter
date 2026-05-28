@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>종목별 공시 History — Phase 1 (실적)</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+    h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+    h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+    h3 { color: #2c5282; margin-top: 1.5rem; }
+    pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+    table th { background: #edf2f7; text-align: left; }
+    table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+    ul, ol { padding-left: 1.5rem; }
+    li { margin: 0.2rem 0; }
+    blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+
+<h1>종목별 공시 History — Phase 1 (실적)</h1>
+
+<p><strong>Date:</strong> 2026-05-26</p>
+<p><strong>Scope:</strong> 종목별 공시 timeline 페이지 신규 구축. Phase 1은 "실적" 카테고리(정기보고서)만 완전 구현. 다른 카테고리는 후속 Phase.</p>
+
+<h2>Phase Scope</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+  <thead><tr><th>Phase</th><th>내용</th><th>본 spec</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Phase 1</strong></td><td>페이지 + 라우팅 + 실적 카테고리 카드</td><td>✅ 본 문서</td></tr>
+    <tr><td>Phase 2</td><td>지분 변동(VIP 통합) + 기타 raw 카테고리</td><td>별도 spec</td></tr>
+    <tr><td>Phase 3</td><td>M&amp;A · 배당 · 감사 등 세분화, 카드 디자인 정교화</td><td>별도 spec</td></tr>
+  </tbody>
+</table>
+
+<h2>Goals</h2>
+<ul>
+  <li>종목 단위 페이지 <code>/stocks/[code]</code> 신규 — 진입은 종목명 옆 📋 아이콘.</li>
+  <li>실적 timeline 카드: 보고서명·시기·매출/영업익/순이익 + YoY/QoQ + 공시 일시.</li>
+  <li>DART API 호출 결과 DB 캐시(<code>Disclosure</code> 테이블), lazy fetch + 명시적 refresh.</li>
+</ul>
+
+<h2>Non-Goals (Phase 1)</h2>
+<ul>
+  <li>지분/감사/배당 등 다른 카테고리 카드 — Phase 2/3로 이연.</li>
+  <li>애널리스트 컨센서스 "예상대비" 표시 — 데이터 소스 없음.</li>
+  <li>모든 종목 사전 백그라운드 batch fetch — lazy 방식만.</li>
+  <li>공시 검색/필터 UI — Phase 후속.</li>
+</ul>
+
+<h2>Data Model</h2>
+
+<p>신규 테이블 <code>Disclosure</code>. <code>StockMaster</code>와 N:1.</p>
+
+<pre><code>model Disclosure {
+  rcpNo      String   @id @map("rcp_no")          // DART 접수번호 (unique)
+  code       String                                // 종목 코드
+  corpCode   String   @map("corp_code")
+  reportNm   String   @map("report_nm")
+  pblntfTy   String   @map("pblntf_ty")            // DART 대분류 (A/B/C/D/...)
+  rceptDt    DateTime @map("rcept_dt")             // 공시일
+  category   String                                // 우리 분류: "실적" | "기타" (Phase 1은 두 값만)
+  payload    String?                               // JSON 직렬화. 실적은 EarningsPayload.
+  fetchedAt  DateTime @default(now()) @map("fetched_at")
+
+  master     StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+
+  @@index([code, rceptDt])
+  @@index([category])
+  @@map("disclosures")
+}</code></pre>
+
+<p>StockMaster에 <code>disclosures Disclosure[]</code> 관계 추가.</p>
+
+<h3>EarningsPayload (JSON, 실적 카드 전용)</h3>
+<pre><code>interface EarningsPayload {
+  bsnsYear: number;         // 사업연도
+  reprtCode: "11013" | "11012" | "11014" | "11011";  // 1Q / 반기 / 3Q / 사업
+  reprtLabel: string;       // "26Q1" | "26반기" | "26Q3" | "26사업"
+  consolidated: boolean;    // 연결/별도. CFS=연결, OFS=별도
+  // 단위: 원
+  revenue: number | null;       // 매출
+  opIncome: number | null;      // 영업이익
+  netIncome: number | null;     // 순이익
+  // YoY/QoQ는 클라이언트 계산 또는 payload에 포함 — 본 spec에서는 payload에 포함.
+  revenueYoyPct: number | null;
+  opIncomeYoyPct: number | null;
+  netIncomeYoyPct: number | null;
+  revenueQoqPct: number | null;
+  opIncomeQoqPct: number | null;
+  netIncomeQoqPct: number | null;
+}</code></pre>
+
+<h2>DART API 흐름</h2>
+
+<h3>list.json (공시 목록)</h3>
+<p>엔드포인트: <code>https://opendart.fss.or.kr/api/list.json</code></p>
+<p>파라미터:</p>
+<ul>
+  <li><code>corp_code</code> — 8자리 DART 회사 코드 (이미 <code>StockMaster.corpCode</code>에 있음).</li>
+  <li><code>pblntf_ty=A</code> — 정기공시만 (Phase 1).</li>
+  <li><code>bgn_de=20180101</code> — 충분히 과거부터.</li>
+  <li><code>end_de</code> — 오늘.</li>
+  <li><code>page_count=100</code>, 페이지네이션은 <code>page_no</code>.</li>
+</ul>
+
+<h3>fnlttSinglAcnt.json (재무 지표) — 보고서별 N회 호출</h3>
+<p>이미 <code>src/lib/dart/financial.ts</code>의 <code>fetchDartFinancial(corpCode, year, reprtCode)</code> 존재. 재사용.</p>
+<p>응답에서 추출:</p>
+<ul>
+  <li>매출액: <code>account_nm = "매출액"</code> 또는 <code>"수익(매출액)"</code> (금융업 차이) → <code>thstrm_amount</code>.</li>
+  <li>영업이익: <code>"영업이익"</code> 또는 <code>"영업이익(손실)"</code> → 이미 <code>extractOpIncome</code> 패턴 적용.</li>
+  <li>당기순이익: <code>"당기순이익"</code> 또는 <code>"당기순이익(손실)"</code>.</li>
+  <li><code>fs_div</code>: CFS(연결) 또는 OFS(별도). 우선순위: CFS &gt; OFS.</li>
+</ul>
+<p>YoY: <code>(thstrm - frmtrm) / |frmtrm| × 100</code>. QoQ는 직전 분기 데이터 비교 — 같은 사업연도의 직전 reprtCode 결과를 활용하거나 별도 호출.</p>
+
+<h3>Fetch 패턴</h3>
+
+<ol>
+  <li>페이지 진입 → server component가 <code>db.disclosure.findMany({ where: { code, category: "실적" }, orderBy: { rceptDt: "desc" } })</code> 호출.</li>
+  <li>결과 0건이면 → <code>fetchDisclosuresForStock(code)</code> server action 호출 (lazy seed).
+    <ul>
+      <li>list.json에서 정기보고서 목록 가져옴.</li>
+      <li>각 row마다 fnlttSinglAcnt.json 호출해서 매출/영업익/순이익 추출, payload 만들어 upsert.</li>
+      <li>API 부하 고려: 한 종목당 최대 N건(예: 최근 4년 × 4분기 = 16건) 제한.</li>
+    </ul>
+  </li>
+  <li>페이지에 "공시 갱신" 버튼 → 강제 재실행.</li>
+  <li>에러 발생 시 console.error + 빈 상태 표시. 사용자가 refresh로 재시도.</li>
+</ol>
+
+<h2>페이지 구조</h2>
+
+<h3>경로</h3>
+<p><code>/stocks/[code]/page.tsx</code> — Next.js dynamic segment. code는 6자리 종목코드.</p>
+
+<h3>레이아웃</h3>
+<pre><code>┌─────────────────────────────────────────┐
+│ ← 전종목 조회 | 005930 삼성전자 KOSPI      │
+│   현재가 88,200원 · 시총 5.3조 · ROE 9.98% │
+│   [공시 갱신] [네이버 금융]                  │
+├─────────────────────────────────────────┤
+│ 📌 실적                                  │
+│   ┌────────────────────────────────┐    │
+│   │ 분기보고서(2026.03)            │    │
+│   │ 2026.03 (26Q1, 연결)           │    │
+│   │ 매출: 9,340억                  │    │
+│   │ 영업익: 674억                  │    │
+│   │ 순이익: 607억                  │    │
+│   │                                │    │
+│   │ YoY: +5% / +20% / +16%         │    │
+│   │ QoQ: +6% / +102% / +97%        │    │
+│   │ 2026.05.15 14:00               │    │
+│   └────────────────────────────────┘    │
+│   ... 더 많은 분기 카드 (rceptDt desc)    │
+└─────────────────────────────────────────┘</code></pre>
+
+<h3>컴포넌트 분리</h3>
+<ul>
+  <li><code>src/app/stocks/[code]/page.tsx</code> — server component, DB 조회 + lazy fetch trigger.</li>
+  <li><code>src/app/stocks/[code]/StockDetailHeader.tsx</code> — 상단 요약 + 갱신 버튼.</li>
+  <li><code>src/app/stocks/[code]/DisclosureTimeline.tsx</code> — 좌측 카테고리 핀 + 우측 카드 리스트.</li>
+  <li><code>src/app/stocks/[code]/EarningsCard.tsx</code> — 실적 카드 (정렬·포맷팅).</li>
+  <li><code>src/app/stocks/[code]/RefreshButton.tsx</code> — "공시 갱신" 클라이언트 버튼.</li>
+  <li><code>src/actions/disclosures.ts</code> — <code>fetchDisclosuresForStock(code)</code> server action.</li>
+  <li><code>src/lib/dart/list.ts</code> — DART list.json 클라이언트 (신규).</li>
+  <li><code>src/lib/dart/financial-extract.ts</code> — 매출/영업익/순이익 추출 헬퍼 (영업익 패턴 일반화).</li>
+</ul>
+
+<h3>진입 — 종목명 옆 아이콘</h3>
+<p><code>StocksExplorerClient.tsx</code>의 종목명 셀에 작은 📋 (FileText 또는 ExternalLink 류) 아이콘 추가. 클릭 시 <code>/stocks/{code}</code>로 이동. 종목명 텍스트는 기존 네이버 금융 외부링크 유지(기존 동작 보존).</p>
+
+<h2>카테고리 매핑 (Phase 1)</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+  <thead><tr><th>category</th><th>DART pblntf_ty</th><th>카드 type</th></tr></thead>
+  <tbody>
+    <tr><td><code>"실적"</code></td><td><code>A</code> (정기공시) 중 사업/반기/분기보고서</td><td>EarningsCard (재무 지표 포함)</td></tr>
+  </tbody>
+</table>
+
+<p>list.json 응답의 <code>report_nm</code>에 "사업보고서"/"반기보고서"/"분기보고서" 포함 시 "실적"으로 매핑. 그 외는 본 Phase에서 저장 안 함 (Phase 2/3에서 다룸).</p>
+
+<h2>표시 규칙</h2>
+<ul>
+  <li>금액 포맷: <code>1억 미만</code> 원 표기, <code>1억 이상</code> "X억", <code>1조 이상</code> "X.X조".</li>
+  <li>YoY/QoQ: 부호 포함 (예: <code>+5%</code>, <code>-12%</code>). 색상: 양수=녹색, 음수=빨강, 0%=회색.</li>
+  <li>NULL 값: <code>—</code>.</li>
+  <li>공시 일시: <code>YYYY.MM.DD HH:mm</code> (rceptDt 포맷).</li>
+  <li>카드는 rceptDt desc 순 (최신 위).</li>
+</ul>
+
+<h2>Migration</h2>
+
+<pre><code>npx prisma migrate dev --name add_disclosures</code></pre>
+
+<p>SQL:</p>
+<pre><code>CREATE TABLE disclosures (
+  rcp_no TEXT PRIMARY KEY,
+  code TEXT NOT NULL,
+  corp_code TEXT NOT NULL,
+  report_nm TEXT NOT NULL,
+  pblntf_ty TEXT NOT NULL,
+  rcept_dt DATETIME NOT NULL,
+  category TEXT NOT NULL,
+  payload TEXT,
+  fetched_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (code) REFERENCES stock_masters(code) ON DELETE CASCADE
+);
+CREATE INDEX idx_disclosures_code_rcept_dt ON disclosures(code, rcept_dt);
+CREATE INDEX idx_disclosures_category ON disclosures(category);</code></pre>
+
+<h2>검증 기준</h2>
+<ul>
+  <li>마이그레이션 성공, <code>disclosures</code> 테이블 + 인덱스 존재.</li>
+  <li>tsc EXIT=0.</li>
+  <li>/stocks 종목명 옆 📋 아이콘 클릭 → <code>/stocks/005930</code> 이동, 200 응답.</li>
+  <li>첫 진입 시 자동 fetch + 카드 표시 (DART API 응답 대기 시간 ≈ 수 초).</li>
+  <li>"공시 갱신" 버튼 → 같은 종목 다시 fetch, payload 최신화.</li>
+  <li>삼성전자(005930) 페이지에 최근 4년 정기보고서 4~16건 카드 노출, 각 카드는 매출/영업익/순이익 + YoY/QoQ.</li>
+  <li>은행(KB금융 등)도 매출 "수익(매출액)" 매핑 정상 동작.</li>
+  <li>존재하지 않는 코드 <code>/stocks/000000</code> → 404 또는 빈 상태.</li>
+</ul>
+
+<h2>Out of Scope / Open Questions</h2>
+<ul>
+  <li>분기보고서 외 정기공시(사업/반기) YoY/QoQ 계산은 reprtCode 매칭 로직이 필요. 본 Phase에서는 분기끼리·반기끼리만 비교.</li>
+  <li>금융업(은행/보험)의 매출 개념이 일반 산업과 다름 — Phase 1에서는 "수익(매출액)" 표시만, 해석 주의 표기 없음.</li>
+  <li>최초 fetch가 느릴 경우 UX (로딩 표시·취소 등) — 본 Phase는 단순 "로딩 중…" 텍스트.</li>
+</ul>
+
+</body>
+</html>

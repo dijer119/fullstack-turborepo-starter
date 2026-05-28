@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>공시 History Phase 2 — 배당 + 지분</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+    h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+    h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+    h3 { color: #2c5282; margin-top: 1.5rem; }
+    pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+    table th { background: #edf2f7; text-align: left; }
+    table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+    ul, ol { padding-left: 1.5rem; }
+    li { margin: 0.2rem 0; }
+    blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+
+<h1>공시 History Phase 2 — 배당 + 지분</h1>
+
+<p><strong>Date:</strong> 2026-05-27</p>
+<p><strong>Scope:</strong> 종목 상세 페이지 timeline에 "배당", "지분" 카테고리 추가. 기존 "실적" 그대로 유지. Phase 1의 <code>Disclosure</code> 테이블 재활용.</p>
+
+<h2>Goals</h2>
+<ul>
+  <li>종목 페이지에 카테고리 3개 동시 노출: 실적 / 배당 / 지분.</li>
+  <li>배당 카드: 주당 배당금 · 시가배당률 · 배당기준일 · 공시일 (DART 상세 API).</li>
+  <li>지분 카드: 보고서 종류(주식대량보유·임원·주요주주 등) · 공시일. (list.json만 사용, 상세 fetch 없음.)</li>
+  <li><code>fetchDisclosuresForStock</code> 한 호출로 세 카테고리 모두 갱신.</li>
+</ul>
+
+<h2>Non-Goals (Phase 2)</h2>
+<ul>
+  <li>지분 변동 상세 (보유 비율·증감·사유) — Phase 3에서 stkrtChg API 추가 시 다룸. 현재는 list.json의 report_nm만.</li>
+  <li>합병·분할·증자 등 다른 주요사항 카테고리 — Phase 3.</li>
+  <li>VipHolding 데이터 Disclosure로 마이그레이션 — 기존 VipHolding 그대로 유지 (행 확장 표시 그대로).</li>
+</ul>
+
+<h2>Data Model</h2>
+
+<p>기존 <code>Disclosure</code> 테이블 변경 없음. <code>category</code>에 "지분", "배당" 추가만.</p>
+
+<h3>OwnershipPayload (지분 카드 payload)</h3>
+<pre><code>interface OwnershipPayload {
+  pblntfDetailTy?: string;    // DART 세부 코드 (있을 때만)
+  reportType: string;         // "주식대량보유" | "임원·주요주주" | "자기주식" | "기타"
+  // dartUrl은 rcpNo로 https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcpNo} 생성. payload에 별도 저장 안 함.
+}</code></pre>
+
+<h3>DividendPayload (배당 카드 payload)</h3>
+<pre><code>interface DividendPayload {
+  divPerShare: number | null;       // 주당 배당금 (원)
+  dividendYieldPct: number | null;  // 시가배당률 (%)
+  recordDate: string | null;        // 배당기준일 "YYYY-MM-DD"
+  dividendType: "현금" | "주식" | "기타";
+}</code></pre>
+
+<h2>DART API</h2>
+
+<h3>지분 — list.json(pblntf_ty=D)만 사용</h3>
+<p>응답 row의 <code>report_nm</code>으로 reportType 분류:</p>
+<ul>
+  <li><code>/주식등의대량보유상황보고서/</code> → "주식대량보유"</li>
+  <li><code>/임원·주요주주특정증권등소유상황보고서/</code> → "임원·주요주주"</li>
+  <li><code>/자기주식/</code> → "자기주식"</li>
+  <li>그 외 → "기타"</li>
+</ul>
+
+<h3>배당 — list.json(pblntf_ty=B) 필터 + 현금배당 상세</h3>
+<p>1차 list.json: <code>pblntf_ty=B</code>. row 중 <code>report_nm</code>에 "현금·현물배당결정" / "주식배당결정" 포함된 것만 채택.</p>
+<p>2차 상세 API: DART 단일회사 주요계정 API군에 "현금·현물배당 결정" 별도 endpoint 존재. 정확한 URL은 OpenDART 문서 확인 (예: <code>https://opendart.fss.or.kr/api/cashDvdndPaymntDcsn.json</code>). 응답 파싱 후 DividendPayload 추출. 실패 시 payload=null로 저장 (카드에 "—" 표시).</p>
+
+<h3>API 부하 추정</h3>
+<ul>
+  <li>list.json: 종목당 3회 (A, B, D).</li>
+  <li>fnlttSinglAcnt.json: 실적 카테고리 16건 × 1회 = 16 (Phase 1 그대로).</li>
+  <li>cashDvdndPaymntDcsn.json: 배당 row 수만큼 (보통 4년 × 1~2회 = 4~8).</li>
+  <li>총 종목당 ≈ 25 API calls. 100ms 딜레이 시 ≈ 2.5초.</li>
+</ul>
+
+<h2>fetchDisclosuresForStock 확장</h2>
+
+<p>함수 시그니처 유지. 내부에서 세 카테고리 순차 처리:</p>
+
+<pre><code>export async function fetchDisclosuresForStock(code: string) {
+  // 1. master + corpCode 검증 (기존)
+  // 2. list.json pblntf_ty="A" → 정기보고서 → buildEarningsPayload → upsert (기존)
+  // 3. list.json pblntf_ty="D" → 지분 공시 → OwnershipPayload → upsert (신규)
+  // 4. list.json pblntf_ty="B" → 배당 결정 row 필터 → cashDvdndPaymntDcsn 상세 → DividendPayload → upsert (신규)
+  // 각 카테고리는 try/catch로 격리 — 하나 실패해도 다른 카테고리는 진행
+  return { inserted, updated, failed };
+}</code></pre>
+
+<h2>카드 컴포넌트 분리</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+  <thead><tr><th>카테고리</th><th>컴포넌트</th><th>배경색</th><th>주요 표시</th></tr></thead>
+  <tbody>
+    <tr><td>실적</td><td>EarningsCard (있음)</td><td><code>bg-indigo-900/80</code></td><td>매출/영업익/순이익 + YoY/QoQ</td></tr>
+    <tr><td>배당</td><td>DividendCard (신규)</td><td><code>bg-emerald-900/80</code></td><td>주당 배당금, 시가배당률, 배당기준일</td></tr>
+    <tr><td>지분</td><td>OwnershipCard (신규)</td><td><code>bg-amber-900/80</code></td><td>보고서 종류 라벨, 공시일, DART 원본 링크</td></tr>
+  </tbody>
+</table>
+
+<h2>DisclosureTimeline 확장</h2>
+
+<p>3개 섹션, 카테고리별 핀 라벨 + 카드 리스트.</p>
+
+<pre><code>📌 실적
+  [EarningsCard] × N (rceptDt desc)
+
+📌 배당
+  [DividendCard] × N
+
+📌 지분
+  [OwnershipCard] × N
+
+각 섹션에 데이터 0건이면 "공시 없음" 노트.</code></pre>
+
+<h2>페이지 lazy seed 조건</h2>
+
+<p>현재: <code>disclosures.length === 0 && master.corpCode</code> 시 fetch.</p>
+<p>변경: 그대로 유지. 한 카테고리만 비어도 따로 자동 fetch 안 함 (의도적 — refresh 버튼으로 강제 갱신).</p>
+
+<h2>새로 생성/수정 파일</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+  <thead><tr><th>파일</th><th>상태</th><th>책임</th></tr></thead>
+  <tbody>
+    <tr><td><code>src/lib/dart/dividend-detail.ts</code></td><td>신규</td><td>cashDvdndPaymntDcsn API 클라이언트 + 파싱 + DividendPayload 생성</td></tr>
+    <tr><td><code>src/lib/dart/ownership-classify.ts</code></td><td>신규</td><td>report_nm → reportType 분류 + OwnershipPayload 생성</td></tr>
+    <tr><td><code>src/actions/disclosures.ts</code></td><td>수정</td><td>3개 카테고리 순차 처리, try/catch 격리</td></tr>
+    <tr><td><code>src/app/stocks/[code]/OwnershipCard.tsx</code></td><td>신규</td><td>호박색 카드</td></tr>
+    <tr><td><code>src/app/stocks/[code]/DividendCard.tsx</code></td><td>신규</td><td>에메랄드색 카드</td></tr>
+    <tr><td><code>src/app/stocks/[code]/DisclosureTimeline.tsx</code></td><td>수정</td><td>3개 카테고리 섹션</td></tr>
+    <tr><td><code>src/app/stocks/[code]/page.tsx</code></td><td>수정</td><td>3개 카테고리 row 분리해서 timeline에 전달</td></tr>
+  </tbody>
+</table>
+
+<h2>표시 규칙</h2>
+
+<h3>OwnershipCard</h3>
+<pre><code>┌────────────────────────────────┐
+│ 주식대량보유                    │   ← reportType 라벨
+│ 주식등의대량보유상황보고서      │   ← report_nm
+│ DART 원본 ↗                    │
+│ 2026.04.30 14:00               │
+└────────────────────────────────┘</code></pre>
+
+<h3>DividendCard</h3>
+<pre><code>┌────────────────────────────────┐
+│ 현금·현물배당결정                │
+│ 주당 1,500원 · 시가배당률 2.3%   │
+│ 기준일: 2026.06.30              │
+│ 2026.04.10 09:00               │
+└────────────────────────────────┘</code></pre>
+
+<p>NULL 값은 <code>—</code>. 금액 포맷은 EarningsCard와 동일 (<code>formatAmount</code> 재사용).</p>
+
+<h2>검증 기준</h2>
+<ul>
+  <li>tsc EXIT=0.</li>
+  <li>마이그레이션 불필요 (스키마 변경 없음).</li>
+  <li>"공시 갱신" 버튼 한 번 누름 → 종목당 ≈ 25 API calls (수 초).</li>
+  <li>삼성전자(005930) 페이지: 실적·배당·지분 3개 섹션 모두 카드 노출.</li>
+  <li>배당이 없는 종목(예: 카카오뱅크 — 배당이 있다면 다른 종목 선택): 배당 섹션 "공시 없음".</li>
+  <li>지분 카드의 DART 원본 링크 클릭 시 새 탭에서 <code>dart.fss.or.kr</code> 원본 보고서 열림.</li>
+  <li>한 카테고리 fetch 실패 시 다른 카테고리는 정상 표시 (격리 검증).</li>
+</ul>
+
+<h2>Out of Scope / Open Questions</h2>
+<ul>
+  <li>DART 배당 상세 API의 정확한 endpoint와 응답 스키마는 구현 시 OpenDART 문서로 확인. 응답 필드명 변화 가능성 있음.</li>
+  <li>주식배당 (현금 아닌)은 별도 API 또는 별도 카드 처리 필요할 수 있음 — Phase 2에서는 현금배당만 정확히, 주식배당은 <code>dividendType: "주식"</code>으로 표시하되 금액은 null로 둠.</li>
+  <li>지분 카드의 "보고자명" 추출 — list.json의 응답에는 안 들어있음. 상세 fetch 없는 한 표시 불가. Phase 3에서 stkrtChg/elestock API 도입 시 추가.</li>
+</ul>
+
+</body>
+</html>

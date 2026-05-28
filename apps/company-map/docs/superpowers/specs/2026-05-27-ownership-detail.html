@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>지분 공시 상세 — Design Spec</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+    h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+    h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+    h3 { color: #2c5282; margin-top: 1.5rem; }
+    pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+    table th { background: #edf2f7; text-align: left; }
+    table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+    ul, ol { padding-left: 1.5rem; }
+    li { margin: 0.2rem 0; }
+    blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+
+<h1>지분 공시 상세 — Design Spec</h1>
+
+<p><strong>Date:</strong> 2026-05-27</p>
+<p><strong>Scope:</strong> 지분 공시 카드에 보고자·직위·거래수량 등 상세 정보 표시. DART <code>elestock</code> / <code>majorstock</code> 상세 API 호출 + payload 확장. 자기주식·기타는 기존 제목+링크 fallback 유지.</p>
+
+<h2>Goals</h2>
+<ul>
+  <li>임원·주요주주 카드를 이미지처럼 상세 표시 (보고자, 직위, 보고사유, 변동일, 거래수량±, 가격, 금액, 거래후 보유).</li>
+  <li>주식대량보유 카드 상세 표시 (보고자, 보유주식수, 보유비율, 변동비율, 보고사유).</li>
+  <li>기존 fetch 흐름에 자연스럽게 통합: <code>fetchOwnership</code> 안에서 type별 분기.</li>
+</ul>
+
+<h2>Non-Goals (이번 Phase)</h2>
+<ul>
+  <li>자기주식 취득/처분 결정 상세 — DART API 종류 복잡 (취득결정·처분결정·신탁·소각 등 다수). Phase 3로 이연. 이번에는 기존 제목+DART 링크.</li>
+  <li>임원 등기/미등기 구분, 주요주주 여부 등의 세분 필드 — payload에 position 1개 필드로 통합.</li>
+  <li>지분 fetch 자동 갱신 (lazy seed 외) — 사용자가 "공시 갱신" 버튼으로 명시 갱신.</li>
+</ul>
+
+<h2>Payload 확장</h2>
+
+<p><code>src/lib/dart/disclosure-payloads.ts</code>:</p>
+
+<pre><code>export interface ElestockDetail {
+  type: "elestock";
+  filer: string | null;            // 보고자
+  position: string | null;         // 직위 (예: 상무, 등기임원, 주요주주)
+  reason: string | null;           // 보고사유 (예: "장내매수(+)", "장내매도(-)", "증여")
+  changeDate: string | null;       // 변동일 YYYY-MM-DD
+  tradeQuantity: number | null;    // 거래수량 (±, 매수=+, 매도=-)
+  tradePrice: number | null;       // 단가 (원)
+  tradeAmount: number | null;      // 금액 (원)
+  afterShares: number | null;      // 거래후 보유주식수
+}
+
+export interface MajorstockDetail {
+  type: "majorstock";
+  filer: string | null;            // 보고자
+  ownedShares: number | null;      // 보유주식수
+  ownedRatio: number | null;       // 보유비율 (%)
+  changeRatio: number | null;      // 직전 보고 대비 변동 (%p)
+  reason: string | null;           // 보고사유
+}
+
+export type OwnershipDetail = ElestockDetail | MajorstockDetail;
+
+export interface OwnershipPayload {
+  pblntfDetailTy?: string;
+  reportType: "주식대량보유" | "임원·주요주주" | "자기주식" | "기타";
+  detail?: OwnershipDetail | null;   // 자기주식·기타는 null
+}</code></pre>
+
+<h2>DART API</h2>
+
+<h3>elestock.json (임원·주요주주특정증권등소유상황보고서)</h3>
+<p>엔드포인트: <code>https://opendart.fss.or.kr/api/elestock.json</code></p>
+<p>파라미터:</p>
+<ul>
+  <li><code>corp_code</code></li>
+  <li><code>bgn_de</code>, <code>end_de</code></li>
+</ul>
+<p>주의: 정확한 응답 필드명은 OpenDART 문서 확인. 추정 필드 (확인 후 조정):</p>
+<ul>
+  <li><code>repror</code>: 보고자 이름</li>
+  <li><code>isu_exctv_ofcps</code> / <code>isu_exctv_rgist_at</code>: 직위·등기여부</li>
+  <li><code>stkrt_irds_resn</code>: 변동 사유</li>
+  <li><code>trde_dd</code>: 거래일</li>
+  <li><code>trde_qy</code>: 거래수량 (음수 가능)</li>
+  <li><code>unit_pic</code> / <code>trde_uprc</code>: 단가</li>
+  <li><code>trde_amt</code>: 거래금액</li>
+  <li><code>posesn_stock_co_after</code>: 거래후 보유</li>
+</ul>
+<p>응답 list에는 종목의 모든 임원·주요주주 보고가 들어옴. <code>rcept_no</code>로 우리 disclosures의 rcpNo와 매칭.</p>
+
+<h3>majorstock.json (주식등의대량보유상황보고서)</h3>
+<p>엔드포인트: <code>https://opendart.fss.or.kr/api/majorstock.json</code></p>
+<p>응답 추정 필드:</p>
+<ul>
+  <li><code>repror</code>: 보고자</li>
+  <li><code>stkqy</code>: 보유주식수</li>
+  <li><code>stkrt</code>: 보유비율</li>
+  <li><code>stkrt_irds</code>: 변동비율</li>
+  <li><code>report_rs</code>: 보고사유 (단순투자/일반투자/경영참여 등)</li>
+  <li><code>rcept_no</code></li>
+</ul>
+
+<h3>호출 패턴</h3>
+<p>두 API는 종목당 1회 호출 (corp_code + bgn_de/end_de 4년치). 응답을 rcpNo로 indexing하는 Map 생성. <code>fetchOwnership</code>의 row 루프에서 reportType에 따라 Map lookup.</p>
+
+<p>API 부하: 종목당 list.json(D) 1회 + elestock.json 1회 + majorstock.json 1회 = <strong>+2 호출</strong> (이전 추정 16회보다 훨씬 적음 — 개별 row마다가 아닌 종목당 batch).</p>
+
+<h2>fetchOwnership 흐름 변경</h2>
+
+<pre><code>async function fetchOwnership(code, corpCode) {
+  // 1. list.json pblntf_ty="D" — 4년치 (기존)
+  // 2. elestock.json — 4년치 한 번에
+  //    → Map&lt;rcpNo, ElestockDetail&gt;
+  // 3. majorstock.json — 4년치 한 번에
+  //    → Map&lt;rcpNo, MajorstockDetail&gt;
+  // 4. list의 각 row를 분류 → reportType에 따라 Map에서 detail 조회
+  //    → OwnershipPayload (detail 포함) → upsert
+
+  // 두 상세 API 호출이 실패하더라도 reportType 분류는 진행. detail=null로 저장.
+}</code></pre>
+
+<h2>OwnershipCard 표시 분기</h2>
+
+<h3>임원·주요주주 (detail.type === "elestock")</h3>
+<pre><code>┌────────────────────────────────────┐
+│ 임원·주요주주특정증권등소유상황보고서  │
+│                                    │
+│ 보고자: 김종우                      │
+│ 직위: 상무                         │
+│                                    │
+│ 보고사유: 장내매수(+)               │
+│                                    │
+│ 변동일: 2026.04.24                 │
+│ 거래수량: +100주                   │
+│ 거래가격: 377,000원                │
+│ 거래금액: 3,770만원                │
+│ 거래후보유주식수: 100주             │
+│                                    │
+│ 2026.04.27 14:50                   │
+└────────────────────────────────────┘</code></pre>
+
+<p>거래수량 부호: 양수=매수(녹색), 음수=매도(빨강), 0이거나 null="—".</p>
+<p>거래금액 포맷: 1억 이상은 "X.X억", 1억 미만은 "X,XXX만원", 1만 미만은 "X원".</p>
+
+<h3>주식대량보유 (detail.type === "majorstock")</h3>
+<pre><code>┌────────────────────────────────────┐
+│ 주식등의대량보유상황보고서          │
+│                                    │
+│ 보고자: ABC자산운용                 │
+│                                    │
+│ 보유주식수: 1,500,000주             │
+│ 보유비율: 5.12%                    │
+│ 변동: +0.42%p                      │
+│                                    │
+│ 보고사유: 단순투자                  │
+│                                    │
+│ 2026.04.20 16:30                   │
+└────────────────────────────────────┘</code></pre>
+
+<p>변동 부호: 양수=증가(녹색), 음수=감소(빨강). %p 단위 표시 (절대값).</p>
+
+<h3>자기주식·기타 (detail = null)</h3>
+<p>기존과 동일. reportType 라벨 + report_nm + DART 원본 링크 + rceptDt.</p>
+
+<h2>변경 파일</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+  <thead><tr><th>경로</th><th>상태</th><th>책임</th></tr></thead>
+  <tbody>
+    <tr><td><code>src/lib/dart/elestock.ts</code></td><td>신규</td><td>fetchElestock + extractElestockDetail 맵 빌드</td></tr>
+    <tr><td><code>src/lib/dart/majorstock-detail.ts</code></td><td>신규</td><td>fetchMajorstockDetail + extract 맵 빌드 (worker의 기존 majorstock 파일과 분리)</td></tr>
+    <tr><td><code>src/lib/dart/disclosure-payloads.ts</code></td><td>수정</td><td>ElestockDetail / MajorstockDetail / OwnershipDetail 추가</td></tr>
+    <tr><td><code>src/actions/disclosures.ts</code></td><td>수정</td><td>fetchOwnership 안에서 두 상세 API 호출 + Map lookup</td></tr>
+    <tr><td><code>src/app/stocks/[code]/OwnershipCard.tsx</code></td><td>수정</td><td>detail.type에 따라 다른 필드 렌더</td></tr>
+  </tbody>
+</table>
+
+<h2>검증 기준</h2>
+<ul>
+  <li>tsc EXIT=0. 마이그레이션 불필요.</li>
+  <li>"공시 갱신" 누름 → 종목당 추가 ≈ 2~3초.</li>
+  <li>삼성전자(005930) 페이지에서 임원·주요주주 카드에 보고자/직위/거래수량 등 노출.</li>
+  <li>주식대량보유 row가 존재하는 종목(예: VIP 보유 종목 중 일부)에서 majorstock 카드 노출.</li>
+  <li>자기주식·기타 row는 기존과 동일 (제목+링크).</li>
+  <li>상세 API 실패 시 detail=null로 fallback (카드는 제목+링크 형식으로 보임).</li>
+  <li>거래수량 +/- 부호와 색상 (녹/빨).</li>
+</ul>
+
+<h2>Out of Scope / Open Questions</h2>
+<ul>
+  <li>elestock/majorstock 응답의 정확한 필드명은 구현 시 1회 시범 호출로 확인 후 정규식·필드 매핑 조정. Phase 2 alotMatter 패턴과 동일한 위험.</li>
+  <li>임원 등기/미등기, 6%룰 추가/특수관계인 등 세분 — 표시 안 함, 1개 position 필드로 통합.</li>
+  <li>거래후 보유주식수 = 0인 row (전량 매도) 색상 처리 — null 처리와 동일하게 "0주" 표시. 별도 강조 없음.</li>
+</ul>
+
+</body>
+</html>

@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>지분 공시 상세 — Implementation Plan</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+    pre { background: #f4f4f4; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 3px; }
+    pre code { background: none; padding: 0; }
+    h2 { border-bottom: 1px solid #ddd; padding-bottom: 0.3rem; margin-top: 2rem; }
+    h3 { color: #2c5282; }
+    .task { background: #fafafa; padding: 1rem 1.5rem; border-left: 3px solid #2c5282; margin: 1rem 0; border-radius: 4px; }
+    .step { margin: 0.6rem 0; }
+    .files { color: #555; font-size: 0.9rem; }
+    .note { background: #fffae6; padding: 0.6rem; border-left: 3px solid #d69e2e; margin: 0.8rem 0; }
+  </style>
+</head>
+<body>
+
+<h1>지분 공시 상세 Implementation Plan</h1>
+
+<blockquote>
+<p><strong>For agentic workers:</strong> inline 실행. <code>☐</code>는 미완료. TDD 형식 대신 단계별 구현 + 수동 검증.</p>
+</blockquote>
+
+<p><strong>Goal:</strong> 지분 공시 카드에 보고자·직위·거래수량 등 상세 정보 노출. elestock / majorstock 두 DART API 호출 + payload 확장. 자기주식·기타는 기존 제목+링크 fallback.</p>
+
+<p><strong>Architecture:</strong> 종목당 두 상세 API를 4년치 1회씩 호출, 응답을 rcpNo Map으로 indexing해서 list.json(D) row와 매칭. 카드는 detail.type에 따라 분기 렌더.</p>
+
+<p><strong>Tech Stack:</strong> Next.js 16, Prisma 6, DART OpenAPI (elestock.json + majorstock.json).</p>
+
+<div class="note">
+<p><strong>응답 필드명 위험:</strong> Phase 2 alotMatter 사례처럼 응답 필드명 추정이 빗나갈 수 있음. Task 1의 구현은 추정 필드로 시작하고, Task 5의 통합 검증에서 실제 응답을 콘솔 출력해서 필드명 확인 후 정규식·매핑 조정. 그 단계는 plan에 명시.</p>
+</div>
+
+<hr>
+
+<h2>파일 구조</h2>
+
+<table border="1" cellpadding="6" cellspacing="0">
+  <thead><tr><th>파일</th><th>상태</th><th>책임</th></tr></thead>
+  <tbody>
+    <tr><td><code>src/lib/dart/disclosure-payloads.ts</code></td><td>수정</td><td>ElestockDetail / MajorstockDetail / OwnershipDetail 추가</td></tr>
+    <tr><td><code>src/lib/dart/elestock.ts</code></td><td>신규</td><td>fetchElestock + buildElestockMap(corpCode, range)</td></tr>
+    <tr><td><code>src/lib/dart/majorstock-detail.ts</code></td><td>신규</td><td>fetchMajorstockDetail + buildMajorstockMap</td></tr>
+    <tr><td><code>src/actions/disclosures.ts</code></td><td>수정</td><td>fetchOwnership에서 두 Map lookup → payload.detail 채움</td></tr>
+    <tr><td><code>src/app/stocks/[code]/OwnershipCard.tsx</code></td><td>수정</td><td>detail.type 분기 렌더</td></tr>
+    <tr><td><code>scripts/test-elestock-majorstock.ts</code></td><td>신규(임시)</td><td>실제 응답 필드 확인용 디버그 스크립트. 검증 후 삭제 가능.</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>Task 1 — Payload 타입 확장</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/lib/dart/disclosure-payloads.ts</code></p>
+
+<div class="step">☐ <strong>Step 1.1:</strong> 기존 파일을 다음으로 교체:</div>
+
+<pre><code>export type DisclosureCategory = "실적" | "배당" | "지분";
+
+export interface ElestockDetail {
+  type: "elestock";
+  filer: string | null;
+  position: string | null;
+  reason: string | null;
+  changeDate: string | null;
+  tradeQuantity: number | null;
+  tradePrice: number | null;
+  tradeAmount: number | null;
+  afterShares: number | null;
+}
+
+export interface MajorstockDetail {
+  type: "majorstock";
+  filer: string | null;
+  ownedShares: number | null;
+  ownedRatio: number | null;
+  changeRatio: number | null;
+  reason: string | null;
+}
+
+export type OwnershipDetail = ElestockDetail | MajorstockDetail;
+
+export interface OwnershipPayload {
+  pblntfDetailTy?: string;
+  reportType: "주식대량보유" | "임원·주요주주" | "자기주식" | "기타";
+  detail?: OwnershipDetail | null;
+}
+
+export interface DividendPayload {
+  divPerShare: number | null;
+  dividendYieldPct: number | null;
+  recordDate: string | null;
+  dividendType: "현금" | "주식" | "기타";
+}</code></pre>
+
+<div class="step">☐ <strong>Step 1.2:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+<p>Expected: <code>EXIT=0</code>.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 2 — elestock.ts 신규</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/lib/dart/elestock.ts</code> (신규)</p>
+
+<p>응답 필드명은 OpenDART 표준. <code>repror</code>, <code>isu_exctv_ofcps</code>, <code>stkrt_irds_resn</code>, <code>trde_dd</code>, <code>trde_qy</code>, <code>unit_pic</code>, <code>trde_amt</code>, <code>posesn_stock_co_after</code>는 추정. 실제 다르면 Task 5에서 조정.</p>
+
+<div class="step">☐ <strong>Step 2.1:</strong> 파일 생성:</div>
+
+<pre><code>import type { ElestockDetail } from "./disclosure-payloads";
+
+interface ElestockItem {
+  rcept_no?: string;
+  repror?: string;
+  isu_exctv_ofcps?: string;
+  isu_exctv_rgist_at?: string;
+  isu_main_shrholdr?: string;
+  stkrt_irds_resn?: string;
+  trde_dd?: string;            // YYYYMMDD
+  trde_qy?: string;            // 거래수량 (음수 가능)
+  unit_pic?: string;           // 단가
+  trde_amt?: string;
+  posesn_stock_co_after?: string;
+}
+
+interface ElestockResponse {
+  status?: string;
+  message?: string;
+  list?: ElestockItem[];
+}
+
+function sleep(ms: number): Promise&lt;void&gt; {
+  return new Promise((r) =&gt; setTimeout(r, ms));
+}
+
+function isRetriable(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const m = err.message.toLowerCase();
+  return (
+    m.includes("fetch failed") ||
+    m.includes("timeout") ||
+    m.includes("network") ||
+    m.includes("econnreset") ||
+    m.includes("etimedout")
+  );
+}
+
+function parseSignedNum(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/,/g, "").trim();
+  if (cleaned === "" || cleaned === "-") return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatYmd(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const digits = raw.replace(/[^\d]/g, "");
+  if (digits.length &lt; 8) return null;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+}
+
+function derivePosition(item: ElestockItem): string | null {
+  // 직위 (예: 상무, 대표이사). 비어있으면 등기 여부·주요주주 여부로 fallback.
+  if (item.isu_exctv_ofcps) return item.isu_exctv_ofcps;
+  if (item.isu_exctv_rgist_at === "Y") return "등기임원";
+  if (item.isu_main_shrholdr === "Y") return "주요주주";
+  return null;
+}
+
+export async function fetchElestock(params: {
+  corpCode: string;
+  bgnDe: string;
+  endDe: string;
+}): Promise&lt;ElestockResponse | null&gt; {
+  const apiKey = process.env.DART_API_KEY;
+  if (!apiKey) throw new Error("DART_API_KEY not set");
+  const url = new URL("https://opendart.fss.or.kr/api/elestock.json");
+  url.searchParams.set("crtfc_key", apiKey);
+  url.searchParams.set("corp_code", params.corpCode);
+  url.searchParams.set("bgn_de", params.bgnDe);
+  url.searchParams.set("end_de", params.endDe);
+
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; attempt &lt;= MAX_ATTEMPTS; attempt++) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+      if (!resp.ok) return null;
+      return (await resp.json()) as ElestockResponse;
+    } catch (err) {
+      if (attempt &lt; MAX_ATTEMPTS && isRetriable(err)) {
+        await sleep(500 * 2 ** (attempt - 1));
+        continue;
+      }
+      console.warn(
+        `[dart] elestock fetch failed corp=${params.corpCode}:`,
+        err instanceof Error ? err.message : err,
+      );
+      return null;
+    }
+  }
+  return null;
+}
+
+/** rcpNo → ElestockDetail Map. 응답 0건이거나 실패면 빈 Map. */
+export async function buildElestockMap(params: {
+  corpCode: string;
+  bgnDe: string;
+  endDe: string;
+}): Promise&lt;Map&lt;string, ElestockDetail&gt;&gt; {
+  const resp = await fetchElestock(params);
+  const map = new Map&lt;string, ElestockDetail&gt;();
+  if (!resp || resp.status !== "000" || !resp.list) return map;
+
+  for (const item of resp.list) {
+    if (!item.rcept_no) continue;
+    const detail: ElestockDetail = {
+      type: "elestock",
+      filer: item.repror ?? null,
+      position: derivePosition(item),
+      reason: item.stkrt_irds_resn ?? null,
+      changeDate: formatYmd(item.trde_dd),
+      tradeQuantity: parseSignedNum(item.trde_qy),
+      tradePrice: parseSignedNum(item.unit_pic),
+      tradeAmount: parseSignedNum(item.trde_amt),
+      afterShares: parseSignedNum(item.posesn_stock_co_after),
+    };
+    map.set(item.rcept_no, detail);
+  }
+  return map;
+}</code></pre>
+
+<div class="step">☐ <strong>Step 2.2:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+</div>
+
+<hr>
+
+<h2>Task 3 — majorstock-detail.ts 신규</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/lib/dart/majorstock-detail.ts</code> (신규)</p>
+
+<p>worker의 기존 majorstock 파일은 VIP 보유 트래킹용이라 별도 파일로 분리.</p>
+
+<div class="step">☐ <strong>Step 3.1:</strong> 파일 생성:</div>
+
+<pre><code>import type { MajorstockDetail } from "./disclosure-payloads";
+
+interface MajorstockItem {
+  rcept_no?: string;
+  repror?: string;
+  stkqy?: string;            // 보유주식수
+  stkrt?: string;            // 보유비율 (%)
+  stkrt_irds?: string;       // 변동비율 (%p)
+  report_rs?: string;        // 보고사유 (단순투자/일반투자/경영참여 등)
+}
+
+interface MajorstockResponse {
+  status?: string;
+  message?: string;
+  list?: MajorstockItem[];
+}
+
+function sleep(ms: number): Promise&lt;void&gt; {
+  return new Promise((r) =&gt; setTimeout(r, ms));
+}
+
+function isRetriable(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const m = err.message.toLowerCase();
+  return (
+    m.includes("fetch failed") ||
+    m.includes("timeout") ||
+    m.includes("network") ||
+    m.includes("econnreset") ||
+    m.includes("etimedout")
+  );
+}
+
+function parseSignedNum(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/,/g, "").trim();
+  if (cleaned === "" || cleaned === "-") return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+export async function fetchMajorstockDetail(params: {
+  corpCode: string;
+  bgnDe: string;
+  endDe: string;
+}): Promise&lt;MajorstockResponse | null&gt; {
+  const apiKey = process.env.DART_API_KEY;
+  if (!apiKey) throw new Error("DART_API_KEY not set");
+  const url = new URL("https://opendart.fss.or.kr/api/majorstock.json");
+  url.searchParams.set("crtfc_key", apiKey);
+  url.searchParams.set("corp_code", params.corpCode);
+  url.searchParams.set("bgn_de", params.bgnDe);
+  url.searchParams.set("end_de", params.endDe);
+
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; attempt &lt;= MAX_ATTEMPTS; attempt++) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+      if (!resp.ok) return null;
+      return (await resp.json()) as MajorstockResponse;
+    } catch (err) {
+      if (attempt &lt; MAX_ATTEMPTS && isRetriable(err)) {
+        await sleep(500 * 2 ** (attempt - 1));
+        continue;
+      }
+      console.warn(
+        `[dart] majorstock-detail fetch failed corp=${params.corpCode}:`,
+        err instanceof Error ? err.message : err,
+      );
+      return null;
+    }
+  }
+  return null;
+}
+
+export async function buildMajorstockMap(params: {
+  corpCode: string;
+  bgnDe: string;
+  endDe: string;
+}): Promise&lt;Map&lt;string, MajorstockDetail&gt;&gt; {
+  const resp = await fetchMajorstockDetail(params);
+  const map = new Map&lt;string, MajorstockDetail&gt;();
+  if (!resp || resp.status !== "000" || !resp.list) return map;
+
+  for (const item of resp.list) {
+    if (!item.rcept_no) continue;
+    const detail: MajorstockDetail = {
+      type: "majorstock",
+      filer: item.repror ?? null,
+      ownedShares: parseSignedNum(item.stkqy),
+      ownedRatio: parseSignedNum(item.stkrt),
+      changeRatio: parseSignedNum(item.stkrt_irds),
+      reason: item.report_rs ?? null,
+    };
+    map.set(item.rcept_no, detail);
+  }
+  return map;
+}</code></pre>
+
+<div class="step">☐ <strong>Step 3.2:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+</div>
+
+<hr>
+
+<h2>Task 4 — fetchOwnership 확장</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/actions/disclosures.ts</code></p>
+
+<div class="step">☐ <strong>Step 4.1:</strong> import 추가:</div>
+
+<pre><code>import { buildElestockMap } from "@/lib/dart/elestock";
+import { buildMajorstockMap } from "@/lib/dart/majorstock-detail";
+import type { OwnershipDetail } from "@/lib/dart/disclosure-payloads";</code></pre>
+
+<div class="step">☐ <strong>Step 4.2:</strong> <code>fetchOwnership</code> 함수 전체 교체 (기존 함수 위치):</div>
+
+<pre><code>async function fetchOwnership(code: string, corpCode: string): Promise&lt;FetchStats&gt; {
+  const { bgnDe, endDe } = todayDateRange();
+  const resp = await fetchDartList({
+    corpCode,
+    pblntfTy: "D",
+    bgnDe,
+    endDe,
+    pageCount: 100,
+  });
+  if (!resp || resp.status !== "000" || !resp.list) {
+    return { inserted: 0, updated: 0, failed: 1 };
+  }
+
+  // 두 상세 API를 종목 단위로 한 번씩 호출해 rcpNo Map 구축.
+  // 실패는 빈 Map으로 graceful degrade.
+  const [elestockMap, majorMap] = await Promise.all([
+    buildElestockMap({ corpCode, bgnDe, endDe }),
+    buildMajorstockMap({ corpCode, bgnDe, endDe }),
+  ]);
+
+  const rows = resp.list
+    .slice(0, MAX_REPORTS_PER_STOCK)
+    .map((it) =&gt; ({
+      rcpNo: it.rcept_no,
+      reportNm: it.report_nm,
+      rceptDt: new Date(
+        `${it.rcept_dt.slice(0, 4)}-${it.rcept_dt.slice(4, 6)}-${it.rcept_dt.slice(6, 8)}`,
+      ),
+    }));
+
+  let inserted = 0;
+  let updated = 0;
+  for (const r of rows) {
+    const base = classifyOwnership(r.reportNm);
+    let detail: OwnershipDetail | null = null;
+    if (base.reportType === "임원·주요주주") {
+      detail = elestockMap.get(r.rcpNo) ?? null;
+    } else if (base.reportType === "주식대량보유") {
+      detail = majorMap.get(r.rcpNo) ?? null;
+    }
+    const payload = { ...base, detail };
+
+    const existing = await db.disclosure.findUnique({ where: { rcpNo: r.rcpNo } });
+    await db.disclosure.upsert({
+      where: { rcpNo: r.rcpNo },
+      create: {
+        rcpNo: r.rcpNo,
+        code,
+        corpCode,
+        reportNm: r.reportNm,
+        pblntfTy: "D",
+        rceptDt: r.rceptDt,
+        category: "지분",
+        payload: JSON.stringify(payload),
+      },
+      update: {
+        payload: JSON.stringify(payload),
+        fetchedAt: new Date(),
+      },
+    });
+    if (existing) updated++;
+    else inserted++;
+  }
+  return { inserted, updated, failed: 0 };
+}</code></pre>
+
+<div class="step">☐ <strong>Step 4.3:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+</div>
+
+<hr>
+
+<h2>Task 5 — 실제 응답 필드 확인 + 정규식 보정</h2>
+
+<div class="task">
+
+<p>응답 필드명 추정이 빗나갈 위험. 작은 스크립트로 실제 응답을 출력해서 확인.</p>
+
+<p class="files"><strong>Files:</strong> <code>scripts/test-elestock-majorstock.ts</code> (신규/임시)</p>
+
+<div class="step">☐ <strong>Step 5.1:</strong> 스크립트 생성:</div>
+
+<pre><code>import { config } from "dotenv";
+import path from "node:path";
+config({ path: path.resolve(__dirname, "..", ".env.local") });
+config({ path: path.resolve(__dirname, "..", ".env") });
+
+import { fetchElestock } from "../src/lib/dart/elestock";
+import { fetchMajorstockDetail } from "../src/lib/dart/majorstock-detail";
+
+const corpCode = "00126380"; // 삼성전자
+
+(async () =&gt; {
+  console.log("=== elestock ===");
+  const ele = await fetchElestock({
+    corpCode,
+    bgnDe: "20220101",
+    endDe: "20260527",
+  });
+  console.log("status:", ele?.status, "count:", ele?.list?.length);
+  if (ele?.list && ele.list.length &gt; 0) {
+    console.log("sample row keys:", Object.keys(ele.list[0]));
+    console.log("sample row:", JSON.stringify(ele.list[0], null, 2));
+  }
+
+  console.log("\n=== majorstock ===");
+  const maj = await fetchMajorstockDetail({
+    corpCode,
+    bgnDe: "20220101",
+    endDe: "20260527",
+  });
+  console.log("status:", maj?.status, "count:", maj?.list?.length);
+  if (maj?.list && maj.list.length &gt; 0) {
+    console.log("sample row keys:", Object.keys(maj.list[0]));
+    console.log("sample row:", JSON.stringify(maj.list[0], null, 2));
+  }
+  process.exit(0);
+})();</code></pre>
+
+<div class="step">☐ <strong>Step 5.2:</strong> 실행:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsx scripts/test-elestock-majorstock.ts 2&gt;&1 | head -80</code></pre>
+
+<div class="step">☐ <strong>Step 5.3:</strong> 출력의 <code>sample row keys</code>를 보고:</div>
+<ul>
+  <li>Task 2의 <code>ElestockItem</code> 인터페이스 필드명을 실제 응답에 맞춰 수정.</li>
+  <li>Task 2의 <code>derivePosition</code> 로직 보정 (예: 직위 필드명이 <code>isu_exctv_ofcps</code>가 아니라 다른 이름이면 변경).</li>
+  <li>Task 3의 <code>MajorstockItem</code> 인터페이스 동일하게 수정.</li>
+</ul>
+<p>가능한 변형 예시: <code>repror</code> → <code>nm</code> / <code>repror_nm</code>, <code>trde_dd</code> → <code>chg_dd</code> / <code>varlt_dd</code>. 실제 응답으로 확인.</p>
+
+<div class="step">☐ <strong>Step 5.4:</strong> 수정 후 tsc + 같은 스크립트 재실행해서 추출 결과 확인:</div>
+
+<pre><code># buildElestockMap, buildMajorstockMap 출력도 같이 확인
+import { buildElestockMap } from "../src/lib/dart/elestock";
+import { buildMajorstockMap } from "../src/lib/dart/majorstock-detail";
+
+const eMap = await buildElestockMap({ corpCode, bgnDe: "20220101", endDe: "20260527" });
+const mMap = await buildMajorstockMap({ corpCode, bgnDe: "20220101", endDe: "20260527" });
+console.log("elestock map size:", eMap.size);
+const eFirst = [...eMap.values()][0];
+console.log("elestock sample:", eFirst);
+console.log("majorstock map size:", mMap.size);
+const mFirst = [...mMap.values()][0];
+console.log("majorstock sample:", mFirst);</code></pre>
+
+<p>위 코드를 스크립트에 이어붙여 실행. detail 필드들이 null이 아닌 정상 값인지 확인.</p>
+
+</div>
+
+<hr>
+
+<h2>Task 6 — OwnershipCard 분기 렌더</h2>
+
+<div class="task">
+
+<p class="files"><strong>Files:</strong> <code>src/app/stocks/[code]/OwnershipCard.tsx</code></p>
+
+<div class="step">☐ <strong>Step 6.1:</strong> 파일 전체 교체:</div>
+
+<pre><code>import type {
+  OwnershipPayload,
+  ElestockDetail,
+  MajorstockDetail,
+} from "@/lib/dart/disclosure-payloads";
+
+interface Props {
+  rcpNo: string;
+  reportNm: string;
+  rceptDt: Date;
+  payload: OwnershipPayload | null;
+}
+
+function formatRceptDt(d: Date): string {
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yy}.${mm}.${dd} ${hh}:${mi}`;
+}
+
+function formatYmd(s: string | null): string {
+  if (!s) return "—";
+  return s.replace(/-/g, ".");
+}
+
+function formatShares(v: number | null): string {
+  if (v == null) return "—";
+  const sign = v &gt; 0 ? "+" : v &lt; 0 ? "" : "";   // 음수는 자체 부호 포함
+  return `${sign}${v.toLocaleString()}주`;
+}
+
+function formatPrice(v: number | null): string {
+  if (v == null) return "—";
+  return `${v.toLocaleString()}원`;
+}
+
+function formatAmount(v: number | null): string {
+  if (v == null) return "—";
+  const abs = Math.abs(v);
+  if (abs &gt;= 1e8) return `${(v / 1e8).toFixed(2)}억`;
+  if (abs &gt;= 1e4) return `${Math.round(v / 1e4).toLocaleString()}만원`;
+  return `${v.toLocaleString()}원`;
+}
+
+function quantityColor(v: number | null): string {
+  if (v == null) return "text-gray-300";
+  if (v &gt; 0) return "text-green-300";
+  if (v &lt; 0) return "text-red-300";
+  return "text-gray-300";
+}
+
+function ElestockBody({ d }: { d: ElestockDetail }) {
+  return (
+    &lt;div className="mt-3 space-y-2 text-sm"&gt;
+      &lt;div className="flex flex-wrap gap-x-4"&gt;
+        &lt;span&gt;보고자: &lt;b&gt;{d.filer ?? "—"}&lt;/b&gt;&lt;/span&gt;
+        &lt;span&gt;직위: &lt;b&gt;{d.position ?? "—"}&lt;/b&gt;&lt;/span&gt;
+      &lt;/div&gt;
+      &lt;div&gt;보고사유: &lt;b&gt;{d.reason ?? "—"}&lt;/b&gt;&lt;/div&gt;
+      &lt;div className="border-t border-amber-700/40 pt-2 space-y-1"&gt;
+        &lt;div&gt;변동일: &lt;b&gt;{formatYmd(d.changeDate)}&lt;/b&gt;&lt;/div&gt;
+        &lt;div&gt;
+          거래수량: &lt;b className={`font-mono ${quantityColor(d.tradeQuantity)}`}&gt;{formatShares(d.tradeQuantity)}&lt;/b&gt;
+        &lt;/div&gt;
+        &lt;div&gt;거래가격: &lt;b&gt;{formatPrice(d.tradePrice)}&lt;/b&gt;&lt;/div&gt;
+        &lt;div&gt;거래금액: &lt;b&gt;{formatAmount(d.tradeAmount)}&lt;/b&gt;&lt;/div&gt;
+        &lt;div&gt;거래후보유주식수: &lt;b&gt;{d.afterShares != null ? `${d.afterShares.toLocaleString()}주` : "—"}&lt;/b&gt;&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}
+
+function MajorstockBody({ d }: { d: MajorstockDetail }) {
+  const changeColor =
+    d.changeRatio == null
+      ? "text-gray-300"
+      : d.changeRatio &gt; 0
+        ? "text-green-300"
+        : d.changeRatio &lt; 0
+          ? "text-red-300"
+          : "text-gray-300";
+  return (
+    &lt;div className="mt-3 space-y-2 text-sm"&gt;
+      &lt;div&gt;보고자: &lt;b&gt;{d.filer ?? "—"}&lt;/b&gt;&lt;/div&gt;
+      &lt;div className="space-y-1"&gt;
+        &lt;div&gt;보유주식수: &lt;b&gt;{d.ownedShares != null ? `${d.ownedShares.toLocaleString()}주` : "—"}&lt;/b&gt;&lt;/div&gt;
+        &lt;div&gt;보유비율: &lt;b&gt;{d.ownedRatio != null ? `${d.ownedRatio.toFixed(2)}%` : "—"}&lt;/b&gt;&lt;/div&gt;
+        &lt;div&gt;
+          변동: &lt;b className={`font-mono ${changeColor}`}&gt;
+            {d.changeRatio == null ? "—" : `${d.changeRatio &gt;= 0 ? "+" : ""}${d.changeRatio.toFixed(2)}%p`}
+          &lt;/b&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div&gt;보고사유: &lt;b&gt;{d.reason ?? "—"}&lt;/b&gt;&lt;/div&gt;
+    &lt;/div&gt;
+  );
+}
+
+export function OwnershipCard({ rcpNo, reportNm, rceptDt, payload }: Props) {
+  const dartUrl = `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${rcpNo}`;
+  const detail = payload?.detail ?? null;
+  return (
+    &lt;article className="rounded-lg bg-amber-900/80 p-5 text-gray-100 shadow"&gt;
+      {payload && (
+        &lt;span className="inline-block rounded bg-amber-700/80 px-2 py-0.5 text-xs font-medium"&gt;
+          {payload.reportType}
+        &lt;/span&gt;
+      )}
+      &lt;h3 className="mt-2 text-base font-bold"&gt;{reportNm}&lt;/h3&gt;
+
+      {detail?.type === "elestock" && &lt;ElestockBody d={detail} /&gt;}
+      {detail?.type === "majorstock" && &lt;MajorstockBody d={detail} /&gt;}
+
+      &lt;a
+        href={dartUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-3 inline-block text-xs text-amber-200 hover:underline"
+      &gt;
+        DART 원본 ↗
+      &lt;/a&gt;
+      &lt;p className="mt-3 text-xs text-gray-300"&gt;{formatRceptDt(rceptDt)}&lt;/p&gt;
+    &lt;/article&gt;
+  );
+}</code></pre>
+
+<div class="step">☐ <strong>Step 6.2:</strong> tsc:</div>
+
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+
+</div>
+
+<hr>
+
+<h2>Task 7 — 통합 검증</h2>
+
+<div class="task">
+
+<div class="step">☐ <strong>Step 7.1:</strong> 005930 disclosures 중 지분 row 삭제 후 page 진입 시 lazy seed로 재 fetch:</div>
+
+<pre><code>sqlite3 /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/data/company-map.db \
+  "DELETE FROM disclosures WHERE code='005930' AND category='지분';"
+sqlite3 /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/data/company-map.db \
+  "SELECT COUNT(*) FROM disclosures WHERE code='005930' AND category='지분';"</code></pre>
+
+<p>Expected: 0.</p>
+
+<div class="step">☐ <strong>Step 7.2:</strong> 페이지 진입 — lazy seed 조건은 "전체 disclosures 0건"이라 동작 안 함. 따라서 server action 직접 호출하는 임시 스크립트 추가 또는 RefreshButton 사용. 가장 간단: <code>fetchDisclosuresForStock</code> 직접 호출 스크립트:</div>
+
+<pre><code>cat &gt; /tmp/refresh-disclosures.ts &lt;&lt;'EOF'
+import { config } from "dotenv";
+import path from "node:path";
+config({ path: path.resolve("/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/.env.local") });
+config({ path: path.resolve("/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/.env") });
+import { fetchDisclosuresForStock } from "../Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/src/actions/disclosures";
+(async () =&gt; {
+  const r = await fetchDisclosuresForStock("005930");
+  console.log(r);
+  process.exit(0);
+})();
+EOF
+# 실제 추천: 브라우저에서 /stocks/005930 진입 후 "공시 갱신" 버튼 클릭.</code></pre>
+
+<p>가장 안전: 브라우저로 갱신 버튼 사용. 또는 기존 <code>scripts/test-fetch-disclosures.ts</code>를 elestock·majorstock map까지 부르는 형태로 확장 사용.</p>
+
+<div class="step">☐ <strong>Step 7.3:</strong> DB에서 payload 확인:</div>
+
+<pre><code>sqlite3 /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map/data/company-map.db \
+  "SELECT report_nm, substr(payload, 1, 200) FROM disclosures WHERE code='005930' AND category='지분' LIMIT 5;"</code></pre>
+
+<p>Expected: 임원·주요주주 row의 payload에 <code>"type":"elestock"</code> + <code>filer</code> 등 필드 노출.</p>
+
+<div class="step">☐ <strong>Step 7.4:</strong> 페이지 렌더 검증:</div>
+
+<pre><code>curl -s "http://localhost:3004/stocks/005930" &gt; /tmp/od.html
+grep -oE "보고자:|직위:|보고사유:|거래수량:|거래가격:|거래금액:|거래후보유주식수:|보유주식수:|보유비율:" /tmp/od.html | sort -u
+grep -oE "&gt;[^&lt;]*(\+|-)?[0-9,]+주&lt;" /tmp/od.html | head -5</code></pre>
+
+<p>Expected: 라벨 일부 매치. 거래수량 부호 표시 확인.</p>
+
+<div class="step">☐ <strong>Step 7.5 (수동):</strong> 브라우저로 005930 페이지 열어 지분 카드 시각 확인 — 이미지 패턴과 유사한 디자인, 거래수량 부호별 색상.</div>
+
+<div class="step">☐ <strong>Step 7.6:</strong> 임시 디버그 스크립트 정리:</div>
+
+<pre><code># 검증 끝나면 정리 (선택). 추후 디버깅용으로 남겨도 무방.
+rm -f /tmp/refresh-disclosures.ts /tmp/od.html</code></pre>
+
+<p>또는 <code>scripts/test-elestock-majorstock.ts</code>은 향후 디버깅 용도로 남길지 사용자 선택.</p>
+
+</div>
+
+<hr>
+
+<h2>Self-Review</h2>
+
+<p><strong>Spec coverage:</strong></p>
+<ul>
+  <li>OwnershipPayload + ElestockDetail / MajorstockDetail / OwnershipDetail → Task 1 ✓</li>
+  <li>elestock.json 클라이언트 + buildElestockMap → Task 2 ✓</li>
+  <li>majorstock.json 클라이언트 + buildMajorstockMap → Task 3 ✓</li>
+  <li>fetchOwnership 두 Map lookup → Task 4 ✓</li>
+  <li>응답 필드명 보정 단계 → Task 5 (명시적으로 안전장치) ✓</li>
+  <li>OwnershipCard 분기 렌더 + 색상 + 포맷 → Task 6 ✓</li>
+  <li>자기주식·기타는 detail=null로 기존 fallback ✓ (Task 4·6 모두 처리)</li>
+  <li>검증 → Task 7 ✓</li>
+</ul>
+
+<p><strong>Placeholder scan:</strong> 모든 step에 실제 코드/명령. 응답 필드명 변경은 Task 5에서 명시 단계로 처리. ✓</p>
+
+<p><strong>Type consistency:</strong></p>
+<ul>
+  <li>ElestockDetail / MajorstockDetail / OwnershipDetail — Task 1에서 정의, Task 2·3·4·6에서 동일 import. ✓</li>
+  <li>buildElestockMap / buildMajorstockMap 시그니처 — Task 2·3에서 정의, Task 4에서 일치 호출. ✓</li>
+  <li>OwnershipPayload.detail 필드 — Task 1에서 옵셔널 정의, Task 4에서 항상 채움 (null 또는 detail), Task 6에서 동일 path 접근. ✓</li>
+</ul>
+
+</body>
+</html>
