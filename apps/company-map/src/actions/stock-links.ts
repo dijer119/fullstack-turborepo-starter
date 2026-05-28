@@ -1,5 +1,6 @@
 "use server";
 
+import { Prisma } from "@prisma-clients/company-map";
 import { db } from "@/lib/db";
 import {
   fetchOgMeta,
@@ -67,6 +68,11 @@ export async function addLink(
   if (!/^https?:\/\//i.test(url)) {
     return { ok: false, error: "http(s) URL만 저장할 수 있습니다" };
   }
+  try {
+    new URL(url);
+  } catch {
+    return { ok: false, error: "올바른 URL이 아닙니다" };
+  }
 
   const master = await db.stockMaster.findUnique({
     where: { code },
@@ -105,11 +111,18 @@ export async function updateLink(
     const trimmed = patch.memo?.trim() ?? "";
     data.memo = trimmed === "" ? null : trimmed;
   }
+  if (Object.keys(data).length === 0) {
+    const row = await db.stockLink.findUnique({ where: { id } });
+    return row ? toView(row) : null;
+  }
   try {
     const updated = await db.stockLink.update({ where: { id }, data });
     return toView(updated);
-  } catch {
-    return null;
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
+      return null;
+    }
+    throw e;
   }
 }
 
@@ -118,7 +131,10 @@ export async function deleteLink(id: string): Promise<{ ok: boolean }> {
   try {
     await db.stockLink.delete({ where: { id } });
     return { ok: true };
-  } catch {
-    return { ok: false };
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
+      return { ok: false };
+    }
+    throw e;
   }
 }
