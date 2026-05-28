@@ -13,6 +13,7 @@ const ITEMS: Item[] = [
   { id: "dividends", label: "배당", dotClass: "bg-emerald-500" },
   { id: "ownership", label: "지분", dotClass: "bg-amber-500" },
   { id: "contracts", label: "계약", dotClass: "bg-cyan-500" },
+  { id: "links", label: "관련 링크", dotClass: "bg-rose-500" },
 ];
 
 export function SectionNav() {

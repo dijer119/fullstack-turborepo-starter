@@ -11,6 +11,8 @@ import type {
 import { StockDetailHeader } from "./StockDetailHeader";
 import { DisclosureTimeline } from "./DisclosureTimeline";
 import { SectionNav } from "./SectionNav";
+import { RelatedLinksCard } from "./RelatedLinksCard";
+import { listLinksByCode } from "@/actions/stock-links";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +79,8 @@ export default async function StockDetailPage({
       payload: d.payload ? (JSON.parse(d.payload) as ContractPayload) : null,
     }));
 
+  const links = await listLinksByCode(code);
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-6">
       <Link
@@ -111,6 +115,7 @@ export default async function StockDetailPage({
             ownership={ownership}
             contracts={contracts}
           />
+          <RelatedLinksCard code={master.code} initialLinks={links} />
         </div>
         <SectionNav />
       </div>
