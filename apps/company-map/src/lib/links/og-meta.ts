@@ -8,12 +8,14 @@ export interface OgMeta {
 
 export type LinkKind = "blog" | "news";
 
+const FETCH_TIMEOUT_MS = 5_000;
+
 const NEWS_HOST_PATTERNS = [
   "news.naver.com",
   "n.news.naver.com",
   "media.naver.com",
   "yna.co.kr",
-  "yonhapnews",
+  "yonhapnews.co.kr",
   "hankyung.com",
   "mk.co.kr",
   "edaily.co.kr",
@@ -87,7 +89,7 @@ export function parseOgMeta(html: string, url: string): OgMeta {
 export async function fetchOgMeta(url: string): Promise<OgMeta> {
   try {
     const resp = await fetch(url, {
-      signal: AbortSignal.timeout(5_000),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 Chrome/130 Safari/537.36",
