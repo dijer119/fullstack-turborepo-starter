@@ -68,6 +68,7 @@ model StockMaster {
   priceChange           PriceChange?
   memo                  StockMemo?
   override              StockOverride?
+  disclosures           Disclosure[]
 
   @@index([name])
   @@index([market])
@@ -253,4 +254,22 @@ model StockOverride {
   master    StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@map("stock_overrides")
+}
+
+model Disclosure {
+  rcpNo      String   @id @map("rcp_no")
+  code       String
+  corpCode   String   @map("corp_code")
+  reportNm   String   @map("report_nm")
+  pblntfTy   String   @map("pblntf_ty")
+  rceptDt    DateTime @map("rcept_dt")
+  category   String
+  payload    String?
+  fetchedAt  DateTime @default(now()) @map("fetched_at")
+
+  master     StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+
+  @@index([code, rceptDt])
+  @@index([category])
+  @@map("disclosures")
 }

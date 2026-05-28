@@ -500,6 +500,13 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                   <td className="sticky left-0 z-10 bg-white p-2 font-medium group-hover:bg-gray-50 dark:bg-gray-950 dark:group-hover:bg-gray-900/50">
                     <div className="flex items-center gap-1.5">
                       <MemoButton stockCode={r.code} initialHasMemo={r.hasMemo} />
+                      <Link
+                        href={`/stocks/${r.code}`}
+                        className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                        title="공시 history"
+                      >
+                        <FileText size={14} />
+                      </Link>
                       <a
                         href={`https://finance.naver.com/item/main.naver?code=${r.code}`}
                         target="_blank"
