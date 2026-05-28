@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>종목별 관련 링크 저장 — 구현 계획</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.9em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .task { background: #fafafa; padding: 1rem 1.5rem; border-left: 3px solid #2c5282; margin: 1rem 0; border-radius: 4px; }
+  .step { margin: 0.8rem 0 0.3rem; }
+  .files { color: #4a5568; font-size: 0.92em; }
+  .meta { color: #718096; font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<h1>종목별 관련 링크(블로그·뉴스) 저장 — 구현 계획</h1>
+<p class="meta">앱: <code>company-map</code> · 작성일: 2026-05-29 · spec: <code>docs/superpowers/specs/2026-05-29-stock-links-design.html</code></p>
+
+<blockquote>
+<p><strong>For agentic workers:</strong> superpowers:executing-plans로 inline 실행 권장. <code>☐</code> 미완료 / <code>☑</code> 완료. og-meta 유틸은 TDD(테스트 먼저), UI·액션은 단계별 구현 + 수동 검증. 각 Task 끝에서 커밋.</p>
+</blockquote>
+
+<p><strong>Goal:</strong> 전종목 조회의 각 종목에 블로그·뉴스 URL을 수동 저장하고, 붙여넣으면 OG 메타(제목·출처·이미지)를 자동 추출해 종목 상세 페이지에서 모아 본다.</p>
+<p><strong>Architecture:</strong> 신규 <code>StockLink</code> 모델(1:N) + <code>fetch</code>+<code>cheerio</code> 기반 동기 best-effort 메타 추출. 기존 <code>StockMemo</code> server action 패턴을 그대로 따른다. 전종목 테이블엔 존재 표시기만 노출.</p>
+<p><strong>Tech Stack:</strong> Next.js 16 (App Router, server actions) · Prisma + SQLite · cheerio · vitest · Tailwind · lucide-react. 새 의존성 0.</p>
+
+<h2>파일 구조</h2>
+<table>
+  <thead><tr><th>파일</th><th>책임</th><th>Task</th></tr></thead>
+  <tbody>
+    <tr><td><code>prisma/schema.prisma</code> (수정)</td><td><code>StockLink</code> 모델 + <code>StockMaster.links</code> relation</td><td>1</td></tr>
+    <tr><td><code>src/lib/links/og-meta.ts</code> (생성)</td><td><code>parseOgMeta</code>·<code>fetchOgMeta</code>·<code>inferKind</code>·<code>hostFromUrl</code></td><td>2</td></tr>
+    <tr><td><code>src/lib/links/og-meta.test.ts</code> (생성)</td><td>parseOgMeta·inferKind 단위 테스트</td><td>2</td></tr>
+    <tr><td><code>src/actions/stock-links.ts</code> (생성)</td><td>list·add·update·delete server actions</td><td>3</td></tr>
+    <tr><td><code>src/app/stocks/[code]/RelatedLinksCard.tsx</code> (생성)</td><td>상세 "관련 링크" 섹션(client)</td><td>4</td></tr>
+    <tr><td><code>src/app/stocks/[code]/page.tsx</code> (수정)</td><td>초기 링크 SSR 로드 + 카드 렌더</td><td>4</td></tr>
+    <tr><td><code>src/app/stocks/[code]/SectionNav.tsx</code> (수정)</td><td>"관련 링크" 네비 항목</td><td>4</td></tr>
+    <tr><td><code>src/actions/stocks-explorer.ts</code> (수정)</td><td>row에 <code>hasLinks</code> 집계</td><td>5</td></tr>
+    <tr><td><code>src/app/stocks/StocksExplorerClient.tsx</code> (수정)</td><td>행별 링크 존재 표시기</td><td>5</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>Task 1 — Prisma 스키마: StockLink 모델</h2>
+<div class="task">
+<p class="files"><strong>Files:</strong> 수정 <code>prisma/schema.prisma</code></p>
+
+<div class="step">☐ <strong>Step 1.1:</strong> <code>StockMaster</code> 모델의 relation 블록에서 <code>disclosures Disclosure[]</code> 줄 바로 아래에 한 줄 추가:</div>
+<pre><code>  disclosures           Disclosure[]
+  links                 StockLink[]</code></pre>
+<p>(<code>disclosures</code> 줄은 이미 존재 — 그 다음에 <code>links</code>만 삽입)</p>
+
+<div class="step">☐ <strong>Step 1.2:</strong> 파일 맨 끝에 신규 모델 추가:</div>
+<pre><code>model StockLink {
+  id        String   @id @default(uuid())
+  code      String
+  url       String
+  title     String?
+  siteName  String?  @map("site_name")
+  imageUrl  String?  @map("image_url")
+  kind      String   @default("blog")
+  memo      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  master    StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+
+  @@unique([code, url])
+  @@index([code, createdAt])
+  @@map("stock_links")
+}</code></pre>
+
+<div class="step">☐ <strong>Step 1.3:</strong> 마이그레이션 + 클라이언트 재생성:</div>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx prisma migrate dev --name add_stock_links; echo "EXIT=$?"</code></pre>
+<p>Expected: <code>EXIT=0</code>, <code>prisma/migrations/&lt;ts&gt;_add_stock_links/</code> 생성, "Generated Prisma Client" 메시지.</p>
+
+<div class="step">☐ <strong>Step 1.4:</strong> 타입 확인 (<code>db.stockLink</code> 존재):</div>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+<p>Expected: <code>EXIT=0</code>.</p>
+
+<div class="step">☐ <strong>Step 1.5:</strong> 커밋:</div>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter
+git add apps/company-map/prisma/schema.prisma apps/company-map/prisma/migrations
+git commit -m "feat(company-map): StockLink 모델 추가 (종목별 관련 링크)"</code></pre>
+</div>
+
+<hr>
+
+<h2>Task 2 — OG 메타 추출 유틸 (TDD)</h2>
+<div class="task">
+<p class="files"><strong>Files:</strong> 생성 <code>src/lib/links/og-meta.ts</code>, 테스트 <code>src/lib/links/og-meta.test.ts</code></p>
+
+<div class="step">☐ <strong>Step 2.1:</strong> 실패하는 테스트 작성 — <code>src/lib/links/og-meta.test.ts</code>:</div>
+<pre><code>import { describe, it, expect } from "vitest";
+import { parseOgMeta, inferKind } from "./og-meta";
+
+describe("parseOgMeta", () => {
+  it("OG 태그 완비 → 전 필드 추출", () => {
+    const html = `&lt;html&gt;&lt;head&gt;
+      &lt;meta property="og:title" content="삼성전자 실적 분석"&gt;
+      &lt;meta property="og:site_name" content="네이버 블로그"&gt;
+      &lt;meta property="og:image" content="https://img.example.com/a.png"&gt;
+    &lt;/head&gt;&lt;body&gt;&lt;/body&gt;&lt;/html&gt;`;
+    expect(parseOgMeta(html, "https://blog.naver.com/x/1")).toEqual({
+      title: "삼성전자 실적 분석",
+      siteName: "네이버 블로그",
+      imageUrl: "https://img.example.com/a.png",
+    });
+  });
+
+  it("OG 누락 → title·twitter:image 폴백, siteName은 null", () => {
+    const html = `&lt;html&gt;&lt;head&gt;
+      &lt;title&gt;대체 제목&lt;/title&gt;
+      &lt;meta name="twitter:image" content="https://img.example.com/t.png"&gt;
+    &lt;/head&gt;&lt;body&gt;&lt;/body&gt;&lt;/html&gt;`;
+    const r = parseOgMeta(html, "https://example.com/post");
+    expect(r.title).toBe("대체 제목");
+    expect(r.imageUrl).toBe("https://img.example.com/t.png");
+    expect(r.siteName).toBeNull();
+  });
+
+  it("상대경로 og:image를 페이지 URL 기준 절대경로로 보정", () => {
+    const html = `&lt;meta property="og:image" content="/thumb/1.jpg"&gt;`;
+    const r = parseOgMeta(html, "https://news.example.com/article/5");
+    expect(r.imageUrl).toBe("https://news.example.com/thumb/1.jpg");
+  });
+
+  it("빈 HTML → 모두 null", () => {
+    expect(parseOgMeta("", "https://example.com")).toEqual({
+      title: null,
+      siteName: null,
+      imageUrl: null,
+    });
+  });
+});
+
+describe("inferKind", () => {
+  it("알려진 언론사 도메인 → news", () => {
+    expect(inferKind("https://n.news.naver.com/article/001/0001")).toBe("news");
+    expect(inferKind("https://www.hankyung.com/article/2026")).toBe("news");
+  });
+
+  it("블로그·미지 호스트 → blog", () => {
+    expect(inferKind("https://blog.naver.com/user/123")).toBe("blog");
+    expect(inferKind("https://someone.tistory.com/45")).toBe("blog");
+  });
+
+  it("파싱 불가 URL → blog", () => {
+    expect(inferKind("not a url")).toBe("blog");
+  });
+});</code></pre>
+
+<div class="step">☐ <strong>Step 2.2:</strong> 테스트 실행 → 실패 확인:</div>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx vitest run src/lib/links/og-meta.test.ts; echo "EXIT=$?"</code></pre>
+<p>Expected: FAIL — <code>Cannot find module './og-meta'</code> (또는 export 없음). <code>EXIT</code>≠0.</p>
+
+<div class="step">☐ <strong>Step 2.3:</strong> 구현 — <code>src/lib/links/og-meta.ts</code>:</div>
+<pre><code>import * as cheerio from "cheerio";
+
+export interface OgMeta {
+  title: string | null;
+  siteName: string | null;
+  imageUrl: string | null;
+}
+
+export type LinkKind = "blog" | "news";
+
+const NEWS_HOST_PATTERNS = [
+  "news.naver.com",
+  "n.news.naver.com",
+  "media.naver.com",
+  "yna.co.kr",
+  "yonhapnews",
+  "hankyung.com",
+  "mk.co.kr",
+  "edaily.co.kr",
+  "mt.co.kr",
+  "sedaily.com",
+  "fnnews.com",
+  "chosun.com",
+  "donga.com",
+  "joongang.co.kr",
+  "hani.co.kr",
+  "khan.co.kr",
+  "heraldcorp.com",
+  "newsis.com",
+  "news1.kr",
+];
+
+/** URL 호스트만 안전 추출. 파싱 실패 시 null. */
+export function hostFromUrl(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+/** 호스트 기반 블로그/뉴스 추정. 언론사 도메인 매칭 시 news, 그 외 blog. */
+export function inferKind(url: string): LinkKind {
+  const host = hostFromUrl(url);
+  if (!host) return "blog";
+  return NEWS_HOST_PATTERNS.some((p) => host.includes(p)) ? "news" : "blog";
+}
+
+function pick($: cheerio.CheerioAPI, selectors: string[]): string | null {
+  for (const sel of selectors) {
+    const el = $(sel).first();
+    const raw = el.attr("content") ?? el.text();
+    const trimmed = raw?.trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
+/** HTML 문자열에서 OG 메타 추출. 순수 함수 — 네트워크 없음. */
+export function parseOgMeta(html: string, url: string): OgMeta {
+  const $ = cheerio.load(html);
+
+  const title = pick($, [
+    'meta[property="og:title"]',
+    'meta[name="twitter:title"]',
+    "title",
+  ]);
+
+  const siteName = pick($, ['meta[property="og:site_name"]']);
+
+  let imageUrl = pick($, [
+    'meta[property="og:image"]',
+    'meta[name="twitter:image"]',
+  ]);
+  if (imageUrl) {
+    try {
+      imageUrl = new URL(imageUrl, url).toString();
+    } catch {
+      // 보정 실패 시 원본 유지
+    }
+  }
+
+  return { title, siteName, imageUrl };
+}
+
+/** URL fetch 후 OG 메타 추출. 실패·타임아웃·비HTML → 모두 null (throw 안 함). */
+export async function fetchOgMeta(url: string): Promise&lt;OgMeta&gt; {
+  try {
+    const resp = await fetch(url, {
+      signal: AbortSignal.timeout(5_000),
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 Chrome/130 Safari/537.36",
+      },
+    });
+    if (!resp.ok) return { title: null, siteName: null, imageUrl: null };
+    const ct = resp.headers.get("content-type") ?? "";
+    if (!ct.includes("html")) {
+      return { title: null, siteName: null, imageUrl: null };
+    }
+    const html = await resp.text();
+    return parseOgMeta(html, url);
+  } catch (err) {
+    console.warn(
+      `[stock-links] og fetch failed ${url}:`,
+      err instanceof Error ? err.message : err,
+    );
+    return { title: null, siteName: null, imageUrl: null };
+  }
+}</code></pre>
+
+<div class="step">☐ <strong>Step 2.4:</strong> 테스트 실행 → 통과 확인:</div>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx vitest run src/lib/links/og-meta.test.ts; echo "EXIT=$?"</code></pre>
+<p>Expected: 7 passed, <code>EXIT=0</code>.</p>
+
+<div class="step">☐ <strong>Step 2.5:</strong> 커밋:</div>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter
+git add apps/company-map/src/lib/links/
+git commit -m "feat(company-map): OG 메타 추출 유틸 + 테스트"</code></pre>
+</div>
+
+<hr>
+
+<h2>Task 3 — server actions</h2>
+<div class="task">
+<p class="files"><strong>Files:</strong> 생성 <code>src/actions/stock-links.ts</code></p>
+
+<div class="step">☐ <strong>Step 3.1:</strong> 구현 — <code>src/actions/stock-links.ts</code>:</div>
+<pre><code>"use server";
+
+import { db } from "@/lib/db";
+import {
+  fetchOgMeta,
+  inferKind,
+  hostFromUrl,
+  type LinkKind,
+} from "@/lib/links/og-meta";
+
+export interface StockLinkView {
+  id: string;
+  url: string;
+  title: string | null;
+  siteName: string | null;
+  imageUrl: string | null;
+  kind: LinkKind;
+  memo: string | null;
+  createdAt: string; // ISO 8601
+}
+
+interface StockLinkRow {
+  id: string;
+  url: string;
+  title: string | null;
+  siteName: string | null;
+  imageUrl: string | null;
+  kind: string;
+  memo: string | null;
+  createdAt: Date;
+}
+
+function toView(row: StockLinkRow): StockLinkView {
+  return {
+    id: row.id,
+    url: row.url,
+    title: row.title,
+    siteName: row.siteName,
+    imageUrl: row.imageUrl,
+    kind: row.kind === "news" ? "news" : "blog",
+    memo: row.memo,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/** 종목별 링크 목록 (최신순). */
+export async function listLinksByCode(code: string): Promise&lt;StockLinkView[]&gt; {
+  if (!/^\d{6}$/.test(code)) return [];
+  const rows = await db.stockLink.findMany({
+    where: { code },
+    orderBy: { createdAt: "desc" },
+  });
+  return rows.map(toView);
+}
+
+export type AddLinkResult =
+  | { ok: true; link: StockLinkView }
+  | { ok: false; error: string };
+
+/** URL 저장 + OG 메타 자동 추출. 중복(code,url)이면 기존 row 반환 (idempotent). */
+export async function addLink(
+  code: string,
+  rawUrl: string,
+): Promise&lt;AddLinkResult&gt; {
+  if (!/^\d{6}$/.test(code)) return { ok: false, error: "잘못된 종목 코드" };
+  const url = rawUrl.trim();
+  if (!/^https?:\/\//i.test(url)) {
+    return { ok: false, error: "http(s) URL만 저장할 수 있습니다" };
+  }
+
+  const master = await db.stockMaster.findUnique({
+    where: { code },
+    select: { code: true },
+  });
+  if (!master) return { ok: false, error: "존재하지 않는 종목입니다" };
+
+  const existing = await db.stockLink.findUnique({
+    where: { code_url: { code, url } },
+  });
+  if (existing) return { ok: true, link: toView(existing) };
+
+  const meta = await fetchOgMeta(url);
+  const created = await db.stockLink.create({
+    data: {
+      code,
+      url,
+      title: meta.title,
+      siteName: meta.siteName ?? hostFromUrl(url),
+      imageUrl: meta.imageUrl,
+      kind: inferKind(url),
+      memo: null,
+    },
+  });
+  return { ok: true, link: toView(created) };
+}
+
+/** 종류·메모 수동 편집. 빈 메모는 null로 저장. */
+export async function updateLink(
+  id: string,
+  patch: { kind?: LinkKind; memo?: string | null },
+): Promise&lt;StockLinkView | null&gt; {
+  const data: { kind?: string; memo?: string | null } = {};
+  if (patch.kind === "blog" || patch.kind === "news") data.kind = patch.kind;
+  if (patch.memo !== undefined) {
+    const trimmed = patch.memo?.trim() ?? "";
+    data.memo = trimmed === "" ? null : trimmed;
+  }
+  try {
+    const updated = await db.stockLink.update({ where: { id }, data });
+    return toView(updated);
+  } catch {
+    return null;
+  }
+}
+
+/** 링크 삭제. */
+export async function deleteLink(id: string): Promise&lt;{ ok: boolean }&gt; {
+  try {
+    await db.stockLink.delete({ where: { id } });
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}</code></pre>
+
+<div class="step">☐ <strong>Step 3.2:</strong> 타입 확인:</div>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+<p>Expected: <code>EXIT=0</code>. (<code>code_url</code> 복합 unique 이름이 Prisma 생성 타입과 일치하는지 여기서 검증됨.)</p>
+
+<div class="step">☐ <strong>Step 3.3:</strong> 커밋:</div>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter
+git add apps/company-map/src/actions/stock-links.ts
+git commit -m "feat(company-map): 종목 링크 server actions (list/add/update/delete)"</code></pre>
+</div>
+
+<hr>
+
+<h2>Task 4 — 상세 페이지 "관련 링크" 섹션</h2>
+<div class="task">
+<p class="files"><strong>Files:</strong> 생성 <code>src/app/stocks/[code]/RelatedLinksCard.tsx</code>; 수정 <code>src/app/stocks/[code]/page.tsx</code>, <code>src/app/stocks/[code]/SectionNav.tsx</code></p>
+
+<div class="step">☐ <strong>Step 4.1:</strong> 생성 — <code>src/app/stocks/[code]/RelatedLinksCard.tsx</code>:</div>
+<pre><code>"use client";
+
+import { useState, useTransition } from "react";
+import { ExternalLink, Trash2, Plus } from "lucide-react";
+import {
+  addLink,
+  updateLink,
+  deleteLink,
+  type StockLinkView,
+} from "@/actions/stock-links";
+
+export function RelatedLinksCard({
+  code,
+  initialLinks,
+}: {
+  code: string;
+  initialLinks: StockLinkView[];
+}) {
+  const [links, setLinks] = useState&lt;StockLinkView[]&gt;(initialLinks);
+  const [url, setUrl] = useState("");
+  const [error, setError] = useState&lt;string | null&gt;(null);
+  const [pending, startTransition] = useTransition();
+
+  const onAdd = () => {
+    const value = url.trim();
+    if (!value) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await addLink(code, value);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setLinks((prev) =>
+        prev.some((l) => l.id === res.link.id) ? prev : [res.link, ...prev],
+      );
+      setUrl("");
+    });
+  };
+
+  const onToggleKind = (link: StockLinkView) => {
+    const next = link.kind === "news" ? "blog" : "news";
+    setLinks((prev) =>
+      prev.map((l) => (l.id === link.id ? { ...l, kind: next } : l)),
+    );
+    startTransition(async () => {
+      await updateLink(link.id, { kind: next });
+    });
+  };
+
+  const onMemoBlur = (link: StockLinkView, memo: string) => {
+    if (memo === (link.memo ?? "")) return;
+    setLinks((prev) =>
+      prev.map((l) => (l.id === link.id ? { ...l, memo: memo || null } : l)),
+    );
+    startTransition(async () => {
+      await updateLink(link.id, { memo });
+    });
+  };
+
+  const onDelete = (id: string) => {
+    setLinks((prev) => prev.filter((l) => l.id !== id));
+    startTransition(async () => {
+      await deleteLink(id);
+    });
+  };
+
+  return (
+    &lt;section id="links" className="scroll-mt-6"&gt;
+      &lt;h2 className="mb-3 text-lg font-semibold"&gt;관련 링크&lt;/h2&gt;
+
+      &lt;div className="mb-4 flex gap-2"&gt;
+        &lt;input
+          type="url"
+          value={url}
+          onChange={(e) =&gt; setUrl(e.target.value)}
+          onKeyDown={(e) =&gt; {
+            if (e.key === "Enter") onAdd();
+          }}
+          placeholder="블로그·뉴스 URL 붙여넣기"
+          className="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900"
+        /&gt;
+        &lt;button
+          type="button"
+          onClick={onAdd}
+          disabled={pending || url.trim() === ""}
+          className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        &gt;
+          &lt;Plus size={14} /&gt;
+          {pending ? "가져오는 중…" : "추가"}
+        &lt;/button&gt;
+      &lt;/div&gt;
+      {error &amp;&amp; &lt;p className="mb-3 text-sm text-red-600"&gt;{error}&lt;/p&gt;}
+
+      {links.length === 0 ? (
+        &lt;p className="text-sm text-gray-500"&gt;아직 저장된 링크가 없습니다.&lt;/p&gt;
+      ) : (
+        &lt;ul className="space-y-3"&gt;
+          {links.map((link) =&gt; (
+            &lt;li
+              key={link.id}
+              className="flex gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+            &gt;
+              {link.imageUrl &amp;&amp; (
+                // eslint-disable-next-line @next/next/no-img-element
+                &lt;img
+                  src={link.imageUrl}
+                  alt=""
+                  className="h-16 w-16 shrink-0 rounded object-cover"
+                /&gt;
+              )}
+              &lt;div className="min-w-0 flex-1"&gt;
+                &lt;div className="flex items-center gap-2"&gt;
+                  &lt;button
+                    type="button"
+                    onClick={() =&gt; onToggleKind(link)}
+                    className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                      link.kind === "news"
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                        : "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300"
+                    }`}
+                    title="클릭하여 종류 전환"
+                  &gt;
+                    {link.kind === "news" ? "뉴스" : "블로그"}
+                  &lt;/button&gt;
+                  &lt;span className="truncate text-xs text-gray-500"&gt;
+                    {link.siteName ?? ""}
+                  &lt;/span&gt;
+                &lt;/div&gt;
+                &lt;a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 flex items-start gap-1 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                &gt;
+                  &lt;span className="min-w-0 break-words"&gt;{link.title ?? link.url}&lt;/span&gt;
+                  &lt;ExternalLink size={12} className="mt-1 shrink-0" /&gt;
+                &lt;/a&gt;
+                &lt;input
+                  type="text"
+                  defaultValue={link.memo ?? ""}
+                  onBlur={(e) =&gt; onMemoBlur(link, e.target.value.trim())}
+                  placeholder="메모"
+                  className="mt-2 w-full rounded border border-gray-200 bg-transparent px-2 py-1 text-xs dark:border-gray-700"
+                /&gt;
+              &lt;/div&gt;
+              &lt;button
+                type="button"
+                onClick={() =&gt; onDelete(link.id)}
+                aria-label="삭제"
+                className="shrink-0 self-start rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-gray-800"
+              &gt;
+                &lt;Trash2 size={14} /&gt;
+              &lt;/button&gt;
+            &lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+    &lt;/section&gt;
+  );
+}</code></pre>
+
+<div class="step">☐ <strong>Step 4.2:</strong> <code>src/app/stocks/[code]/page.tsx</code> 수정 — import 추가 (기존 <code>import { SectionNav }</code> 줄 아래):</div>
+<pre><code>import { SectionNav } from "./SectionNav";
+import { RelatedLinksCard } from "./RelatedLinksCard";
+import { listLinksByCode } from "@/actions/stock-links";</code></pre>
+
+<div class="step">☐ <strong>Step 4.3:</strong> 같은 파일 — 링크 데이터 로드. <code>contracts</code> 배열을 만드는 블록(<code>const contracts = ...</code>)이 끝난 직후, <code>return (</code> 위에 추가:</div>
+<pre><code>  const links = await listLinksByCode(code);
+</code></pre>
+
+<div class="step">☐ <strong>Step 4.4:</strong> 같은 파일 — <code>&lt;DisclosureTimeline ... /&gt;</code> 컴포넌트 닫힘 바로 다음 줄(같은 <code>&lt;div className="min-w-0 flex-1 space-y-6"&gt;</code> 안)에 카드 추가:</div>
+<pre><code>          &lt;DisclosureTimeline
+            earnings={earnings}
+            dividends={dividends}
+            ownership={ownership}
+            contracts={contracts}
+          /&gt;
+          &lt;RelatedLinksCard code={master.code} initialLinks={links} /&gt;</code></pre>
+
+<div class="step">☐ <strong>Step 4.5:</strong> <code>src/app/stocks/[code]/SectionNav.tsx</code> 수정 — <code>ITEMS</code> 배열 마지막에 항목 추가:</div>
+<pre><code>const ITEMS: Item[] = [
+  { id: "earnings", label: "실적", dotClass: "bg-indigo-500" },
+  { id: "dividends", label: "배당", dotClass: "bg-emerald-500" },
+  { id: "ownership", label: "지분", dotClass: "bg-amber-500" },
+  { id: "contracts", label: "계약", dotClass: "bg-cyan-500" },
+  { id: "links", label: "관련 링크", dotClass: "bg-rose-500" },
+];</code></pre>
+
+<div class="step">☐ <strong>Step 4.6:</strong> 타입 확인:</div>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+<p>Expected: <code>EXIT=0</code>.</p>
+
+<div class="step">☐ <strong>Step 4.7:</strong> 수동 검증 — dev 서버:</div>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter && yarn workspace company-map dev</code></pre>
+<p>브라우저에서 <code>http://localhost:3004/stocks/005930</code> (삼성전자) 접속 → 하단 "관련 링크" 섹션 확인. 뉴스 URL(예: 네이버 뉴스 기사) 붙여넣고 "추가" → 제목·출처·썸네일·"뉴스" 배지 표시, 새로고침해도 유지. 종류 배지 클릭 시 블로그↔뉴스 토글, 메모 입력 후 포커스 아웃 시 저장, 삭제 버튼 동작. 우측 SectionNav에 "관련 링크" 항목 표시 및 클릭 스크롤 확인. (확인 후 서버 종료)</p>
+
+<div class="step">☐ <strong>Step 4.8:</strong> 커밋:</div>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter
+git add apps/company-map/src/app/stocks/[code]/
+git commit -m "feat(company-map): 종목 상세에 관련 링크 섹션 추가"</code></pre>
+</div>
+
+<hr>
+
+<h2>Task 5 — 전종목 테이블 링크 존재 표시기</h2>
+<div class="task">
+<p class="files"><strong>Files:</strong> 수정 <code>src/actions/stocks-explorer.ts</code>, <code>src/app/stocks/StocksExplorerClient.tsx</code></p>
+
+<div class="step">☐ <strong>Step 5.1:</strong> <code>src/actions/stocks-explorer.ts</code> — <code>StocksExplorerRow</code> 인터페이스의 <code>hasMemo: boolean;</code> 줄 아래에 추가:</div>
+<pre><code>  hasMemo: boolean;
+  hasLinks: boolean;
+  manualRoe: number | null;</code></pre>
+<p>(<code>hasMemo</code>, <code>manualRoe</code>는 이미 존재 — 사이에 <code>hasLinks</code> 삽입)</p>
+
+<div class="step">☐ <strong>Step 5.2:</strong> 같은 파일 — <code>findMany</code>의 <code>include</code>에서 <code>_count</code> 줄을 다음으로 교체:</div>
+<pre><code>        _count: { select: { vipHoldings: true, links: true } },</code></pre>
+
+<div class="step">☐ <strong>Step 5.3:</strong> 같은 파일 — rows <code>.map</code> 안 <code>hasMemo: m.memo != null,</code> 줄 아래에 추가:</div>
+<pre><code>    hasMemo: m.memo != null,
+    hasLinks: m._count.links > 0,
+    manualRoe: m.override?.manualRoe ?? null,</code></pre>
+<p>(<code>hasMemo</code>, <code>manualRoe</code>는 이미 존재 — 사이에 <code>hasLinks</code> 삽입)</p>
+
+<div class="step">☐ <strong>Step 5.4:</strong> <code>src/app/stocks/StocksExplorerClient.tsx</code> — lucide import에 <code>Link2</code> 추가 (6번째 줄):</div>
+<pre><code>import { Filter, ChevronDown, ChevronUp, ExternalLink, FileText, Link2 } from "lucide-react";</code></pre>
+
+<div class="step">☐ <strong>Step 5.5:</strong> 같은 파일 — 행 이름 셀에서 "공시 history" <code>&lt;Link&gt;</code>(<code>FileText</code> 포함) 닫는 <code>&lt;/Link&gt;</code> 바로 다음에 표시기 추가:</div>
+<pre><code>                      &lt;Link
+                        href={`/stocks/${r.code}`}
+                        className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                        title="공시 history"
+                      &gt;
+                        &lt;FileText size={14} /&gt;
+                      &lt;/Link&gt;
+                      {r.hasLinks &amp;&amp; (
+                        &lt;Link
+                          href={`/stocks/${r.code}#links`}
+                          className="rounded p-0.5 text-rose-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          title="관련 링크 있음"
+                        &gt;
+                          &lt;Link2 size={14} /&gt;
+                        &lt;/Link&gt;
+                      )}</code></pre>
+<p>(앞 <code>&lt;Link ... 공시 history&gt;</code> 블록은 이미 존재 — 그 뒤에 <code>{r.hasLinks &amp;&amp; (...)}</code>만 삽입)</p>
+
+<div class="step">☐ <strong>Step 5.6:</strong> 타입 확인:</div>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx tsc --noEmit; echo "EXIT=$?"</code></pre>
+<p>Expected: <code>EXIT=0</code>.</p>
+
+<div class="step">☐ <strong>Step 5.7:</strong> 수동 검증 — dev 서버에서 <code>http://localhost:3004/stocks</code> 접속. Task 4에서 링크를 추가한 종목(예: 삼성전자) 행에 분홍색 링크 아이콘 표시, 클릭 시 상세 "관련 링크" 섹션으로 이동 확인. 링크 없는 종목엔 아이콘 미표시.</p>
+
+<div class="step">☐ <strong>Step 5.8:</strong> 전체 테스트 + 커밋:</div>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map && npx vitest run; echo "EXIT=$?"</code></pre>
+<p>Expected: 전체 통과, <code>EXIT=0</code>.</p>
+<pre><code>cd /Users/dijer/dev/workspace/fullstack-turborepo-starter
+git add apps/company-map/src/actions/stocks-explorer.ts apps/company-map/src/app/stocks/StocksExplorerClient.tsx
+git commit -m "feat(company-map): 전종목 테이블에 링크 존재 표시기 추가"</code></pre>
+</div>
+
+<hr>
+
+<h2>완료 기준</h2>
+<ul>
+  <li>종목 상세에서 URL 붙여넣기 → 제목·출처·썸네일 자동 채움, 종류·메모 편집·삭제 동작.</li>
+  <li>메타 추출 실패해도 URL은 항상 저장(빈 메타 + 호스트 출처).</li>
+  <li>전종목 테이블에서 링크 보유 종목에 표시기 노출, 클릭 시 상세 이동.</li>
+  <li><code>npx tsc --noEmit</code>·<code>npx vitest run</code> 모두 통과.</li>
+</ul>
+
+</body>
+</html>
