@@ -510,8 +510,9 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                       {r.hasLinks && (
                         <Link
                           href={`/stocks/${r.code}#links`}
-                          className="rounded p-0.5 text-rose-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          className="rounded p-0.5 text-rose-500 hover:bg-gray-100 hover:text-rose-600 dark:text-rose-400 dark:hover:bg-gray-800"
                           title="관련 링크 있음"
+                          aria-label="관련 링크 있음"
                         >
                           <Link2 size={14} />
                         </Link>
