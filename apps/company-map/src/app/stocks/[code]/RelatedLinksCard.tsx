@@ -9,6 +9,10 @@ import {
   type StockLinkView,
 } from "@/actions/stock-links";
 
+function toggleKind(k: StockLinkView["kind"]): StockLinkView["kind"] {
+  return k === "news" ? "blog" : "news";
+}
+
 export function RelatedLinksCard({
   code,
   initialLinks,
@@ -39,29 +43,53 @@ export function RelatedLinksCard({
   };
 
   const onToggleKind = (link: StockLinkView) => {
-    const next = link.kind === "news" ? "blog" : "news";
+    const next = toggleKind(link.kind);
     setLinks((prev) =>
       prev.map((l) => (l.id === link.id ? { ...l, kind: next } : l)),
     );
     startTransition(async () => {
-      await updateLink(link.id, { kind: next });
+      const rollback = () =>
+        setLinks((prev) =>
+          prev.map((l) => (l.id === link.id ? { ...l, kind: link.kind } : l)),
+        );
+      try {
+        const res = await updateLink(link.id, { kind: next });
+        if (!res) rollback();
+      } catch {
+        rollback();
+      }
     });
   };
 
   const onMemoBlur = (link: StockLinkView, memo: string) => {
     if (memo === (link.memo ?? "")) return;
+    const prevMemo = link.memo;
     setLinks((prev) =>
       prev.map((l) => (l.id === link.id ? { ...l, memo: memo || null } : l)),
     );
     startTransition(async () => {
-      await updateLink(link.id, { memo });
+      const rollback = () =>
+        setLinks((prev) =>
+          prev.map((l) => (l.id === link.id ? { ...l, memo: prevMemo } : l)),
+        );
+      try {
+        const res = await updateLink(link.id, { memo });
+        if (!res) rollback();
+      } catch {
+        rollback();
+      }
     });
   };
 
   const onDelete = (id: string) => {
+    const snapshot = links;
     setLinks((prev) => prev.filter((l) => l.id !== id));
     startTransition(async () => {
-      await deleteLink(id);
+      try {
+        await deleteLink(id);
+      } catch {
+        setLinks(snapshot);
+      }
     });
   };
 
