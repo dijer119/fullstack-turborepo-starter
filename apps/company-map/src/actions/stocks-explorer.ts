@@ -50,6 +50,7 @@ export interface StocksExplorerRow {
   tags: TagView[];
   pctChange3M: number | null;
   hasMemo: boolean;
+  hasLinks: boolean;
   manualRoe: number | null;
 }
 
@@ -173,7 +174,7 @@ export async function getStocksExplorer(
           take: 1,
           select: { rceptDt: true },
         },
-        _count: { select: { vipHoldings: true } },
+        _count: { select: { vipHoldings: true, links: true } },
         financialSnapshot: true,
         tags: { include: { tag: true } },
         priceChange: true,
@@ -215,6 +216,7 @@ export async function getStocksExplorer(
     tags: m.tags.map((t) => ({ id: t.tag.id, name: t.tag.name })),
     pctChange3M: m.priceChange?.pctChange ?? null,
     hasMemo: m.memo != null,
+    hasLinks: m._count.links > 0,
     manualRoe: m.override?.manualRoe ?? null,
   }));
 

@@ -3,7 +3,7 @@
 import React, { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Filter, ChevronDown, ChevronUp, ExternalLink, FileText } from "lucide-react";
+import { Filter, ChevronDown, ChevronUp, ExternalLink, FileText, Link2 } from "lucide-react";
 import type {
   MarketFilter,
   StocksExplorerRow,
@@ -507,6 +507,15 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                       >
                         <FileText size={14} />
                       </Link>
+                      {r.hasLinks && (
+                        <Link
+                          href={`/stocks/${r.code}#links`}
+                          className="rounded p-0.5 text-rose-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          title="관련 링크 있음"
+                        >
+                          <Link2 size={14} />
+                        </Link>
+                      )}
                       <a
                         href={`https://finance.naver.com/item/main.naver?code=${r.code}`}
                         target="_blank"
