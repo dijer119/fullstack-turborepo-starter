@@ -15,6 +15,7 @@ const LABELS: Record<RefreshKind, { name: string; estimate: string }> = {
   operating_income: { name: "영업이익 시계열", estimate: "~60분" },
   trade: { name: "수출입 동향", estimate: "~3분" },
   price_changes: { name: "3개월 주가변동", estimate: "~45분" },
+  ncav_financials: { name: "NCAV·재무제표", estimate: "~수십분" },
 };
 
 const POLL_MS = 3000;

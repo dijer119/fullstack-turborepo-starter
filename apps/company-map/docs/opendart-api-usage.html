@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenDART API 호출 기능 인벤토리</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.9em; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; vertical-align: top; }
+  ul { padding-left: 1.4rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .weight-high { color: #c53030; font-weight: 600; }
+  .weight-mid { color: #b7791f; font-weight: 600; }
+  .weight-low { color: #2f855a; }
+  .meta { color: #718096; font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<h1>OpenDART API를 호출하는 기능 인벤토리</h1>
+<p class="meta">대상: <code>fullstack-turborepo-starter/apps/company-map</code> + 공유 키 소비자 · 조사일 2026-05-30</p>
+
+<blockquote>
+일일 한도(기본 <strong>20,000건/일</strong>)를 소비하는 것은 <code>crtfc_key</code>를 쓰는 <strong>OpenDART API(<code>opendart.fss.or.kr/api/*</code>)</strong> 호출뿐입니다.
+공시 <strong>원문 뷰어</strong>(<code>dart.fss.or.kr/dsaf001</code>, <code>/report/viewer.do</code>) 스크래핑은 키를 쓰지 않아 한도와 무관합니다.
+<br><strong>중요:</strong> company-map 앱과 DART MCP 서버가 <strong>같은 키(<code>51cdca36…a9f4</code>)를 공유</strong>해 동일한 2만 건 풀을 나눠 씁니다.
+</blockquote>
+
+<h2>1. company-map — OpenDART API 호출 라이브러리</h2>
+<p><code>src/lib/dart/</code>의 저수준 호출부. 각 함수가 특정 OpenDART 엔드포인트를 호출합니다.</p>
+<table>
+  <thead><tr><th>파일 · 함수</th><th>엔드포인트</th><th>용도</th></tr></thead>
+  <tbody>
+    <tr><td><code>list.ts · fetchDartList</code></td><td><code>list.json</code></td><td>공시 목록 검색(유형별)</td></tr>
+    <tr><td><code>disclosure-list.ts</code></td><td><code>list.json</code></td><td>공시 목록(별도 경로)</td></tr>
+    <tr><td><code>financial.ts · fetchDartFinancial / getLatestFinancial</code></td><td><code>fnlttSinglAcnt.json</code></td><td>단일회사 재무제표</td></tr>
+    <tr><td><code>alotMatter.ts · fetchAlotMatter</code></td><td><code>alotMatter.json</code></td><td>배당 상세</td></tr>
+    <tr><td><code>elestock.ts · buildElestockMap</code></td><td><code>elestock.json</code></td><td>임원·주요주주 소유</td></tr>
+    <tr><td><code>major-stock.ts · fetchMajorStockByCorp</code><br><code>majorstock-detail.ts · buildMajorstockMap</code></td><td><code>majorstock.json</code></td><td>대량보유(5%) 상황</td></tr>
+    <tr><td><code>corp-code.ts · loadCorpCodeMap</code></td><td><code>corpCode.xml</code></td><td>고유번호(corp_code) 매핑(대용량 zip)</td></tr>
+  </tbody>
+</table>
+
+<h2>2. company-map — 이를 호출하는 기능(진입점)</h2>
+<table>
+  <thead><tr><th>기능 / 진입점</th><th>호출 경로</th><th>호출 엔드포인트</th><th>한도 소비</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>종목 상세 "공시 갱신" 버튼</strong><br><span class="meta">/stocks/[code], RefreshButton</span></td>
+      <td><code>src/actions/disclosures.ts · fetchDisclosuresForStock</code> → 실적/지분/배당/계약 4 fetcher</td>
+      <td><code>list.json</code> ×다수 + <code>alotMatter</code> + <code>elestock</code> + <code>majorstock</code></td>
+      <td class="weight-mid">종목당 수~수십 콜</td>
+    </tr>
+    <tr>
+      <td><strong>백그라운드 worker — NCAV 스크리닝</strong><br><span class="meta">worker/index.ts → ncav-loop.ts</span></td>
+      <td><code>getLatestFinancial</code>(재무) + <code>loadCorpCodeMap</code></td>
+      <td><code>fnlttSinglAcnt.json</code>, <code>corpCode.xml</code></td>
+      <td class="weight-high">전종목 배치 — 대량</td>
+    </tr>
+    <tr>
+      <td><strong>VIP/대량보유 갱신</strong></td>
+      <td><code>src/lib/dart/vip-holdings.ts · fetchMajorStockByCorp</code> + corpCode</td>
+      <td><code>majorstock.json</code>, <code>corpCode.xml</code></td>
+      <td class="weight-mid">다수 종목</td>
+    </tr>
+    <tr>
+      <td><strong>영업이익 이력 / 실적 payload</strong></td>
+      <td><code>operating-income.ts</code>, <code>earnings-payload.ts</code> → <code>getLatestFinancial</code></td>
+      <td><code>fnlttSinglAcnt.json</code></td>
+      <td class="weight-mid">종목·연도별</td>
+    </tr>
+    <tr>
+      <td><strong>corp_code 매핑 갱신</strong></td>
+      <td><code>corp-code.ts · loadCorpCodeMap</code></td>
+      <td><code>corpCode.xml</code></td>
+      <td class="weight-low">1회(대용량 zip)</td>
+    </tr>
+    <tr>
+      <td><strong>일회성 스크립트</strong><br><span class="meta">scripts/</span></td>
+      <td><code>enrich-market-from-dart.ts</code>(list.json), <code>refresh-operating-income.ts</code>, <code>refresh-005930.ts</code>, <code>smoke-dart.ts</code> 등</td>
+      <td>list/financial/majorstock 등</td>
+      <td class="weight-mid">실행 시 종목 수만큼</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>3. DART MCP 서버 (같은 키 공유)</h2>
+<p>
+<code>dart.log</code> 확인 결과 <strong>동일 키(<code>51cdca36…</code>)</strong>로 <code>corpCode.xml</code>, <code>fnlttSinglAcntAll.json</code>(전체 재무제표 — 무거움), <code>list.json</code>을 호출합니다.
+이 세션에서 쓰는 다음 도구들이 company-map과 <strong>같은 2만 건 풀</strong>을 소비합니다:
+</p>
+<ul>
+  <li><code>mcp__DART__get_disclosurelist</code> / <code>get_disclosure</code> → <code>list.json</code> 등</li>
+  <li><code>mcp__DART__get_complete_financial_statements</code> / <code>get_xbrl_financial_statements</code> → <code>fnlttSinglAcntAll.json</code> (호출당 무거움)</li>
+  <li><code>mcp__DART__get_single_company_key_indicators</code>, 각종 채권/증자 발행 조회 도구</li>
+  <li><code>mcp__DART__get_corpcode</code> / <code>update_corplist</code> → <code>corpCode.xml</code></li>
+</ul>
+<p>→ 모닝브리프·산업분석 보고서를 만들 때 이 MCP 도구를 다수 호출하면 한도가 빠르게 소진됩니다(오늘 <code>020</code>의 유력 원인).</p>
+
+<h2>4. 한도와 무관 (참고)</h2>
+<ul>
+  <li><code>dart.fss.or.kr</code> 공시 원문 뷰어 스크래핑: <code>contract-detail.ts</code>(계약 상세), <code>OwnershipCard</code>/<code>ContractCard</code>의 링크, <code>vip-holdings.ts</code>의 <code>dartUrl</code> — <code>crtfc_key</code> 미사용이라 일일한도와 무관.</li>
+</ul>
+
+<h2>5. 한도 절약 팁</h2>
+<ul>
+  <li>가장 큰 소비처는 <strong>worker NCAV 전종목 배치</strong>와 <strong>MCP 전체 재무제표 조회</strong>. 빈도/범위를 줄이거나 결과를 캐싱(이미 DB에 저장하는 구조이므로 재호출 회피).</li>
+  <li>"공시 갱신"은 이미 DB에 있으면 재fetch하지 않도록 가드돼 있음(상세 페이지). 강제 갱신 남발 자제.</li>
+  <li>company-map과 MCP에 <strong>키를 분리</strong>하면 한쪽이 다른 쪽 한도를 잠식하지 않음.</li>
+  <li>필요 시 OpenDART에 <strong>사용한도 증량 신청</strong>.</li>
+</ul>
+
+</body>
+</html>

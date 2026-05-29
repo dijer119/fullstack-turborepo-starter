@@ -32,11 +32,9 @@ async function backgroundUpdate() {
       await analyzeAllStocks({ shouldStop: () => shuttingDown });
       if (shuttingDown) break;
 
-      try {
-        await runNcavScreening();
-      } catch (err) {
-        console.error("[worker] NCAV screening error:", err);
-      }
+      // NCAV·재무제표 배치(runNcavScreening)는 전종목 DART fnlttSinglAcnt 호출로
+      // 일일 사용한도를 크게 소비하므로 자동 루프에서 제외했다.
+      // /stocks "데이터 업데이트" 메뉴에서 수동 실행한다 (refresh kind: ncav_financials).
 
       try {
         await tradeSyncTick();
