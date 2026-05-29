@@ -109,13 +109,13 @@ export default async function StockDetailPage({
             pbr={master.analysis?.pbr ?? null}
             manualRoe={master.override?.manualRoe ?? null}
           />
+          <RelatedLinksCard code={master.code} initialLinks={links} />
           <DisclosureTimeline
             earnings={earnings}
             dividends={dividends}
             ownership={ownership}
             contracts={contracts}
           />
-          <RelatedLinksCard code={master.code} initialLinks={links} />
         </div>
         <SectionNav />
       </div>
