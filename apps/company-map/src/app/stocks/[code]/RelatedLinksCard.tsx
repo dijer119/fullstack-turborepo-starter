@@ -134,6 +134,7 @@ export function RelatedLinksCard({
                 <img
                   src={link.imageUrl}
                   alt=""
+                  referrerPolicy="no-referrer"
                   className="h-16 w-16 shrink-0 rounded object-cover"
                 />
               )}
