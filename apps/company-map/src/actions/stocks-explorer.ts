@@ -2,6 +2,7 @@
 
 import { Prisma } from "@prisma-clients/company-map";
 import type { TagView } from "./tags";
+import type { Grade } from "./ratings";
 import { db } from "@/lib/db";
 
 export type MarketFilter = "ALL" | "KOSPI" | "KOSDAQ";
@@ -27,6 +28,7 @@ export interface StocksExplorerParams {
   vipOnly?: boolean;
   memoOnly?: boolean;
   tagIds?: number[];
+  grades?: Grade[];
 }
 
 export interface StocksExplorerRow {
@@ -52,6 +54,7 @@ export interface StocksExplorerRow {
   hasMemo: boolean;
   hasLinks: boolean;
   manualRoe: number | null;
+  grade: Grade | null;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -118,6 +121,10 @@ export async function getStocksExplorer(
     where.memo = { isNot: null };
   }
 
+  if (params.grades && params.grades.length > 0) {
+    where.rating = { is: { grade: { in: params.grades } } };
+  }
+
   if (params.tagIds && params.tagIds.length > 0) {
     where.AND = params.tagIds.map((tagId) => ({
       tags: { some: { tagId } },
@@ -180,6 +187,7 @@ export async function getStocksExplorer(
         priceChange: true,
         memo: { select: { code: true } },
         override: true,
+        rating: { select: { grade: true } },
       },
       orderBy,
       skip: (page - 1) * pageSize,
@@ -218,6 +226,7 @@ export async function getStocksExplorer(
     hasMemo: m.memo != null,
     hasLinks: m._count.links > 0,
     manualRoe: m.override?.manualRoe ?? null,
+    grade: (m.rating?.grade as Grade | undefined) ?? null,
   }));
 
   return { rows, total };

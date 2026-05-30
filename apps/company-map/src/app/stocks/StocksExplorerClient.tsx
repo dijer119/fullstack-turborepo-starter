@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Filter, ChevronDown, ChevronUp, ExternalLink, FileText, Link2 } from "lucide-react";
@@ -22,6 +23,7 @@ import {
   type TagView,
 } from "@/actions/tags";
 import { getMemoByCode, setMemo } from "@/actions/memos";
+import { setRating, type Grade } from "@/actions/ratings";
 import { RoeCell } from "./RoeCell";
 
 export interface StocksExplorerView {
@@ -35,6 +37,7 @@ export interface StocksExplorerView {
   vipOnly: boolean;
   memoOnly: boolean;
   tagIds: number[];
+  grades: Grade[];
   sort: StocksSort;
   page: number;
   pageSize: number;
@@ -59,10 +62,22 @@ function buildQuery(view: Partial<StocksExplorerView>): string {
   if (view.vipOnly) qs.set("vip", "1");
   if (view.memoOnly) qs.set("memo", "1");
   if (view.tagIds && view.tagIds.length > 0) qs.set("tags", view.tagIds.join(","));
+  if (view.grades && view.grades.length > 0) qs.set("grades", view.grades.join(","));
   if (view.sort && view.sort !== "marcap_desc") qs.set("sort", view.sort);
   if (view.page && view.page > 1) qs.set("page", String(view.page));
   return qs.toString();
 }
+
+// 등급(상/중/하) 신호등 색상·라벨. 미지정은 회색.
+const GRADE_DOT: Record<Grade, string> = {
+  high: "bg-green-500",
+  mid: "bg-amber-400",
+  low: "bg-red-500",
+};
+const GRADE_LABEL: Record<Grade, string> = { high: "상", mid: "중", low: "하" };
+const GRADE_OPTIONS: Grade[] = ["high", "mid", "low"];
+// 클릭 순환 순서: 미지정 → 상 → 중 → 하 → 미지정
+const GRADE_CYCLE: (Grade | null)[] = [null, "high", "mid", "low"];
 
 function pct(v: number | null): string {
   if (v == null) return "—";
@@ -158,7 +173,8 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
       view.analyzedOnly ||
       view.vipOnly ||
       view.memoOnly ||
-      view.tagIds.length > 0,
+      view.tagIds.length > 0 ||
+      view.grades.length > 0,
   );
 
   // 폼 로컬 상태 (제출 전까지는 URL 미반영)
@@ -179,6 +195,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
   const [vipOnly, setVipOnly] = useState(view.vipOnly);
   const [memoOnly, setMemoOnly] = useState(view.memoOnly);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>(view.tagIds);
+  const [selectedGrades, setSelectedGrades] = useState<Grade[]>(view.grades);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [vipDetails, setVipDetails] = useState<Record<string, VipHoldingDetailRow[]>>({});
   const [vipLoading, setVipLoading] = useState<Set<string>>(new Set());
@@ -228,6 +245,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
       vipOnly,
       memoOnly,
       tagIds: selectedTagIds,
+      grades: selectedGrades,
       page: 1,
     });
   };
@@ -242,6 +260,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
     setVipOnly(false);
     setMemoOnly(false);
     setSelectedTagIds([]);
+    setSelectedGrades([]);
     startTransition(() => router.replace("/stocks"));
   };
 
@@ -392,6 +411,37 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
             />
             <span>메모 있는 종목만</span>
           </label>
+          <div className="md:col-span-2 lg:col-span-3">
+            <div className="mb-1 text-xs text-gray-600 dark:text-gray-400">
+              등급 (선택 등급만 · AND):
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {GRADE_OPTIONS.map((g) => {
+                const active = selectedGrades.includes(g);
+                return (
+                  <button
+                    type="button"
+                    key={g}
+                    onClick={() =>
+                      setSelectedGrades(
+                        active
+                          ? selectedGrades.filter((x) => x !== g)
+                          : [...selectedGrades, g],
+                      )
+                    }
+                    className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs ${
+                      active
+                        ? "bg-blue-600 text-white"
+                        : "border border-gray-300 hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <span className={`inline-block h-2 w-2 rounded-full ${GRADE_DOT[g]}`} />
+                    {GRADE_LABEL[g]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           {allTags.length > 0 && (
             <div className="md:col-span-2 lg:col-span-3">
               <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
@@ -499,6 +549,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                 >
                   <td className="sticky left-0 z-10 bg-white p-2 font-medium group-hover:bg-gray-50 dark:bg-gray-950 dark:group-hover:bg-gray-900/50">
                     <div className="flex items-center gap-1.5">
+                      <RatingDot stockCode={r.code} initialGrade={r.grade} />
                       <MemoButton stockCode={r.code} initialHasMemo={r.hasMemo} />
                       <Link
                         href={`/stocks/${r.code}`}
@@ -836,6 +887,47 @@ function TagCell({
   );
 }
 
+// 종목명 셀 맨 왼쪽 등급 점. 클릭 시 미지정→상→중→하→미지정 순환 (신호등 색).
+function RatingDot({
+  stockCode,
+  initialGrade,
+}: {
+  stockCode: string;
+  initialGrade: Grade | null;
+}) {
+  const [grade, setGrade] = useState<Grade | null>(initialGrade);
+  const [saving, setSaving] = useState(false);
+
+  const cycle = () => {
+    const prev = grade;
+    const idx = GRADE_CYCLE.indexOf(prev);
+    const next = GRADE_CYCLE[(idx + 1) % GRADE_CYCLE.length];
+    setGrade(next);
+    setSaving(true);
+    setRating(stockCode, next)
+      .then((r) => setGrade(r.grade))
+      .catch(() => setGrade(prev))
+      .finally(() => setSaving(false));
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={cycle}
+      disabled={saving}
+      aria-label={grade ? `등급 ${GRADE_LABEL[grade]}` : "등급 미지정"}
+      title={grade ? `등급: ${GRADE_LABEL[grade]} (클릭하여 변경)` : "등급 지정 (클릭)"}
+      className="inline-flex items-center justify-center rounded p-0.5"
+    >
+      <span
+        className={`inline-block h-3 w-3 rounded-full ${
+          grade ? GRADE_DOT[grade] : "bg-gray-300 dark:bg-gray-600"
+        }`}
+      />
+    </button>
+  );
+}
+
 function MemoButton({
   stockCode,
   initialHasMemo,
@@ -904,13 +996,15 @@ function MemoButton({
       >
         <FileText size={14} fill={hasMemo ? "currentColor" : "none"} />
       </button>
-      {open && pos && (
-        <>
-          <div
-            className="fixed inset-0 z-30"
-            onClick={closePopover}
-            aria-hidden
-          />
+      {open &&
+        pos &&
+        createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-30"
+              onClick={closePopover}
+              aria-hidden
+            />
           <div
             className="fixed z-40 w-72 rounded-md border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-900"
             style={{ top: pos.top, left: pos.left }}
@@ -958,8 +1052,9 @@ function MemoButton({
               </>
             )}
           </div>
-        </>
-      )}
+          </>,
+          document.body,
+        )}
     </>
   );
 }

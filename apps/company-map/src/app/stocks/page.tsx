@@ -3,6 +3,7 @@ import {
   type MarketFilter,
   type StocksSort,
 } from "@/actions/stocks-explorer";
+import type { Grade } from "@/actions/ratings";
 import { StocksExplorerClient, type StocksExplorerView } from "./StocksExplorerClient";
 import { listRefreshStates } from "@/actions/refresh-jobs";
 import { listTags } from "@/actions/tags";
@@ -41,6 +42,11 @@ export default async function StocksPage({
     .map((s) => Number(s.trim()))
     .filter((n) => Number.isFinite(n) && n > 0);
 
+  const grades = (sp.grades ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((g): g is Grade => g === "high" || g === "mid" || g === "low");
+
   const view: StocksExplorerView = {
     market,
     search: sp.search ?? "",
@@ -52,6 +58,7 @@ export default async function StocksPage({
     vipOnly: sp.vip === "1",
     memoOnly: sp.memo === "1",
     tagIds,
+    grades,
     sort,
     page,
     pageSize: 50,

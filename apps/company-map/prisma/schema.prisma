@@ -70,6 +70,7 @@ model StockMaster {
   override              StockOverride?
   disclosures           Disclosure[]
   links                 StockLink[]
+  rating                StockRating?
 
   @@index([name])
   @@index([market])
@@ -291,4 +292,15 @@ model StockLink {
   @@unique([code, url])
   @@index([code, createdAt])
   @@map("stock_links")
+}
+
+model StockRating {
+  code      String   @id
+  grade     String   // "high"=상 | "mid"=중 | "low"=하
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  master    StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+
+  @@index([grade])
+  @@map("stock_ratings")
 }
