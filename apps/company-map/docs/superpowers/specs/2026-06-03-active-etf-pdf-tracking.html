@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>액티브 ETF 구성종목·비중 변화 추적 — Design Spec</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+    h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+    h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+    h3 { color: #2c5282; margin-top: 1.5rem; }
+    pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+    table th { background: #edf2f7; text-align: left; }
+    table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+    ul, ol { padding-left: 1.5rem; }
+    li { margin: 0.2rem 0; }
+    blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+
+<h1>액티브 ETF 구성종목·비중 변화 추적 — Design Spec</h1>
+
+<p><strong>Date:</strong> 2026-06-03</p>
+<p><strong>Scope:</strong> <code>/stocks</code>(전종목 조회) 하위에 <code>/stocks/etf</code> 페이지 신설. 관심 ETF를 코드로 등록하면 worker가 매 영업일 KRX PDF(구성종목·비중)를 스냅샷으로 저장하고, ETF 선택 시 <strong>최신 스냅샷을 직전 스냅샷과 비교</strong>해 비중 상위 10종목의 신규 진입·이탈·비중 증감을 보여준다.</p>
+
+<h2>Goals</h2>
+<ul>
+  <li>관심 ETF(예: 액티브 ETF <code>0074K0</code>)의 구성종목과 비중을 한눈에 확인.</li>
+  <li>직전 영업일 대비 <strong>구성종목·비중 변화</strong>(신규 편입 / 이탈 / 비중 증감 %p)를 시각적으로 표시.</li>
+  <li>worker 자동 일별 수집으로 변화 이력이 별도 조작 없이 누적.</li>
+</ul>
+
+<h2>Non-Goals</h2>
+<ul>
+  <li>액티브 ETF 전체/전체 ETF 자동 추적 — YAGNI. 사용자가 등록한 관심 ETF만 다룬다.</li>
+  <li>임의 두 날짜 비교, 기간(N일) 비교 — 직전 스냅샷 대비만. (추후 확장 여지)</li>
+  <li>비중 상위 10위 밖 종목 저장 — 스냅샷당 상위 10종목만 저장.</li>
+  <li>Naver 페이지 스크래핑 — 데이터 소스는 KRX MDC.</li>
+</ul>
+
+<h2>Decisions (확정된 요구사항)</h2>
+<table>
+  <tr><th>항목</th><th>결정</th></tr>
+  <tr><td>ETF 범위</td><td>관심 ETF만 등록 (watchlist)</td></tr>
+  <tr><td>데이터 소스</td><td>KRX MDC (ETF PDF)</td></tr>
+  <tr><td>수집 주기</td><td>worker 자동 일별 + 수동 갱신 버튼</td></tr>
+  <tr><td>비교 기준</td><td>직전 스냅샷 대비</td></tr>
+  <tr><td>저장 데이터 모델</td><td>정규화 테이블 (EtfWatch / EtfPdfSnapshot / EtfPdfHolding)</td></tr>
+  <tr><td>배치 위치</td><td><code>/stocks/etf</code> 중첩 라우트</td></tr>
+  <tr><td>스냅샷당 저장 종목 수</td><td>비중 내림차순 <strong>상위 10종목</strong>만</td></tr>
+</table>
+
+<h2>데이터 모델 (Prisma · SQLite)</h2>
+<p>company-map 전용 SQLite + 별도 Prisma 클라이언트(<code>@prisma-clients/company-map</code>)에 테이블 3개 추가. 마이그레이션 후 <code>prisma generate</code> 필요.</p>
+<pre><code>model EtfWatch {
+  code      String   @id            // KRX 단축코드 (예: "0074K0")
+  isin      String?  @map("isin")   // KRX 표준코드/ISIN (등록 시 1회 해석)
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  snapshots EtfPdfSnapshot[]
+  @@map("etf_watches")
+}
+
+model EtfPdfSnapshot {
+  id        String   @id @default(uuid())
+  etfCode   String   @map("etf_code")
+  trdDd     String   @map("trd_dd")     // 기준일 yyyymmdd
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  watch     EtfWatch       @relation(fields: [etfCode], references: [code], onDelete: Cascade)
+  holdings  EtfPdfHolding[]
+
+  @@unique([etfCode, trdDd])
+  @@index([etfCode, trdDd])
+  @@map("etf_pdf_snapshots")
+}
+
+model EtfPdfHolding {
+  id              String  @id @default(uuid())
+  snapshotId      String  @map("snapshot_id")
+  constituentCode String  @map("constituent_code")
+  constituentName String  @map("constituent_name")
+  weight          Float?                              // 비중 %
+  shares          Float?                              // 주식수/계약수
+  amount          Float?                              // 평가금액(원)
+
+  snapshot        EtfPdfSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  @@index([snapshotId])
+  @@map("etf_pdf_holdings")
+}</code></pre>
+<p>스냅샷당 <code>EtfPdfHolding</code>은 비중 상위 10행으로 제한한다.</p>
+
+<h2>데이터 파이프라인</h2>
+<h3>KRX 연동 (<code>worker/fetch-krx-etf.ts</code>)</h3>
+<p>기존 <code>worker/fetch-krx.ts</code>의 헤더·세션·<code>lastBusinessDay()</code> 패턴을 재사용한다.</p>
+<ul>
+  <li><code>resolveEtfIsin(code)</code> — ETF 전종목 목록(MDCSTAT04601 계열)에서 단축코드 → ISIN 해석. ETF 등록 시 1회 호출.</li>
+  <li><code>fetchEtfPdf(isin, trdDd)</code> — 해당 ETF의 PDF 구성종목(MDCSTAT05001 계열) 호출 → 종목코드·명·비중·주식수·평가금액 행 파싱.</li>
+</ul>
+<blockquote>
+  <strong>⚠️ KRX 엔드포인트 검증 한계 / OPEN ITEM:</strong> 설계 세션의 네트워크에서는 KRX가 IP를 차단(<code>LOGOUT</code> 400)하여 worker가 쓰는 기존 엔드포인트(MDCSTAT01501)조차 직접 호출하지 못했다. 이는 엔드포인트 문제가 아니라 환경 차단이며, company-map worker는 실제 런타임에서 KRX를 정상 호출 중이다. 따라서 <strong>새 ETF 목록/PDF 엔드포인트의 정확한 <code>bld</code> 값과 파라미터, 응답 필드명은 구현 단계에서 앱 런타임(worker 또는 일회성 tsx 스크립트)으로 확정</strong>하고, 실제 응답을 픽스처로 저장해 파서 단위 테스트를 작성한다.
+</blockquote>
+
+<h3>스냅샷 수집 (<code>worker/etf-pdf-loop.ts</code>)</h3>
+<ul>
+  <li>각 <code>EtfWatch</code>에 대해 최신 영업일 PDF를 가져와 <code>(etfCode, trdDd)</code> upsert.</li>
+  <li>해당 기준일 스냅샷이 이미 있으면 <strong>skip</strong> — 2분 worker 루프가 같은 날 중복 수집하지 않게 한다.</li>
+  <li>저장 시 비중 내림차순 정렬 후 <strong>상위 10종목만</strong> <code>EtfPdfHolding</code>으로 기록.</li>
+  <li>worker 메인 루프(<code>worker/index.ts</code>)에 추가. 관심 ETF가 소수라 부하가 가벼워 NCAV 배치와 달리 자동 루프에 포함 가능.</li>
+</ul>
+
+<h3>수동 갱신</h3>
+<ul>
+  <li><code>refresh-jobs</code>에 <code>kind: "etf_pdf"</code> 추가 → <code>/stocks/etf</code>의 "구성종목 갱신" 버튼에서 즉시 실행.</li>
+</ul>
+
+<h2>변화 계산 (순수 함수)</h2>
+<p><code>diffHoldings(latest, prev)</code> — 최신·직전 스냅샷의 상위 10 holdings를 비교해 종목별 변화 산출. UI·테스트에서 공용.</p>
+<pre><code>interface HoldingChange {
+  constituentCode: string;
+  constituentName: string;
+  weight: number | null;          // 최신 비중
+  weightDelta: number | null;     // %p (최신 - 직전), 신규면 null/+전체
+  shares: number | null;
+  sharesDelta: number | null;
+  status: "신규" | "유지" | "이탈"; // Top10 기준
+}</code></pre>
+<ul>
+  <li>비중 내림차순 정렬. <strong>이탈</strong> 종목(직전 Top10에 있었으나 최신 Top10에 없음)은 테이블 하단에 별도 표기.</li>
+  <li><strong>라벨 의미</strong>: 상위 10종목만 저장하므로 "신규/이탈"은 <em>ETF 전체 편입·편출이 아니라 비중 상위 10위 진입·이탈</em>을 뜻한다. UI 라벨은 <code>신규(Top10 진입)</code> / <code>이탈(Top10 밖)</code>로 명시한다.</li>
+</ul>
+
+<h2>UI (<code>/stocks/etf</code>)</h2>
+<ul>
+  <li><strong>등록 영역</strong>: 코드 입력으로 ETF 추가 / 삭제. 추가 시 ISIN 해석 + 즉시 1회 스냅샷 수집.</li>
+  <li><strong>ETF 선택 → 구성종목 변화 테이블</strong>: 컬럼 = <code>종목명 · 비중 · 비중Δ(%p, 증가 녹색/감소 빨강) · 상태(신규🟢/이탈🔴) · 주식수 · 주식수Δ</code>. 상단에 <code>기준일 vs 직전일</code> 표기.</li>
+  <li><strong>"구성종목 갱신" 버튼</strong> (수동 트리거, 기존 RefreshButton/RefreshMenu 패턴).</li>
+  <li>전종목 조회 페이지·메뉴(AppMenu/ActiveNav)에서 진입 링크 추가.</li>
+</ul>
+
+<h2>에러 처리 / 엣지 케이스</h2>
+<ul>
+  <li>KRX 호출 실패: 스냅샷 미생성(기존 데이터 유지), 화면에 경고 표시. 개별 ETF 실패가 다른 ETF 수집을 막지 않는다.</li>
+  <li>스냅샷이 1개뿐(직전 없음): 변화 없이 현재 구성만 표시("비교할 직전 데이터 없음").</li>
+  <li>신규 ETF 등록 직후: 당일 스냅샷만 존재 → 위와 동일 처리.</li>
+  <li>단축코드 → ISIN 해석 실패: 등록 거부 + 에러 메시지.</li>
+</ul>
+
+<h2>테스트 (Vitest)</h2>
+<ul>
+  <li><code>diffHoldings</code> 순수 함수: 신규 진입 / 이탈 / 비중 증감 / 주식수 증감 케이스.</li>
+  <li>KRX PDF 파서: 실제 응답 픽스처 기반 파싱 테스트(구현 시 앱 런타임에서 캡처).</li>
+  <li>상위 10 제한 로직: 11개 이상 입력 시 비중 상위 10만 저장되는지.</li>
+</ul>
+
+<h2>구현 영향 파일 (요약)</h2>
+<table>
+  <tr><th>파일</th><th>변경</th></tr>
+  <tr><td><code>prisma/schema.prisma</code></td><td>EtfWatch / EtfPdfSnapshot / EtfPdfHolding 추가 + migrate/generate</td></tr>
+  <tr><td><code>worker/fetch-krx-etf.ts</code> (신규)</td><td>KRX ETF 목록·PDF fetch/파싱</td></tr>
+  <tr><td><code>worker/etf-pdf-loop.ts</code> (신규)</td><td>관심 ETF 일별 스냅샷 수집(상위 10, 중복 skip)</td></tr>
+  <tr><td><code>worker/index.ts</code></td><td>루프에 etf-pdf-loop 추가</td></tr>
+  <tr><td><code>src/lib/etf/diff.ts</code> (신규)</td><td><code>diffHoldings</code> 순수 함수 + 테스트</td></tr>
+  <tr><td><code>src/actions/etf.ts</code> (신규)</td><td>등록/삭제/조회/수동갱신 Server Actions</td></tr>
+  <tr><td><code>src/app/stocks/etf/</code> (신규)</td><td>페이지 + 등록/테이블/갱신 컴포넌트</td></tr>
+  <tr><td><code>refresh-jobs</code> 관련</td><td><code>kind: "etf_pdf"</code> 추가</td></tr>
+  <tr><td>AppMenu/ActiveNav · 전종목 조회 페이지</td><td>진입 링크</td></tr>
+</table>
+
+</body>
+</html>
