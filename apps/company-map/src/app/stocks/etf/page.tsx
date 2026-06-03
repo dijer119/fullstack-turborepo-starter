@@ -1,0 +1,26 @@
+import Link from "next/link";
+import { listEtfWatches, getEtfDetail } from "@/actions/etf";
+import { EtfManager } from "./EtfManager";
+
+export const dynamic = "force-dynamic";
+
+export default async function EtfPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>;
+}) {
+  const { code } = await searchParams;
+  const watches = await listEtfWatches();
+  const selected = code ?? watches[0]?.code ?? null;
+  const detail = selected ? await getEtfDetail(selected) : null;
+
+  return (
+    <main className="mx-auto max-w-5xl px-4 py-6">
+      <Link href="/stocks" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
+        ← 전종목 조회
+      </Link>
+      <h1 className="mt-4 mb-4 text-xl font-bold">액티브 ETF 구성종목 변화</h1>
+      <EtfManager watches={watches} selected={selected} detail={detail} />
+    </main>
+  );
+}
