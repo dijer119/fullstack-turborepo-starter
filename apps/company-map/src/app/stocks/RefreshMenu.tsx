@@ -16,6 +16,7 @@ const LABELS: Record<RefreshKind, { name: string; estimate: string }> = {
   trade: { name: "수출입 동향", estimate: "~3분" },
   price_changes: { name: "3개월 주가변동", estimate: "~45분" },
   ncav_financials: { name: "NCAV·재무제표", estimate: "~수십분" },
+  etf_pdf: { name: "ETF PDF 스냅샷", estimate: "~수분" },
 };
 
 const POLL_MS = 3000;

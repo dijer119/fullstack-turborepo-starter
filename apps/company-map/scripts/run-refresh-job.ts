@@ -6,7 +6,7 @@ config({ path: path.resolve(__dirname, "..", ".env") });
 import { spawnSync } from "node:child_process";
 import { db } from "../worker/db";
 
-type Kind = "krx_stocks" | "vip_holdings" | "operating_income" | "trade" | "price_changes" | "ncav_financials";
+type Kind = "krx_stocks" | "vip_holdings" | "operating_income" | "trade" | "price_changes" | "ncav_financials" | "etf_pdf";
 
 const SCRIPTS: Record<Kind, string[]> = {
   krx_stocks: ["scripts/regenerate-krx-stocks.ts", "scripts/smoke-load-krx.ts"],
@@ -15,6 +15,7 @@ const SCRIPTS: Record<Kind, string[]> = {
   trade: ["scripts/ingest-trade.ts"],
   price_changes: ["scripts/refresh-price-changes.ts"],
   ncav_financials: ["scripts/refresh-ncav.ts"],
+  etf_pdf: ["scripts/refresh-etf-pdf.ts"],
 };
 
 (async () => {
