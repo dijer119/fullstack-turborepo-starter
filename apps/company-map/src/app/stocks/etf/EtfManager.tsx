@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { registerEtf, removeEtf, type EtfWatchView, type EtfDetailView } from "@/actions/etf";
-import { triggerRefresh } from "@/actions/refresh-jobs";
+import { triggerRefresh, type RefreshStateView } from "@/actions/refresh-jobs";
 
 function pct(v: number | null): string { return v == null ? "—" : `${v.toFixed(2)}%`; }
 function deltaP(v: number | null): string { return v == null ? "" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%p`; }
@@ -12,9 +12,36 @@ function deltaColor(v: number | null): string {
   return v > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
 }
 
+function fmtTime(iso: string | null): string {
+  if (!iso) return "—";
+  return iso.replace("T", " ").slice(0, 16);
+}
+
+// refresh_states 상태 + 로그를 사용자에게 보여주기 위한 톤/라벨.
+// 잡은 exit 0이어도 개별 ETF 수집이 실패할 수 있어 output 텍스트로 실패를 판정한다.
+function refreshTone(state: RefreshStateView): { label: string; cls: string } {
+  const base = "rounded px-2 py-0.5 text-xs font-medium ";
+  if (state.status === "running")
+    return { label: "수집 중…", cls: base + "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" };
+  if (state.status === "idle")
+    return { label: "아직 수집 안 함", cls: base + "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300" };
+  const hasError = state.output != null && /실패|Error|HTTP\s*\d{3}/.test(state.output);
+  if (state.status === "failed" || hasError)
+    return {
+      label: state.status === "failed" ? "실패" : "일부 실패",
+      cls: base + "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+    };
+  return { label: "정상", cls: base + "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" };
+}
+
 export function EtfManager({
-  watches, selected, detail,
-}: { watches: EtfWatchView[]; selected: string | null; detail: EtfDetailView | null }) {
+  watches, selected, detail, refreshState,
+}: {
+  watches: EtfWatchView[];
+  selected: string | null;
+  detail: EtfDetailView | null;
+  refreshState: RefreshStateView | null;
+}) {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [pending, start] = useTransition();
@@ -28,8 +55,11 @@ export function EtfManager({
   });
   const refresh = () => start(async () => {
     await triggerRefresh("etf_pdf");
-    setMsg("구성종목 갱신 시작됨 (잠시 후 새로고침)");
+    setMsg("구성종목 갱신 시작됨 — 5초 후 자동 새로고침");
+    setTimeout(() => router.refresh(), 5000);
   });
+
+  const tone = refreshState ? refreshTone(refreshState) : null;
 
   return (
     <div className="space-y-5">
@@ -49,6 +79,28 @@ export function EtfManager({
         </button>
         {msg && <span className="text-xs text-gray-500">{msg}</span>}
       </div>
+
+      {refreshState && tone && (
+        <div className="rounded-md border border-gray-200 p-3 text-sm dark:border-gray-800">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-gray-500">수집 상태</span>
+            <span className={tone.cls}>{tone.label}</span>
+            <span className="text-xs text-gray-400">
+              마지막 실행: {fmtTime(refreshState.finishedAt ?? refreshState.startedAt)}
+            </span>
+          </div>
+          {refreshState.output && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                수집 로그 보기
+              </summary>
+              <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap rounded bg-gray-50 p-2 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                {refreshState.output}
+              </pre>
+            </details>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {watches.map((w) => (
