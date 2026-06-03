@@ -1,0 +1,19 @@
+{
+  "_note": "SYNTHETIC fixture matching KRX MDCSTAT05001 (ETF PDF 구성종목) output shape. Replace with a REAL KRX response captured from a KRX-accessible environment (see plan Task 2) to confirm field names. Field keys follow KRX conventions: COMPST_ISU_CD, COMPST_ISU_NM, COMPST_RTO(비중%), COMPST_ISU_CU1_SHRS(주식수), VALU_AMT(평가금액).",
+  "output": [
+    { "COMPST_ISU_CD": "005930", "COMPST_ISU_NM": "삼성전자", "COMPST_RTO": "18.42", "COMPST_ISU_CU1_SHRS": "1,250", "VALU_AMT": "98,750,000" },
+    { "COMPST_ISU_CD": "000660", "COMPST_ISU_NM": "SK하이닉스", "COMPST_RTO": "12.10", "COMPST_ISU_CU1_SHRS": "320", "VALU_AMT": "64,000,000" },
+    { "COMPST_ISU_CD": "373220", "COMPST_ISU_NM": "LG에너지솔루션", "COMPST_RTO": "9.55", "COMPST_ISU_CU1_SHRS": "150", "VALU_AMT": "51,000,000" },
+    { "COMPST_ISU_CD": "207940", "COMPST_ISU_NM": "삼성바이오로직스", "COMPST_RTO": "7.88", "COMPST_ISU_CU1_SHRS": "45", "VALU_AMT": "42,300,000" },
+    { "COMPST_ISU_CD": "005380", "COMPST_ISU_NM": "현대차", "COMPST_RTO": "6.20", "COMPST_ISU_CU1_SHRS": "180", "VALU_AMT": "33,200,000" },
+    { "COMPST_ISU_CD": "035420", "COMPST_ISU_NM": "NAVER", "COMPST_RTO": "5.43", "COMPST_ISU_CU1_SHRS": "210", "VALU_AMT": "29,100,000" },
+    { "COMPST_ISU_CD": "051910", "COMPST_ISU_NM": "LG화학", "COMPST_RTO": "4.77", "COMPST_ISU_CU1_SHRS": "95", "VALU_AMT": "25,600,000" },
+    { "COMPST_ISU_CD": "006400", "COMPST_ISU_NM": "삼성SDI", "COMPST_RTO": "4.05", "COMPST_ISU_CU1_SHRS": "70", "VALU_AMT": "21,700,000" },
+    { "COMPST_ISU_CD": "035720", "COMPST_ISU_NM": "카카오", "COMPST_RTO": "3.62", "COMPST_ISU_CU1_SHRS": "400", "VALU_AMT": "19,400,000" },
+    { "COMPST_ISU_CD": "068270", "COMPST_ISU_NM": "셀트리온", "COMPST_RTO": "3.11", "COMPST_ISU_CU1_SHRS": "110", "VALU_AMT": "16,650,000" },
+    { "COMPST_ISU_CD": "105560", "COMPST_ISU_NM": "KB금융", "COMPST_RTO": "2.50", "COMPST_ISU_CU1_SHRS": "130", "VALU_AMT": "13,400,000" },
+    { "COMPST_ISU_CD": "055550", "COMPST_ISU_NM": "신한지주", "COMPST_RTO": "1.95", "COMPST_ISU_CU1_SHRS": "140", "VALU_AMT": "10,450,000" },
+    { "COMPST_ISU_CD": "KRD020020003", "COMPST_ISU_NM": "원화현금", "COMPST_RTO": "2.42", "COMPST_ISU_CU1_SHRS": "-", "VALU_AMT": "12,950,000" }
+  ],
+  "CURRENT_DATETIME": "2026.06.02 PM 06:30:00"
+}
