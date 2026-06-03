@@ -8,6 +8,7 @@ const NAV_ITEMS: Array<{ path: string; label: string }> = [
   { path: "/calculator", label: "계산기" },
   { path: "/top-stocks", label: "상위종목" },
   { path: "/ncav", label: "NCAV" },
+  { path: "/stocks/etf", label: "ETF" },
 ];
 
 /** 현재 경로에 해당하는 nav 항목 1개만 노출. 그 외에는 아무것도 렌더하지 않는다. */

@@ -8,6 +8,7 @@ import { StocksExplorerClient, type StocksExplorerView } from "./StocksExplorerC
 import { listRefreshStates } from "@/actions/refresh-jobs";
 import { listTags } from "@/actions/tags";
 import { RefreshMenu } from "./RefreshMenu";
+import Link from "next/link";
 
 export const metadata = { title: "전종목 조회 — Company Map" };
 export const dynamic = "force-dynamic";
@@ -76,6 +77,9 @@ export default async function StocksPage({
           <p className="mt-1 text-sm text-gray-500">
             KOSPI · KOSDAQ 전체 상장 종목. 필터·정렬로 탐색하세요.
           </p>
+          <Link href="/stocks/etf" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
+            액티브 ETF 구성종목 변화 →
+          </Link>
         </div>
         <RefreshMenu initialStates={refreshStates} />
       </header>
