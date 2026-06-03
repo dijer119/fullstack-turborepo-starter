@@ -109,6 +109,13 @@ const TOOLS: Tool[] = [
     path: "/stocks",
     icon: Search,
   },
+  {
+    key: "etf",
+    name: "액티브 ETF 구성종목",
+    description: "관심 ETF 구성종목·비중 변화 추적",
+    path: "/stocks/etf",
+    icon: Layers,
+  },
 ];
 
 /** 현재 브라우저 origin과 비교해 internal navigation 여부 판단. SSR에서는 false. */
