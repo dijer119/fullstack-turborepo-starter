@@ -14,7 +14,10 @@ function deltaColor(v: number | null): string {
 
 function fmtTime(iso: string | null): string {
   if (!iso) return "—";
-  return iso.replace("T", " ").slice(0, 16);
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.replace("T", " ").slice(0, 16);
+  // ISO(UTC) → KST 표기. timeZone을 고정해 SSR/CSR 결과가 동일.
+  return d.toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }).slice(0, 16);
 }
 
 // refresh_states 상태 + 로그를 사용자에게 보여주기 위한 톤/라벨.
