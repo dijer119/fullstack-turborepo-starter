@@ -61,6 +61,34 @@ export function extractOpIncome(
   return { thstrm: c.thstrm!, frmtrm: c.frmtrm! };
 }
 
+/** 당기순이익 row 추출. extractOpIncome과 동일 규칙(연결 우선).
+ *  "법인세차감전 순이익"·"총포괄손익"은 이름 집합에 없으므로 제외된다. */
+export function extractNetIncome(
+  response: unknown,
+): { thstrm: bigint; frmtrm: bigint } | null {
+  const r = response as DartResponse;
+  if (r.status !== "000") return null;
+  const list = r.list ?? [];
+
+  const NET_INCOME_NAMES = new Set(["당기순이익", "당기순이익(손실)"]);
+  const candidates = list
+    .filter((item) => NET_INCOME_NAMES.has(item.account_nm ?? ""))
+    .map((item) => {
+      const isConsolidated = item.fs_nm === "연결재무제표" || item.fs_div === "CFS";
+      return {
+        priority: isConsolidated ? 0 : 1,
+        thstrm: parseAmount(item.thstrm_amount),
+        frmtrm: parseAmount(item.frmtrm_amount),
+      };
+    })
+    .filter((c) => c.thstrm !== null && c.frmtrm !== null)
+    .sort((a, b) => a.priority - b.priority);
+
+  if (candidates.length === 0) return null;
+  const c = candidates[0];
+  return { thstrm: c.thstrm!, frmtrm: c.frmtrm! };
+}
+
 /** 시도 순서: 올해 11014 → 11012 → 11013 → 작년 11011. 첫 매칭에서 멈춤. */
 export async function findLatestOpIncomeReport(
   corpCode: string,

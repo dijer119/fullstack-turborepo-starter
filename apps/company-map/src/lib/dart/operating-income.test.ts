@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { extractOpIncome } from "./operating-income";
+import { extractOpIncome, extractNetIncome } from "./operating-income";
 
 const fixture = JSON.parse(
   readFileSync(
@@ -90,5 +90,51 @@ describe("extractOpIncome", () => {
         ],
       }),
     ).toEqual({ thstrm: 2_727_566_000_000n, frmtrm: 1_500_000_000_000n });
+  });
+});
+
+describe("extractNetIncome", () => {
+  it("returns 연결 당기순이익(손실), 별도/세전이익/포괄손익은 제외", () => {
+    const r = extractNetIncome({
+      status: "000",
+      list: [
+        { account_nm: "영업이익", fs_nm: "연결재무제표", thstrm_amount: "5,000,000,000", frmtrm_amount: "3,800,000,000" },
+        { account_nm: "법인세차감전 순이익", fs_nm: "연결재무제표", thstrm_amount: "13,545,563,000,000", frmtrm_amount: "10,320,412,000,000" },
+        { account_nm: "당기순이익(손실)", fs_nm: "재무제표", thstrm_amount: "10,668,573,000,000", frmtrm_amount: "5,694,610,000,000" },
+        { account_nm: "당기순이익(손실)", fs_nm: "연결재무제표", thstrm_amount: "12,225,747,000,000", frmtrm_amount: "10,100,904,000,000" },
+        { account_nm: "총포괄손익", fs_nm: "연결재무제표", thstrm_amount: "999", frmtrm_amount: "999" },
+      ],
+    });
+    expect(r).toEqual({ thstrm: 12_225_747_000_000n, frmtrm: 10_100_904_000_000n });
+  });
+
+  it("연결이 없으면 별도(재무제표)로 폴백", () => {
+    const r = extractNetIncome({
+      status: "000",
+      list: [
+        { account_nm: "당기순이익(손실)", fs_nm: "재무제표", thstrm_amount: "1,000,000,000", frmtrm_amount: "900,000,000" },
+      ],
+    });
+    expect(r).toEqual({ thstrm: 1_000_000_000n, frmtrm: 900_000_000n });
+  });
+
+  it("'당기순이익' (괄호 없음) 표기도 매칭", () => {
+    const r = extractNetIncome({
+      status: "000",
+      list: [
+        { account_nm: "당기순이익", fs_nm: "연결재무제표", thstrm_amount: "-1,500", frmtrm_amount: "2,000" },
+      ],
+    });
+    expect(r).toEqual({ thstrm: -1_500n, frmtrm: 2_000n });
+  });
+
+  it("당기순이익 행이 없으면 null", () => {
+    expect(
+      extractNetIncome({ status: "000", list: [{ account_nm: "영업이익", thstrm_amount: "1", frmtrm_amount: "1" }] }),
+    ).toBeNull();
+  });
+
+  it("status != '000'이면 null", () => {
+    expect(extractNetIncome({ status: "013", list: [] })).toBeNull();
   });
 });
