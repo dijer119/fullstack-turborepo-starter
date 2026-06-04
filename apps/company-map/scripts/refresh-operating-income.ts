@@ -5,7 +5,7 @@ config({ path: path.resolve(__dirname, "..", ".env") });
 
 import { db } from "../worker/db";
 import { fetchDartFinancial } from "@/lib/dart/financial";
-import { extractOpIncome, type ReprtCode } from "@/lib/dart/operating-income";
+import { extractOpIncome, extractNetIncome, type ReprtCode } from "@/lib/dart/operating-income";
 
 const CALL_DELAY_MS = 100;
 const REPORT_CODES: ReprtCode[] = ["11013", "11012", "11014", "11011"];
@@ -47,6 +47,8 @@ const REPORT_PRIORITY: Record<ReprtCode, number> = {
       reprtCode: ReprtCode;
       thstrm: bigint;
       frmtrm: bigint;
+      niThstrm: bigint | null;
+      niFrmtrm: bigint | null;
     }> = [];
 
     for (const year of years) {
@@ -57,11 +59,14 @@ const REPORT_PRIORITY: Record<ReprtCode, number> = {
           if (!resp) continue;
           const op = extractOpIncome(resp);
           if (!op) continue;
+          const ni = extractNetIncome(resp); // 같은 응답 재사용 (추가 DART 호출 없음)
           collected.push({
             bsnsYear: year,
             reprtCode: code,
             thstrm: op.thstrm,
             frmtrm: op.frmtrm,
+            niThstrm: ni?.thstrm ?? null,
+            niFrmtrm: ni?.frmtrm ?? null,
           });
           await db.operatingIncomeHistory.upsert({
             where: {
@@ -107,6 +112,12 @@ const REPORT_PRIORITY: Record<ReprtCode, number> = {
         Number.isFinite(base) && base !== 0 && Number.isFinite(curr)
           ? ((curr - base) / Math.abs(base)) * 100
           : null;
+      const niBase = latest.niFrmtrm != null ? Number(latest.niFrmtrm) : NaN;
+      const niCurr = latest.niThstrm != null ? Number(latest.niThstrm) : NaN;
+      const netIncomeYoyPct =
+        Number.isFinite(niBase) && niBase !== 0 && Number.isFinite(niCurr)
+          ? ((niCurr - niBase) / Math.abs(niBase)) * 100
+          : null;
       await db.financialSnapshot.upsert({
         where: { code: m.code },
         create: {
@@ -117,6 +128,9 @@ const REPORT_PRIORITY: Record<ReprtCode, number> = {
           opIncomeYoyBase: latest.frmtrm,
           opIncomePrevReport: prev?.thstrm ?? null,
           opIncomeYoyPct: yoyPct,
+          netIncome: latest.niThstrm,
+          netIncomeYoyBase: latest.niFrmtrm,
+          netIncomeYoyPct,
         },
         update: {
           latestBsnsYear: latest.bsnsYear,
@@ -125,6 +139,9 @@ const REPORT_PRIORITY: Record<ReprtCode, number> = {
           opIncomeYoyBase: latest.frmtrm,
           opIncomePrevReport: prev?.thstrm ?? null,
           opIncomeYoyPct: yoyPct,
+          netIncome: latest.niThstrm,
+          netIncomeYoyBase: latest.niFrmtrm,
+          netIncomeYoyPct,
           fetchedAt: new Date(),
         },
       });
