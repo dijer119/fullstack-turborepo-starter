@@ -48,6 +48,8 @@ export interface StocksExplorerRow {
   opIncome: number | null;
   opIncomeYoyBase: number | null;
   opIncomePrevReport: number | null;
+  netIncome: number | null;
+  netIncomeYoyBase: number | null;
   latestReprtCode: string | null;
   tags: TagView[];
   pctChange3M: number | null;
@@ -55,6 +57,7 @@ export interface StocksExplorerRow {
   hasLinks: boolean;
   manualRoe: number | null;
   grade: Grade | null;
+  treasuryCancelCount: number;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -219,6 +222,8 @@ export async function getStocksExplorer(
     vipLatestRceptDt: m.vipHoldings[0]?.rceptDt.toISOString() ?? null,
     opIncome: m.financialSnapshot?.opIncome != null ? Number(m.financialSnapshot.opIncome) : null,
     opIncomeYoyBase: m.financialSnapshot?.opIncomeYoyBase != null ? Number(m.financialSnapshot.opIncomeYoyBase) : null,
+    netIncome: m.financialSnapshot?.netIncome != null ? Number(m.financialSnapshot.netIncome) : null,
+    netIncomeYoyBase: m.financialSnapshot?.netIncomeYoyBase != null ? Number(m.financialSnapshot.netIncomeYoyBase) : null,
     opIncomePrevReport: m.financialSnapshot?.opIncomePrevReport != null ? Number(m.financialSnapshot.opIncomePrevReport) : null,
     latestReprtCode: m.financialSnapshot?.latestReprtCode ?? null,
     tags: m.tags.map((t) => ({ id: t.tag.id, name: t.tag.name })),
@@ -227,6 +232,7 @@ export async function getStocksExplorer(
     hasLinks: m._count.links > 0,
     manualRoe: m.override?.manualRoe ?? null,
     grade: (m.rating?.grade as Grade | undefined) ?? null,
+    treasuryCancelCount: m.treasuryCancelCount,
   }));
 
   return { rows, total };
