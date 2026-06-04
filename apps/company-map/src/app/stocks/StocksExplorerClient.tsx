@@ -508,7 +508,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-separate border-spacing-0">
           <thead>
-            <tr className="text-left">
+            <tr className="text-left [&>th]:whitespace-nowrap">
               <th className="sticky top-0 left-0 z-20 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">종목명</th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">코드</th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">시가총액</th>
