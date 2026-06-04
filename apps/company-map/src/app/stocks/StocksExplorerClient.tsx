@@ -4,7 +4,7 @@ import React, { useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Filter, ChevronDown, ChevronUp, ExternalLink, FileText, Link2 } from "lucide-react";
+import { Filter, ChevronDown, ChevronUp, ExternalLink, FileText, Link2, Flame } from "lucide-react";
 import type {
   MarketFilter,
   StocksExplorerRow,
@@ -537,7 +537,8 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
               </th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">3M</th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">VIP</th>
-              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">YoY</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">영업이익 YoY</th>
+              <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-right font-medium dark:border-gray-700 dark:bg-gray-900">순이익 YoY</th>
               <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">Tag</th>
             </tr>
           </thead>
@@ -566,6 +567,17 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                           aria-label="관련 링크 있음"
                         >
                           <Link2 size={14} />
+                        </Link>
+                      )}
+                      {r.treasuryCancelCount > 0 && (
+                        <Link
+                          href={`/stocks/${r.code}#treasury`}
+                          className="inline-flex items-center gap-0.5 rounded bg-violet-100 px-1 py-0.5 text-[11px] font-semibold leading-none text-violet-700 hover:bg-violet-200 dark:bg-violet-900/50 dark:text-violet-300 dark:hover:bg-violet-900"
+                          title={`자사주 소각 결정 ${r.treasuryCancelCount}회`}
+                          aria-label={`자사주 소각 결정 ${r.treasuryCancelCount}회`}
+                        >
+                          <Flame size={11} />
+                          {r.treasuryCancelCount}
                         </Link>
                       )}
                       <a
@@ -686,13 +698,24 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                       </td>
                     );
                   })()}
+                  {(() => {
+                    const niYoy = computeGrowth(r.netIncome, r.netIncomeYoyBase);
+                    return (
+                      <td
+                        className={`p-2 text-right font-mono ${growthColorClass(niYoy)}`}
+                        title={titleForGrowth(r.latestReprtCode, "yoy")}
+                      >
+                        {formatGrowth(niYoy)}
+                      </td>
+                    );
+                  })()}
                   <td className="p-2">
                     <TagCell stockCode={r.code} tags={r.tags} allTags={allTags} />
                   </td>
                 </tr>
                 {expanded.has(r.code) && (
                   <tr key={r.code + "-expand"} className="bg-blue-50/40 dark:bg-blue-950/20">
-                    <td colSpan={15} className="p-3">
+                    <td colSpan={16} className="p-3">
                       <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
                         브이아이피자산운용 보유 공시 (최근 6개월)
                       </div>
@@ -730,7 +753,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={15} className="p-6 text-center text-gray-500">
+                <td colSpan={16} className="p-6 text-center text-gray-500">
                   조건에 맞는 종목이 없습니다.
                 </td>
               </tr>
