@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>순이익(당기순이익) YoY 컬럼 추가 — Design Spec</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+    h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+    h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+    h3 { color: #2c5282; margin-top: 1.5rem; }
+    pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+    table th { background: #edf2f7; text-align: left; }
+    table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+    ul, ol { padding-left: 1.5rem; }
+    li { margin: 0.2rem 0; }
+    blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+
+<h1>순이익(당기순이익) YoY 컬럼 추가 — Design Spec</h1>
+
+<p><strong>Date:</strong> 2026-06-05</p>
+<p><strong>Scope:</strong> <code>/stocks</code>(전종목 조회) 리스트에 <strong>당기순이익 전년동기 대비(YoY)</strong> 컬럼을 추가한다. 기존 영업이익 YoY와 동일한 파이프라인을 재사용하며, 데이터는 영업이익을 가져오는 동일한 DART <code>fnlttSinglAcnt</code> 응답에서 추출하므로 <strong>추가 DART 호출이 없다</strong>.</p>
+
+<h2>Goals</h2>
+<ul>
+  <li>리스트에서 영업이익 YoY 옆에 순이익 YoY를 함께 확인 — 수익성 변화를 영업·순이익 두 관점으로 비교.</li>
+  <li>기존 영업이익 YoY 수집 잡(<code>operating_income</code>)에 순이익 추출을 얹어 <strong>DART 호출 추가 없이</strong> 채운다.</li>
+  <li>두 YoY 컬럼을 라벨로 명확히 구분(<code>영업이익 YoY</code> / <code>순이익 YoY</code>).</li>
+</ul>
+
+<h2>Non-Goals</h2>
+<ul>
+  <li>순이익 QoQ(직전 보고 대비) — YAGNI. 리스트는 YoY만 표시하므로 prevReport/history 저장 안 함.</li>
+  <li>순이익 기준 정렬 옵션 추가 — 요청 외. 정렬은 현행(YoY 정렬=영업이익) 유지.</li>
+  <li>지배주주지분 순이익 등 별도 분해 — 영업이익과 동일하게 연결 <code>당기순이익(손실)</code> 총액만 사용.</li>
+</ul>
+
+<h2>Decisions</h2>
+<table>
+  <tr><th>항목</th><th>결정</th></tr>
+  <tr><td>데이터 소스</td><td>영업이익과 동일한 <code>fnlttSinglAcnt</code> 응답 (추가 호출 0)</td></tr>
+  <tr><td>순이익 계정</td><td><code>account_nm ∈ {"당기순이익","당기순이익(손실)"}</code>, 연결재무제표(CFS) 우선</td></tr>
+  <tr><td>YoY 산식</td><td>당기(thstrm) vs 전년동기(frmtrm) — 영업이익과 동일</td></tr>
+  <tr><td>저장</td><td><code>FinancialSnapshot</code>에 net income 3필드 추가(prevReport 제외)</td></tr>
+  <tr><td>컬럼 배치</td><td>기존 "YoY"→"영업이익 YoY"로 변경, 옆에 "순이익 YoY" 추가</td></tr>
+  <tr><td>갱신</td><td>기존 수동 잡 <code>operating_income</code> 그대로 (자동 아님)</td></tr>
+</table>
+
+<h2>데이터 모델 (Prisma · SQLite)</h2>
+<p><code>FinancialSnapshot</code>에 필드 3개 추가. 마이그레이션 후 <code>prisma generate</code> 필요. (DATABASE_URL 오버라이드 금지 — 실제 DB <code>data/company-map.db</code> 사용.)</p>
+<pre><code>model FinancialSnapshot {
+  code               String   @id
+  latestBsnsYear     Int      @map("latest_bsns_year")
+  latestReprtCode    String   @map("latest_reprt_code")
+  opIncome           BigInt?  @map("op_income")
+  opIncomeYoyBase    BigInt?  @map("op_income_yoy_base")
+  opIncomePrevReport BigInt?  @map("op_income_prev_report")
+  opIncomeYoyPct     Float?   @map("op_income_yoy_pct")
+  netIncome          BigInt?  @map("net_income")           // 추가: 당기 순이익(thstrm)
+  netIncomeYoyBase   BigInt?  @map("net_income_yoy_base")  // 추가: 전년동기(frmtrm)
+  netIncomeYoyPct    Float?   @map("net_income_yoy_pct")   // 추가: 정렬/참고용 계산값
+  fetchedAt          DateTime @default(now()) @map("fetched_at")
+
+  master  StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+
+  @@map("financial_snapshots")
+}</code></pre>
+
+<h2>추출 함수 (<code>src/lib/dart/operating-income.ts</code>)</h2>
+<p><code>extractOpIncome</code>와 동일 패턴의 <code>extractNetIncome(response)</code> 추가. 실제 DART 응답에서 순이익 계정명은 <code>"당기순이익(손실)"</code>로 들어오며 연결/별도 두 행이 모두 존재 → 연결(CFS) 우선, 첫 유효 행의 <code>{thstrm, frmtrm}</code> 반환.</p>
+<pre><code>const NET_INCOME_NAMES = new Set(["당기순이익", "당기순이익(손실)"]);
+
+export function extractNetIncome(
+  response: unknown,
+): { thstrm: bigint; frmtrm: bigint } | null {
+  // extractOpIncome과 동일: status "000" 확인, account_nm 매칭,
+  // fs_nm==="연결재무제표" || fs_div==="CFS" 우선, thstrm·frmtrm 모두 파싱된 첫 행 반환.
+}</code></pre>
+<blockquote>
+  주의: <code>법인세차감전 순이익</code>·<code>총포괄손익</code>은 제외해야 한다(이름 집합을 정확히 매칭). 동일 계정이 IS/포괄손익 섹션에 중복 등장할 수 있으나 연결 우선 정렬 후 첫 행만 사용하므로 무방.
+</blockquote>
+
+<h2>수집 (<code>scripts/refresh-operating-income.ts</code>)</h2>
+<ul>
+  <li>기존 루프에서 이미 가져온 <code>resp</code>로 <code>extractNetIncome(resp)</code>도 호출 → <code>collected</code> 항목에 순이익 <code>{thstrm, frmtrm}</code> 동봉.</li>
+  <li>최신 보고서 선택 로직(연도·보고서 우선순위)은 그대로 재사용. 선택된 최신 항목의 순이익으로 <code>FinancialSnapshot</code>의 <code>netIncome</code>/<code>netIncomeYoyBase</code>/<code>netIncomeYoyPct</code>를 영업이익과 함께 upsert.</li>
+  <li><code>netIncomeYoyPct</code> = <code>frmtrm≠0</code>이면 <code>(thstrm-frmtrm)/|frmtrm|×100</code>, 아니면 null (영업이익과 동일 산식).</li>
+  <li><strong>DART 호출 추가 없음</strong> — 같은 응답 재사용.</li>
+</ul>
+<blockquote>
+  <strong>백필:</strong> 기존 스냅샷에는 순이익 필드가 비어 있으므로, 이 수동 잡(<code>operating_income</code> = "데이터 업데이트")을 한 번 재실행해야 채워진다. 그 전까지 순이익 YoY는 "—"로 표시.
+</blockquote>
+
+<h2>액션 (<code>src/actions/stocks-explorer.ts</code>)</h2>
+<ul>
+  <li><code>StocksExplorerRow</code>에 <code>netIncome: number | null</code>, <code>netIncomeYoyBase: number | null</code> 추가 (영업이익 필드 옆).</li>
+  <li><code>financialSnapshot</code>에서 <code>BigInt → Number</code> 변환해 매핑 (opIncome과 동일 방식).</li>
+</ul>
+
+<h2>UI (<code>src/app/stocks/StocksExplorerClient.tsx</code>)</h2>
+<ul>
+  <li>기존 "YoY" 헤더 → <strong>"영업이익 YoY"</strong>로 라벨 변경.</li>
+  <li>그 옆에 <strong>"순이익 YoY"</strong> 헤더·셀 추가.</li>
+  <li>셀 값 = <code>computeGrowth(r.netIncome, r.netIncomeYoyBase)</code>, 표시·색·툴팁은 기존 <code>formatGrowth</code>/<code>growthColorClass</code>/<code>titleForGrowth</code> 재사용.</li>
+  <li>확장 행 <code>colSpan</code> 등 컬럼 수에 의존하는 값이 있으면 +1 보정.</li>
+</ul>
+
+<h2>테스트 (Vitest)</h2>
+<ul>
+  <li><code>extractNetIncome</code> 단위 테스트 — 실제 DART <code>fnlttSinglAcnt</code> 응답(삼성전자 등) 픽스처에서 연결 <code>당기순이익(손실)</code>의 thstrm/frmtrm를 정확히 뽑고, <code>법인세차감전 순이익</code>/<code>총포괄손익</code>은 제외하는지 확인.</li>
+  <li>기존 <code>extractOpIncome</code> 테스트가 있으면 회귀 확인.</li>
+</ul>
+
+<h2>구현 영향 파일 (요약)</h2>
+<table>
+  <tr><th>파일</th><th>변경</th></tr>
+  <tr><td><code>prisma/schema.prisma</code></td><td>FinancialSnapshot에 net income 3필드 + migrate/generate</td></tr>
+  <tr><td><code>src/lib/dart/operating-income.ts</code></td><td><code>extractNetIncome</code> 추가</td></tr>
+  <tr><td><code>src/lib/dart/operating-income.test.ts</code> (또는 신규)</td><td><code>extractNetIncome</code> 픽스처 테스트</td></tr>
+  <tr><td><code>scripts/refresh-operating-income.ts</code></td><td>같은 응답에서 순이익도 수집·snapshot upsert</td></tr>
+  <tr><td><code>src/actions/stocks-explorer.ts</code></td><td>row에 netIncome/netIncomeYoyBase 노출</td></tr>
+  <tr><td><code>src/app/stocks/StocksExplorerClient.tsx</code></td><td>"YoY"→"영업이익 YoY", "순이익 YoY" 컬럼 추가</td></tr>
+</table>
+
+</body>
+</html>
