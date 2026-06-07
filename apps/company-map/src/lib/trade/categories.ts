@@ -9,7 +9,10 @@ export type CategoryKey =
   | "battery"
   | "nuclear"
   | "solar"
-  | "automotive";
+  | "automotive"
+  | "computer"
+  | "petrochemical"
+  | "petroleum";
 
 export type SubCategory = {
   /** HS code prefix — matched via `hsCode.startsWith(hsPrefix)`. */
@@ -164,6 +167,51 @@ export const CATEGORIES: CategoryDef[] = [
       { hsPrefix: "8708", label: "자동차 부품" },
       { hsPrefix: "8704", label: "화물자동차" },
       { hsPrefix: "8702", label: "버스·승합차" },
+    ],
+  },
+  {
+    key: "computer",
+    label: "컴퓨터",
+    // HS 8471 = 자동자료처리기계와 그 단위기기 (SSD·노트북·데스크탑·서버 등).
+    hsSgnList: ["8471"],
+    subCategories: [
+      { hsPrefix: "847170", label: "기억장치(SSD 등)" },
+      { hsPrefix: "847150", label: "처리장치" },
+      { hsPrefix: "847130", label: "휴대용(노트북)" },
+      { hsPrefix: "847141", label: "기타 자료처리기계" },
+      { hsPrefix: "847160", label: "입출력장치" },
+      { hsPrefix: "847180", label: "기타 단위기기" },
+      { hsPrefix: "847190", label: "기타" },
+    ],
+  },
+  {
+    key: "petrochemical",
+    label: "석유화학",
+    // 석유화학 = 기초유분·방향족(HS 29 유기화학품) + 합성수지(HS 39 플라스틱).
+    // 두 챕터를 한 카테고리로 합산. 4자리 sub-column은 대표 품목만 명명하고
+    // 나머지는 총수출에만 반영됨 (startsWith 매칭, 첫 일치 1개 버킷).
+    hsSgnList: ["29", "39"],
+    subCategories: [
+      { hsPrefix: "3901", label: "폴리에틸렌(PE)" },
+      { hsPrefix: "3902", label: "폴리프로필렌(PP)" },
+      { hsPrefix: "3907", label: "폴리에스터·PET·PC" },
+      { hsPrefix: "2902", label: "방향족(벤젠·자일렌)" },
+      { hsPrefix: "3904", label: "PVC" },
+      { hsPrefix: "2917", label: "방향족카르복실산(PTA)" },
+      { hsPrefix: "3903", label: "PS·ABS" },
+    ],
+  },
+  {
+    key: "petroleum",
+    label: "석유제품",
+    // HS 2710 = 석유와 역청유(원유 제외) 및 조제품 — 정제 석유제품.
+    hsSgnList: ["2710"],
+    subCategories: [
+      { hsPrefix: "271019", label: "중질유(경유·등유·항공유)" },
+      { hsPrefix: "271012", label: "경질유(휘발유·나프타)" },
+      { hsPrefix: "271020", label: "바이오디젤 혼합" },
+      { hsPrefix: "271091", label: "폐유" },
+      { hsPrefix: "271099", label: "기타 폐유" },
     ],
   },
 ];

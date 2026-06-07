@@ -4,13 +4,26 @@
 
 ## 프로젝트 개요
 
-Turborepo 기반의 **프로덕션 환경 지원 풀스택 TypeScript 모노레포**입니다. NestJS 백엔드(Prisma ORM 포함)와 Next.js 프론트엔드(Redux Toolkit Query 포함)로 구성되어 있습니다.
+Turborepo 기반의 **프로덕션 환경 지원 풀스택 TypeScript 모노레포**입니다. 원래는 NestJS 백엔드 + Next.js 프론트엔드 스타터로 출발했으나, 현재는 **5개의 앱**이 공존하는 개인용 워크스페이스로 확장되었습니다. 각 앱은 독립적으로 개발·배포되며 서로 다른 라우터·DB·테스트 스택을 사용합니다.
+
+**앱 목록 (포트):**
+
+| 앱 | 포트 | 스택 | 라우터 | DB / 데이터 | 테스트 |
+|----|------|------|--------|-------------|--------|
+| `api` | 3001 | NestJS + Prisma + GraphQL + Swagger | — | PostgreSQL (Supabase) | Jest |
+| `web` | 3000 | Next.js 15 + Redux Toolkit Query + MUI v7 | **Pages** | api 경유 | Jest |
+| `company-map` | 3004 | Next.js 15 + Prisma + React Flow + Recharts | **App** | **SQLite 단일 파일** | **Vitest** |
+| `blog-collection` | 3002 | Next.js 15 + Supabase + RSS | **App** | Supabase | — |
+| `todo` | 3003 | Next.js + Redux Toolkit | **Pages** | (클라이언트) | — |
+
+> ⚠️ 라우터·테스트 스택이 앱마다 다릅니다. `web`/`todo`는 Pages Router + Jest, `company-map`/`blog-collection`은 App Router이며 `company-map`은 Vitest를 씁니다. 작업 전 해당 앱의 규약을 먼저 확인하세요.
 
 **핵심 기술:**
-- **모노레포**: Turborepo v2.3 + Yarn Workspaces
+- **모노레포**: Turborepo v2.3 + Yarn Workspaces (npm/yarn 혼용 — root는 yarn@1.22)
 - **백엔드**: NestJS v10.4 + Prisma v6.1 + PostgreSQL + GraphQL + Swagger
 - **프론트엔드**: Next.js v15 + React v19 + Redux Toolkit Query v2.5 + Material-UI v7
-- **테스팅**: Jest v29 + Testing Library
+- **company-map**: Next.js App Router + Prisma(SQLite) + React Flow/d3-force + DART/KRX 데이터 파이프라인 + 백그라운드 worker
+- **테스팅**: Jest v29 (api/web) · Vitest (company-map) + Testing Library
 - **DevOps**: Docker + Nginx + NPS 자동화
 
 ## 아키텍처
@@ -40,6 +53,15 @@ apps/
     │   ├── store/    # Redux 스토어 + API 슬라이스
     │   └── components/
     └── tailwind.config.js
+├── company-map/      # 산업·기업 매핑 + 주식 분석 도구 (포트 3004, App Router)
+│   ├── src/app/      # App Router 페이지 (map, stocks, ncav, trade, industries 등)
+│   ├── src/actions/  # Server Actions (companies, mappings, ncav, ratings…)
+│   ├── src/lib/      # dart/, stocks/, trade/, graph/ — 도메인 로직 + 단위 테스트
+│   ├── worker/       # 백그라운드 데이터 수집 루프 (tsx 실행)
+│   ├── scripts/      # 일회성 리프레시·디버그 스크립트 (tsx)
+│   └── prisma/       # SQLite 스키마 + data/company-map.db
+├── blog-collection/  # RSS 블로그 수집기 (포트 3002, App Router + Supabase)
+└── todo/             # Todo 앱 (포트 3003, Pages Router + Redux)
 
 packages/
 ├── tsconfig/         # 공유 TS 설정 (base, nextjs, nestjs, react-library)
@@ -94,20 +116,45 @@ packages/
 - [apps/web/next.config.js](apps/web/next.config.js) - API 프록시가 포함된 Next.js 설정
 - [apps/web/tailwind.config.js](apps/web/tailwind.config.js) - Tailwind 설정
 
+### company-map 아키텍처 (가장 활발히 개발 중)
+
+산업·기업 N:M 매핑 시각화 + 한국 주식 분석 본인용 도구입니다. **`api`/`web`과 완전히 독립**이며, App Router · SQLite · Vitest를 사용합니다.
+
+**데이터 계층 (중요):**
+- **SQLite 단일 파일 DB** — `apps/company-map/data/company-map.db`. 외부 의존성 0. 백업은 파일 복사로 끝.
+- **별도 Prisma 클라이언트** — `schema.prisma`의 `output`이 `node_modules/@prisma-clients/company-map`로 지정됨. `api`의 Prisma 클라이언트와 분리되어 있으므로 스키마 변경 후 **반드시 해당 앱에서 generate** 해야 함.
+- Server Actions(`src/actions/`)에서 직접 DB 접근. NestJS API를 경유하지 않음.
+
+**데이터 파이프라인:**
+- `src/lib/dart/` — DART 공시 API 연동 (공시목록, 재무제표, 지분, 영업이익 등). 루트 `.mcp.json`의 DART MCP 서버와는 별개로 앱 내부에서 직접 호출.
+- `src/lib/stocks/` — 네이버 스크래핑, 내재가치(intrinsic value), NCAV, 가격 이력 분석.
+- `src/lib/trade/` — 관세청 수출입 무역 데이터.
+- `worker/` — `tsx`로 실행되는 백그라운드 루프(2분 주기). KRX 종목 로드 → 종목 분석 → 무역 동기화. **NCAV·재무 전종목 배치는 DART 일일 한도를 크게 소비하므로 자동 루프에서 제외**되어 있고 `/stocks` "데이터 업데이트" 메뉴에서 수동 실행함.
+- `scripts/` — 개별 종목 리프레시·디버그용 일회성 `tsx` 스크립트.
+
+**핵심 파일:**
+- [apps/company-map/prisma/schema.prisma](apps/company-map/prisma/schema.prisma) - SQLite 스키마 (단일 source of truth)
+- [apps/company-map/worker/index.ts](apps/company-map/worker/index.ts) - 백그라운드 수집 루프
+- [apps/company-map/README.md](apps/company-map/README.md) - 셋업·백업·마이그레이션 가이드
+
 ## 개발 명령어
 
 **모든 명령어는 NPS를 사용합니다** - 먼저 전역 설치가 필요: `npm i -g nps`
 
 ### 초기 설정
 ```bash
-nps prepare          # 의존성 설치 + Docker + Prisma 마이그레이션 (한 번만 실행)
+nps prepare          # web + api + todo 의존성 설치 + Docker + Prisma 마이그레이션 (한 번만 실행)
 ```
+> `nps prepare`는 web/api/todo만 다룹니다. `company-map`/`blog-collection`은 각 앱 README에 따라 별도로 셋업하세요 (company-map은 `yarn workspace company-map prisma migrate dev` 등).
 
 ### 개발
 ```bash
-nps dev             # 모든 앱 시작 (web:3000, api:3001)
-cd apps/web && yarn dev   # 프론트엔드만
-cd apps/api && yarn dev   # 백엔드만
+nps dev                          # turbo run dev — 모든 앱 동시 시작
+yarn workspace web dev           # 프론트엔드만 (3000)
+yarn workspace api dev           # 백엔드만 (3001)
+yarn workspace company-map dev   # company-map만 (3004)
+yarn workspace company-map worker      # 백그라운드 수집 루프
+yarn workspace company-map worker:once # 1회만 실행
 ```
 
 ### 빌드
@@ -117,12 +164,18 @@ nps build           # Turborepo가 모든 앱/패키지 빌드
 
 ### 테스팅
 ```bash
-nps test            # 모든 테스트 실행
-nps test.web        # 프론트엔드 테스트만
-nps test.api        # 백엔드 테스트만
-nps test.ci         # CI 모드 (모든 테스트)
+nps test            # web + api + todo 테스트 실행
+nps test.web        # 프론트엔드 테스트만 (Jest)
+nps test.api        # 백엔드 테스트만 (Jest)
+nps test.todo       # todo 테스트만
+nps test.ci         # CI 모드 (web + api + todo)
 
-# 개별 앱 watch 모드
+# company-map은 NPS에 포함되지 않음 — Vitest를 직접 실행
+yarn workspace company-map test          # 1회 실행
+yarn workspace company-map test:watch    # watch 모드
+yarn workspace company-map vitest run src/lib/dart/financial.test.ts  # 단일 파일
+
+# 개별 앱 watch 모드 (Jest)
 cd apps/web && yarn test:watch
 cd apps/api && yarn test:watch
 cd apps/api && yarn test:e2e     # E2E 테스트만
@@ -130,11 +183,16 @@ cd apps/api && yarn test:e2e     # E2E 테스트만
 
 ### 데이터베이스 관리
 ```bash
-nps prisma.generate      # Prisma Client 생성
-nps prisma.migrate.dev   # 마이그레이션 생성 및 실행
-nps prisma.studio        # 데이터베이스 GUI 열기
-cd apps/api && yarn db:seed  # 데이터베이스 시드
+nps prisma.generate      # 두 클라이언트 모두 생성 (api: PostgreSQL + company-map: SQLite)
+nps prisma.migrate.dev   # api 마이그레이션 생성 및 실행
+nps prisma.studio        # api 데이터베이스 GUI 열기
+cd apps/api && yarn db:seed  # api 데이터베이스 시드
+
+# company-map (별도 SQLite DB + 별도 Prisma 클라이언트)
+yarn workspace company-map prisma migrate dev --name <change>
+yarn workspace company-map prisma generate
 ```
+> `nps prisma.generate`는 `api`(PostgreSQL)와 `company-map`(SQLite) **두 개의 분리된 Prisma 클라이언트**를 생성합니다. `company-map` 스키마를 바꿨다면 해당 앱 기준으로 migrate/generate 해야 합니다.
 
 ### Docker
 ```bash
@@ -390,6 +448,8 @@ nps build             # 재빌드
 ## 추가 문서
 
 - [README.md](README.md) - 한국어로 작성된 상세한 설정 가이드
-- [SETUP_SUPABASE.md](SETUP_SUPABASE.md) - Supabase 통합 세부사항
-- [NETWORK_SETUP.md](NETWORK_SETUP.md) - 디바이스 간 네트워크 액세스
-- [MADDINGSTOCK_COMPLETE.md](MADDINGSTOCK_COMPLETE.md) - 텔레그램 메시지 파싱 로직
+- [apps/company-map/README.md](apps/company-map/README.md) - company-map 셋업·백업·마이그레이션
+- [docs/SETUP_SUPABASE.md](docs/SETUP_SUPABASE.md) - Supabase 통합 세부사항
+- [docs/NETWORK_SETUP.md](docs/NETWORK_SETUP.md) - 디바이스 간 네트워크 액세스
+- [docs/MADDINGSTOCK_COMPLETE.md](docs/MADDINGSTOCK_COMPLETE.md) - 텔레그램 메시지 파싱 로직
+- [docs/MESSAGE_PARSING_GUIDE.md](docs/MESSAGE_PARSING_GUIDE.md) - 메시지 파싱 가이드

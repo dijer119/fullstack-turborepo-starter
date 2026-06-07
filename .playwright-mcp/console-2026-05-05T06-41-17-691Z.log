@@ -1,9 +1,0 @@
-[     262ms] [WARNING] setPolicyInfo {versionInfo: Object, sdkInfo: Object, sentryInfo: Object} @ https://ssl.pstatic.net/tveta/libs/glad/prod/gfp-core.js:0
-[   24145ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://m.stock.naver.com/api/stock/009540/summary:0
-[   41599ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://m.stock.naver.com/api/stock/009540/upjong:0
-[   41623ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://m.stock.naver.com/api/stock/009540/sector:0
-[   41649ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://m.stock.naver.com/api/stock/009540/detail:0
-[   41663ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://m.stock.naver.com/api/stock/009540/information:0
-[   41686ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://m.stock.naver.com/api/stock/009540/companyOverview:0
-[   41732ms] [ERROR] Failed to load resource: the server responded with a status of 409 () @ https://api.stock.naver.com/stock/009540/basic:0
-[   41760ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://m.stock.naver.com/api/json/sise/main_list_industry.json:0
