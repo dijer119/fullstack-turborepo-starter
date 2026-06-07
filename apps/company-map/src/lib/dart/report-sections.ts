@@ -55,6 +55,11 @@ export function sanitizeHtml(html: string): string {
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<(link|meta)\b[^>]*>/gi, "")
+    // 문서 래퍼 제거: viewer.do는 전체 문서(<body bgcolor=...>)를 반환하므로
+    // html/head/body/doctype를 제거하지 않으면 페이지 body 속성과 충돌해 hydration 불일치 발생.
+    .replace(/<!doctype[^>]*>/gi, "")
+    .replace(/<\/?(?:html|body)\b[^>]*>/gi, "")
+    .replace(/<head\b[\s\S]*?<\/head>/gi, "")
     .replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, "")
     .replace(/\son[a-z]+\s*=\s*'[^']*'/gi, "")
     .replace(/javascript:/gi, "")

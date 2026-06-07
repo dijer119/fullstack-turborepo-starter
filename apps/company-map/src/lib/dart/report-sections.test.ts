@@ -65,4 +65,16 @@ describe("sanitizeHtml", () => {
     expect(out).not.toContain("<script");
     expect(out).not.toContain("onclick");
   });
+
+  it("문서 래퍼(html/head/body/doctype)를 제거하고 내용은 보존한다", () => {
+    const out = sanitizeHtml(
+      '<!DOCTYPE html><HTML><HEAD><title>x</title></HEAD><BODY bgcolor="#FFFFFF"><p>내용</p></BODY></HTML>',
+    );
+    expect(out).toContain("내용");
+    expect(out).not.toMatch(/<body/i);
+    expect(out).not.toContain("bgcolor");
+    expect(out).not.toMatch(/<head/i);
+    expect(out).not.toContain("<title");
+    expect(out).not.toMatch(/<html/i);
+  });
 });
