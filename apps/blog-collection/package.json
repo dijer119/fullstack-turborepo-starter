@@ -11,6 +11,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.96.0",
+    "cheerio": "^1.2.0",
     "fast-xml-parser": "^5.3.6",
     "lucide-react": "^0.556.0",
     "next": "16.1.6",

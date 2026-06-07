@@ -1,6 +1,10 @@
 "use client";
 
+import { useState } from "react";
+import { BookOpen } from "lucide-react";
 import { toggleFavorite, toggleRead } from "@/actions/post";
+import { fetchPostDetail, type PostDetailResult } from "@/actions/post-detail";
+import { PostDetailModal } from "@/components/post/PostDetailModal";
 import { SafeImage } from "@/components/ui/SafeImage";
 import type { PostWithFeed } from "@/types/post";
 
@@ -25,9 +29,36 @@ export function PostCard({
   post: PostWithFeed;
   tags: string[];
 }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [detail, setDetail] = useState<PostDetailResult | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
   async function handleClick() {
     if (!post.is_read) {
       await toggleRead(post.id, false);
+    }
+  }
+
+  async function handleOpenDetail(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setModalOpen(true);
+    if (!post.is_read) {
+      void toggleRead(post.id, false);
+    }
+    // 이미 받아둔 본문이 있으면 재요청하지 않음
+    if (detail || detailLoading) return;
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      const result = await fetchPostDetail(post.link);
+      if (!result.ok) setDetailError(result.error ?? "본문을 불러오지 못했습니다.");
+      setDetail(result);
+    } catch (err) {
+      setDetailError(err instanceof Error ? err.message : "본문을 불러오지 못했습니다.");
+    } finally {
+      setDetailLoading(false);
     }
   }
 
@@ -95,6 +126,14 @@ export function PostCard({
       </a>
       <div className="flex items-center gap-2 mt-3 justify-end">
         <button
+          onClick={handleOpenDetail}
+          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+          title="본문을 모달로 보기"
+        >
+          <BookOpen size={13} />
+          본문 보기
+        </button>
+        <button
           onClick={handleFavorite}
           className="text-lg hover:scale-110 transition-transform"
           title={post.is_favorite ? "Remove from favorites" : "Add to favorites"}
@@ -109,6 +148,16 @@ export function PostCard({
           {post.is_read ? "Unread" : "Read"}
         </button>
       </div>
+
+      <PostDetailModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        loading={detailLoading}
+        error={detailError}
+        detail={detail}
+        sourceUrl={post.link}
+        fallbackTitle={post.title}
+      />
     </article>
   );
 }

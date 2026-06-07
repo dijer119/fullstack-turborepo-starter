@@ -8,10 +8,10 @@ export async function GET(request: NextRequest) {
 
   try {
     const res = await fetch(url, {
+      // 빈 Referer 헤더("")를 보내면 네이버 CDN(dthumb/imgnews)이 403으로 차단한다.
+      // Referer는 아예 보내지 않는다.
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; BlogCollectionBot/1.0)",
-        Referer: "",
+        "User-Agent": "Mozilla/5.0 (compatible; BlogCollectionBot/1.0)",
       },
     });
 
