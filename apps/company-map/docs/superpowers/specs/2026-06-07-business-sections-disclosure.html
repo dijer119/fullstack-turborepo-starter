@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>종목 상세에 사업개요·매출·수주상황 추가 — Design Spec</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+    h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+    h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+    h3 { color: #2c5282; margin-top: 1.5rem; }
+    pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+    table th { background: #edf2f7; text-align: left; }
+    table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+    ul, ol { padding-left: 1.5rem; }
+    li { margin: 0.2rem 0; }
+    blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+
+<h1>종목 상세에 사업개요·매출·수주상황 추가 — Design Spec</h1>
+
+<p><strong>Date:</strong> 2026-06-07</p>
+<p><strong>Scope:</strong> 종목 상세(<code>/stocks/[code]</code>)의 "공시 갱신" 시 DART 정기보고서 본문 "II. 사업의 내용"에서 <strong>사업개요·매출·수주상황</strong>을 추출해 새 섹션으로 표시한다. 사업개요·매출은 최신 보고서 1개, 수주상황은 분기별로 누적한다.</p>
+
+<h2>Goals</h2>
+<ul>
+  <li>종목 상세에서 사업개요(서술), 매출(매출실적 표), 수주상황(수주잔고 표)을 공시 타임라인에 추가.</li>
+  <li>수주상황은 정기보고서(분기/반기/사업)마다 스냅샷을 누적해 수주잔고 변화를 시점별로 확인.</li>
+  <li>회사마다 표 구조가 달라도 견고하도록, 보고서 표/본문을 정제(sanitize)해 <strong>그대로 렌더링</strong>.</li>
+</ul>
+
+<h2>Non-Goals</h2>
+<ul>
+  <li>매출·수주 표를 고정 컬럼으로 구조화 파싱 — 회사별 형식 차이로 누락 위험. 원문 표 그대로 렌더.</li>
+  <li>사업개요·매출의 분기별 누적 — 최신 1개만(덮어쓰기).</li>
+  <li>비정기공시·해외법인 보고서 — 정기보고서(pblntfTy A)만.</li>
+</ul>
+
+<h2>Decisions</h2>
+<table>
+  <tr><th>항목</th><th>결정</th></tr>
+  <tr><td>사업개요 / 매출</td><td>최신 정기보고서 1개 (덮어쓰기)</td></tr>
+  <tr><td>수주상황</td><td>분기별 누적 (정기보고서별 스냅샷)</td></tr>
+  <tr><td>추출·표시</td><td>보고서 섹션 HTML을 sanitize 후 그대로 렌더(표/문단)</td></tr>
+  <tr><td>섹션 위치</td><td>보고서 main.do의 <code>treeData</code>(목차) 파싱으로 노드 찾기</td></tr>
+  <tr><td>저장</td><td>기존 <code>Disclosure</code> 테이블 + 합성 rcpNo 키</td></tr>
+  <tr><td>트리거</td><td>기존 <code>fetchDisclosuresForStock</code>("공시 갱신")에 통합</td></tr>
+</table>
+
+<h2>데이터 소스 / 섹션 위치 (treeData)</h2>
+<p>정기보고서 <code>https://dart.fss.or.kr/dsaf001/main.do?rcpNo=...</code> 페이지에는 목차가 <code>treeData</code> JS로 들어있고, 각 노드가 제목→문서 파라미터를 매핑한다(실측 확인). 노드 블록 예:</p>
+<pre><code>var node2 = {};
+node2['text']   = "4. 매출 및 수주상황";
+node2['dcmNo']  = "11386164";
+node2['eleId']  = "13";
+node2['offset'] = "60425";
+node2['length'] = "26562";
+node2['dtd']    = "dart4.xsd";</code></pre>
+<p>제목 정규화 매칭으로 노드를 찾는다:</p>
+<ul>
+  <li><strong>사업개요</strong> ← 제목에 "사업의 개요" 포함하는 노드</li>
+  <li><strong>매출 + 수주상황</strong> ← 제목에 "매출" 그리고 "수주" 포함하는 노드("4. 매출 및 수주상황"). 이 한 섹션 안에 매출실적·판매경로·수주상황 소제목과 표가 함께 있음(005930 실측: 매출실적 5회·판매경로 4회·수주상황 2회·표 20개).</li>
+</ul>
+<blockquote>
+  OpenDART API 키 한도와 무관: <code>dsaf001/main.do</code>·<code>report/viewer.do</code>는 공개 문서 뷰어다. 단 본문은 회사마다 EUC-KR/UTF-8이 섞여 기존 <code>dart-viewer.ts</code>의 charset 처리를 재사용한다.
+</blockquote>
+
+<h2>추출 (기존 <code>dart-viewer.ts</code> 재사용)</h2>
+<ul>
+  <li><code>fetchViewerHtmlByParams(rcpNo, dcmNo, eleId, offset, length, dtd)</code>로 섹션 HTML 취득(기존 <code>fetchViewerHtml</code>은 main.do에서 첫 viewDoc만 씀 → 파라미터 직접 지정 버전 추가).</li>
+  <li><strong>사업개요</strong>: 섹션 HTML을 sanitize한 문단/텍스트.</li>
+  <li><strong>매출</strong>: "매출 및 수주상황" 섹션에서 <em>"수주상황" 소제목 이전</em>의 표(매출실적)들.</li>
+  <li><strong>수주상황</strong>: 같은 섹션에서 <em>"수주상황" 소제목 이후</em>의 표들.</li>
+  <li>분할은 소제목 텍스트 위치 기반 휴리스틱. 소제목/표 미발견 시 빈 결과 → 해당 카드 미생성.</li>
+</ul>
+<p><strong>sanitize</strong>: <code>&lt;script&gt;/&lt;style&gt;/&lt;link&gt;/&lt;meta&gt;</code> 제거, on* 이벤트 속성·<code>javascript:</code> 제거. 표/문단/텍스트는 보존. (company-map에 없는 유틸이므로 <code>src/lib/dart/</code>에 작은 sanitize 함수 신설; blog-collection의 접근 차용.)</p>
+
+<h2>저장 (Disclosure + 합성 키)</h2>
+<p>새 category 3개. 기존 배당의 <code>alotMatter-{code}-...</code> 합성키 패턴 차용(같은 보고서 rcpNo가 여러 섹션에 쓰여 충돌하므로 합성키 필요).</p>
+<table>
+  <tr><th>category</th><th>rcpNo(합성)</th><th>범위</th><th>payload</th></tr>
+  <tr><td><code>사업개요</code></td><td><code>bizoverview-{code}</code></td><td>최신 1개(덮어쓰기)</td><td><code>{ html, sourceRcpNo, reportNm }</code></td></tr>
+  <tr><td><code>매출</code></td><td><code>sales-{code}</code></td><td>최신 1개</td><td><code>{ html, sourceRcpNo, reportNm }</code></td></tr>
+  <tr><td><code>수주</code></td><td><code>orders-{code}-{bsnsYear}-{reprtCode}</code></td><td>보고서별 누적</td><td><code>{ html, sourceRcpNo, period }</code></td></tr>
+</table>
+<p><code>DisclosureCategory</code> 타입(<code>disclosure-payloads.ts</code>)에 <code>"사업개요" | "매출" | "수주"</code> 추가. payload 타입 <code>SectionPayload { html: string; sourceRcpNo: string; reportNm?: string; period?: string }</code> 신설.</p>
+
+<h2>수집 (<code>src/actions/disclosures.ts</code>)</h2>
+<ul>
+  <li>새 함수 <code>fetchBusinessSections(code, corpCode)</code>를 추가하고 <code>fetchDisclosuresForStock</code>의 수집 함수 목록에 포함.</li>
+  <li>정기보고서 목록(pblntfTy A, 기존 4년 윈도우)을 최신순 정렬.</li>
+  <li><strong>최신 1개</strong>: main.do → treeData 파싱 → 사업개요·매출/수주 노드 → viewer.do → 사업개요·매출 저장(덮어쓰기), 수주도 저장.</li>
+  <li><strong>수주 분기별 누적</strong>: 그 외 최근 보고서들(최대 8개)에 대해 이미 저장된 합성키는 dedup skip, 신규 보고서만 main.do+viewer.do로 수주상황 추출·저장.</li>
+  <li>종목당 호출 수 bound: 보고서 8개 × (main.do 1 + viewer.do 1~2). 개별 보고서 실패는 무시하고 계속.</li>
+</ul>
+
+<h2>UI (<code>DisclosureTimeline</code> + <code>SectionNav</code> + 카드)</h2>
+<ul>
+  <li>SectionNav에 <strong>사업개요 · 매출 · 수주</strong> 항목 추가(점 색상 신규 배정).</li>
+  <li>DisclosureTimeline에 3개 Section 추가. 카드는 sanitize된 <code>html</code>을 <code>dangerouslySetInnerHTML</code>로 렌더(표 스타일 wrapper: 테두리·헤더배경·가로 스크롤).</li>
+  <li>사업개요·매출: 카드 1개(기준 보고서 표기 + DART 원본 링크).</li>
+  <li>수주: <strong>분기별 카드 여러 개</strong>(기간 <code>period</code> 표기, 최신순).</li>
+  <li><code>page.tsx</code>에서 category별 필터링해 props 전달(기존 earnings/dividends/… 패턴 동일).</li>
+</ul>
+
+<h2>에러 / 엣지</h2>
+<ul>
+  <li>treeData에 해당 섹션 없음(금융사 등 수주상황 없음) → 해당 카드 미생성.</li>
+  <li>제목 변형(번호·띄어쓰기) → 공백 제거 후 부분일치 매칭.</li>
+  <li>viewer.do charset(EUC-KR/UTF-8) → 기존 dart-viewer charset 처리 재사용.</li>
+  <li>개별 섹션/보고서 실패가 다른 공시(실적·배당 등) 수집을 막지 않음(try/catch).</li>
+</ul>
+
+<h2>테스트 (Vitest)</h2>
+<ul>
+  <li><code>parseTreeData(mainHtml)</code> → 제목→{dcmNo,eleId,offset,length,dtd} 매핑 (실제 main.do 픽스처).</li>
+  <li>섹션 분할: "수주상황" 소제목 기준 매출/수주 표 분리 (실제 섹션 HTML 픽스처).</li>
+  <li>sanitize: script/이벤트핸들러 제거, 표 보존.</li>
+</ul>
+
+<h2>구현 영향 파일 (요약)</h2>
+<table>
+  <tr><th>파일</th><th>변경</th></tr>
+  <tr><td><code>src/lib/dart/report-sections.ts</code> (신규)</td><td>treeData 파서 + 섹션 추출/분할 + sanitize (순수 함수)</td></tr>
+  <tr><td><code>src/lib/dart/report-sections.test.ts</code> (신규)</td><td>파서·분할·sanitize 픽스처 테스트</td></tr>
+  <tr><td><code>src/lib/dart/dart-viewer.ts</code></td><td>파라미터 지정 viewer fetch 추가(<code>fetchViewerHtmlByParams</code>)</td></tr>
+  <tr><td><code>src/lib/dart/disclosure-payloads.ts</code></td><td>category 3개 + <code>SectionPayload</code> 타입</td></tr>
+  <tr><td><code>src/actions/disclosures.ts</code></td><td><code>fetchBusinessSections</code> + 루프 포함</td></tr>
+  <tr><td><code>src/app/stocks/[code]/SectionCard.tsx</code> (신규)</td><td>sanitize HTML 렌더 카드</td></tr>
+  <tr><td><code>DisclosureTimeline.tsx · SectionNav.tsx · page.tsx</code></td><td>사업개요/매출/수주 섹션·네비·필터링</td></tr>
+</table>
+
+</body>
+</html>
