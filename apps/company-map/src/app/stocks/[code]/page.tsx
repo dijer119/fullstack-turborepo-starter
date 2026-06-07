@@ -7,6 +7,8 @@ import type {
   OwnershipPayload,
   DividendPayload,
   ContractPayload,
+  TreasuryPayload,
+  SectionPayload,
 } from "@/lib/dart/disclosure-payloads";
 import { StockDetailHeader } from "./StockDetailHeader";
 import { DisclosureTimeline } from "./DisclosureTimeline";
@@ -70,6 +72,15 @@ export default async function StockDetailPage({
       payload: d.payload ? (JSON.parse(d.payload) as OwnershipPayload) : null,
     }));
 
+  const treasury = allDisclosures
+    .filter((d) => d.category === "자사주")
+    .map((d) => ({
+      rcpNo: d.rcpNo,
+      reportNm: d.reportNm,
+      rceptDt: d.rceptDt,
+      payload: d.payload ? (JSON.parse(d.payload) as TreasuryPayload) : null,
+    }));
+
   const contracts = allDisclosures
     .filter((d) => d.category === "계약")
     .map((d) => ({
@@ -78,6 +89,16 @@ export default async function StockDetailPage({
       rceptDt: d.rceptDt,
       payload: d.payload ? (JSON.parse(d.payload) as ContractPayload) : null,
     }));
+
+  const bizOverview = allDisclosures
+    .filter((d) => d.category === "사업개요")
+    .map((d) => ({ rcpNo: d.rcpNo, reportNm: d.reportNm, rceptDt: d.rceptDt, payload: d.payload ? (JSON.parse(d.payload) as SectionPayload) : null }));
+  const sales = allDisclosures
+    .filter((d) => d.category === "매출")
+    .map((d) => ({ rcpNo: d.rcpNo, reportNm: d.reportNm, rceptDt: d.rceptDt, payload: d.payload ? (JSON.parse(d.payload) as SectionPayload) : null }));
+  const orders = allDisclosures
+    .filter((d) => d.category === "수주")
+    .map((d) => ({ rcpNo: d.rcpNo, reportNm: d.reportNm, rceptDt: d.rceptDt, payload: d.payload ? (JSON.parse(d.payload) as SectionPayload) : null }));
 
   const links = await listLinksByCode(code);
 
@@ -114,7 +135,11 @@ export default async function StockDetailPage({
             earnings={earnings}
             dividends={dividends}
             ownership={ownership}
+            treasury={treasury}
             contracts={contracts}
+            bizOverview={bizOverview}
+            sales={sales}
+            orders={orders}
           />
         </div>
         <SectionNav />

@@ -2,12 +2,16 @@ import type { EarningsPayload } from "@/lib/dart/earnings-payload";
 import type {
   OwnershipPayload,
   DividendPayload,
+  TreasuryPayload,
+  ContractPayload,
+  SectionPayload,
 } from "@/lib/dart/disclosure-payloads";
-import type { ContractPayload } from "@/lib/dart/disclosure-payloads";
 import { EarningsCard } from "./EarningsCard";
 import { OwnershipCard } from "./OwnershipCard";
+import { TreasuryCard } from "./TreasuryCard";
 import { DividendCard } from "./DividendCard";
 import { ContractCard } from "./ContractCard";
+import { SectionCard } from "./SectionCard";
 
 interface BaseItem {
   rcpNo: string;
@@ -20,18 +24,28 @@ export interface EarningsItem extends BaseItem {
 export interface OwnershipItem extends BaseItem {
   payload: OwnershipPayload | null;
 }
+export interface TreasuryItem extends BaseItem {
+  payload: TreasuryPayload | null;
+}
 export interface ContractItem extends BaseItem {
   payload: ContractPayload | null;
 }
 export interface DividendItem extends BaseItem {
   payload: DividendPayload | null;
 }
+export interface SectionItem extends BaseItem {
+  payload: SectionPayload | null;
+}
 
 interface Props {
   earnings: EarningsItem[];
   dividends: DividendItem[];
   ownership: OwnershipItem[];
+  treasury: TreasuryItem[];
   contracts: ContractItem[];
+  bizOverview: SectionItem[];
+  sales: SectionItem[];
+  orders: SectionItem[];
 }
 
 function Section({
@@ -66,9 +80,33 @@ function Section({
   );
 }
 
-export function DisclosureTimeline({ earnings, dividends, ownership, contracts }: Props) {
+export function DisclosureTimeline({
+  earnings,
+  dividends,
+  ownership,
+  treasury,
+  contracts,
+  bizOverview,
+  sales,
+  orders,
+}: Props) {
   return (
     <div className="space-y-8">
+      <Section id="bizoverview" pinBg="bg-teal-500" label="사업개요" empty={bizOverview.length === 0}>
+        {bizOverview.map((s) => (
+          <SectionCard key={s.rcpNo} reportNm={s.reportNm} payload={s.payload} accent="bg-teal-900/80" linkClass="text-teal-200" />
+        ))}
+      </Section>
+      <Section id="sales" pinBg="bg-lime-500" label="매출" empty={sales.length === 0}>
+        {sales.map((s) => (
+          <SectionCard key={s.rcpNo} reportNm={s.reportNm} payload={s.payload} accent="bg-lime-900/80" linkClass="text-lime-200" />
+        ))}
+      </Section>
+      <Section id="orders" pinBg="bg-fuchsia-500" label="수주" empty={orders.length === 0}>
+        {orders.map((s) => (
+          <SectionCard key={s.rcpNo} reportNm={s.reportNm} payload={s.payload} accent="bg-fuchsia-900/80" linkClass="text-fuchsia-200" />
+        ))}
+      </Section>
       <Section id="earnings" pinBg="bg-indigo-500" label="실적" empty={earnings.length === 0}>
         {earnings.map((e) => (
           <EarningsCard
@@ -97,6 +135,17 @@ export function DisclosureTimeline({ earnings, dividends, ownership, contracts }
             reportNm={o.reportNm}
             rceptDt={o.rceptDt}
             payload={o.payload}
+          />
+        ))}
+      </Section>
+      <Section id="treasury" pinBg="bg-violet-500" label="자사주" empty={treasury.length === 0}>
+        {treasury.map((t) => (
+          <TreasuryCard
+            key={t.rcpNo}
+            rcpNo={t.rcpNo}
+            reportNm={t.reportNm}
+            rceptDt={t.rceptDt}
+            payload={t.payload}
           />
         ))}
       </Section>

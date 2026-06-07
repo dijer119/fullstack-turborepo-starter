@@ -10,9 +10,13 @@ interface Item {
 
 const ITEMS: Item[] = [
   { id: "links", label: "관련 링크", dotClass: "bg-rose-500" },
+  { id: "bizoverview", label: "사업개요", dotClass: "bg-teal-500" },
+  { id: "sales", label: "매출", dotClass: "bg-lime-500" },
+  { id: "orders", label: "수주", dotClass: "bg-fuchsia-500" },
   { id: "earnings", label: "실적", dotClass: "bg-indigo-500" },
   { id: "dividends", label: "배당", dotClass: "bg-emerald-500" },
   { id: "ownership", label: "지분", dotClass: "bg-amber-500" },
+  { id: "treasury", label: "자사주", dotClass: "bg-violet-500" },
   { id: "contracts", label: "계약", dotClass: "bg-cyan-500" },
 ];
 
