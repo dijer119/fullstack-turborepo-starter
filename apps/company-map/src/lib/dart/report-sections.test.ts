@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
-import { parseTreeData, findSectionNode } from "./report-sections";
+import { parseTreeData, findSectionNode, splitSalesOrders, sanitizeHtml } from "./report-sections";
 
 const mainHtml = readFileSync(
   join(__dirname, "../../../tests/fixtures/dart-report-main.html"),
@@ -36,5 +36,33 @@ describe("findSectionNode", () => {
   });
   it("없으면 null", () => {
     expect(findSectionNode([], "overview")).toBeNull();
+  });
+});
+
+const sectionHtml = readFileSync(
+  join(__dirname, "../../../tests/fixtures/dart-report-section.html"),
+  "utf-8",
+);
+
+describe("splitSalesOrders", () => {
+  it("매출실적 표와 수주상황 표를 분리한다", () => {
+    const { salesHtml, ordersHtml } = splitSalesOrders(sectionHtml);
+    expect(salesHtml).toContain("<table");
+    expect(ordersHtml).toContain("<table");
+    expect(ordersHtml).toContain("수주");
+  });
+  it("수주상황 소제목이 없으면 ordersHtml은 빈 문자열", () => {
+    const { ordersHtml } = splitSalesOrders("<p>매출실적</p><table><tr><td>1</td></tr></table>");
+    expect(ordersHtml).toBe("");
+  });
+});
+
+describe("sanitizeHtml", () => {
+  it("script와 이벤트 핸들러를 제거하고 표는 보존한다", () => {
+    const out = sanitizeHtml('<table onclick="x()"><tr><td>a</td></tr></table><script>bad()</script>');
+    expect(out).toContain("<table");
+    expect(out).toContain("a");
+    expect(out).not.toContain("<script");
+    expect(out).not.toContain("onclick");
   });
 });
