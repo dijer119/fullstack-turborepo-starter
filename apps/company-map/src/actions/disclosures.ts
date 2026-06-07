@@ -12,15 +12,25 @@ import { fetchAlotMatter, extractDividendPayload } from "@/lib/dart/alotMatter";
 import { buildElestockMap } from "@/lib/dart/elestock";
 import { buildMajorstockMap } from "@/lib/dart/majorstock-detail";
 import { fetchContractDetail } from "@/lib/dart/contract-detail";
+import {
+  classifyTreasuryAction,
+  emptyTreasuryPayload,
+  fetchTreasuryDetail,
+} from "@/lib/dart/treasury-detail";
 import type {
   OwnershipDetail,
   OwnershipPayload,
+  TreasuryPayload,
+  SectionPayload,
 } from "@/lib/dart/disclosure-payloads";
+import { parseTreeData, findSectionNode, splitSalesOrders, sanitizeHtml } from "@/lib/dart/report-sections";
+import { fetchDartPage, fetchViewerHtmlByParams } from "@/lib/dart/dart-viewer";
 
 const PERIODIC_REPORT_REGEX = /(사업|반기|분기)보고서/;
 const MAX_REPORTS_PER_STOCK = 16;
 const DIVIDEND_YEARS_LOOKBACK = 4;
-const TSSTK_REGEX = /자기주식|자사주/;
+const TREASURY_B_REGEX = /자기주식|자사주/;
+const TREASURY_CANCEL_REGEX = /소각/;
 const CONTRACT_REGEX = /단일판매[ㆍ··.]?공급계약|공급계약체결|판매계약체결/;
 
 interface FetchStats {
@@ -138,7 +148,7 @@ async function fetchEarnings(code: string, corpCode: string): Promise<FetchStats
 async function fetchOwnership(code: string, corpCode: string): Promise<FetchStats> {
   const { bgnDe, endDe } = todayDateRange();
 
-  // D: 임원·주요주주, 주식대량보유
+  // D: 임원·주요주주, 주식대량보유 (자기주식 취득/처분/소각/신탁은 fetchTreasury가 별도 처리)
   const respD = await fetchDartList({
     corpCode,
     pblntfTy: "D",
@@ -146,18 +156,8 @@ async function fetchOwnership(code: string, corpCode: string): Promise<FetchStat
     endDe,
     pageCount: 100,
   });
-  // B: 자기주식 결정 (취득/처분/소각 등)
-  const respB = await fetchDartList({
-    corpCode,
-    pblntfTy: "B",
-    bgnDe,
-    endDe,
-    pageCount: 100,
-  });
 
-  const okD = respD?.status === "000" && !!respD.list;
-  const okB = respB?.status === "000" && !!respB.list;
-  if (!okD && !okB) {
+  if (respD?.status !== "000" || !respD.list) {
     return { inserted: 0, updated: 0, failed: 1 };
   }
 
@@ -169,26 +169,13 @@ async function fetchOwnership(code: string, corpCode: string): Promise<FetchStat
   type Row = { rcpNo: string; reportNm: string; rceptDt: Date; pblntfTy: string };
   const rows: Row[] = [];
 
-  if (respD?.status === "000" && respD.list) {
-    for (const it of respD.list) {
-      rows.push({
-        rcpNo: it.rcept_no,
-        reportNm: it.report_nm,
-        pblntfTy: "D",
-        rceptDt: parseRceptDt(it.rcept_dt),
-      });
-    }
-  }
-  if (respB?.status === "000" && respB.list) {
-    for (const it of respB.list) {
-      if (!TSSTK_REGEX.test(it.report_nm)) continue;
-      rows.push({
-        rcpNo: it.rcept_no,
-        reportNm: it.report_nm,
-        pblntfTy: "B",
-        rceptDt: parseRceptDt(it.rcept_dt),
-      });
-    }
+  for (const it of respD.list) {
+    rows.push({
+      rcpNo: it.rcept_no,
+      reportNm: it.report_nm,
+      pblntfTy: "D",
+      rceptDt: parseRceptDt(it.rcept_dt),
+    });
   }
 
   rows.sort((a, b) => b.rceptDt.getTime() - a.rceptDt.getTime());
@@ -220,6 +207,106 @@ async function fetchOwnership(code: string, corpCode: string): Promise<FetchStat
         payload: JSON.stringify(payload),
       },
       update: {
+        payload: JSON.stringify(payload),
+        fetchedAt: new Date(),
+      },
+    });
+    if (existing) updated++;
+    else inserted++;
+  }
+  return { inserted, updated, failed: 0 };
+}
+
+async function fetchTreasury(code: string, corpCode: string): Promise<FetchStats> {
+  const { bgnDe, endDe } = todayDateRange();
+
+  // B: 주요사항보고서 — 자기주식 취득/처분/신탁계약 결정
+  const respB = await fetchDartList({
+    corpCode,
+    pblntfTy: "B",
+    bgnDe,
+    endDe,
+    pageCount: 100,
+  });
+  // I: 거래소공시 — 주식소각결정 (제목에 "자기주식"이 없어 B 필터로는 잡히지 않음)
+  const respI = await fetchDartList({
+    corpCode,
+    pblntfTy: "I",
+    bgnDe,
+    endDe,
+    pageCount: 100,
+  });
+
+  const okB = respB?.status === "000" && !!respB.list;
+  const okI = respI?.status === "000" && !!respI.list;
+  if (!okB && !okI) {
+    return { inserted: 0, updated: 0, failed: 1 };
+  }
+
+  type Row = { rcpNo: string; reportNm: string; rceptDt: Date; pblntfTy: string };
+  const rows: Row[] = [];
+
+  if (okB) {
+    for (const it of respB!.list!) {
+      if (!TREASURY_B_REGEX.test(it.report_nm)) continue;
+      rows.push({
+        rcpNo: it.rcept_no,
+        reportNm: it.report_nm,
+        pblntfTy: "B",
+        rceptDt: parseRceptDt(it.rcept_dt),
+      });
+    }
+  }
+  if (okI) {
+    for (const it of respI!.list!) {
+      if (!TREASURY_CANCEL_REGEX.test(it.report_nm)) continue;
+      rows.push({
+        rcpNo: it.rcept_no,
+        reportNm: it.report_nm,
+        pblntfTy: "I",
+        rceptDt: parseRceptDt(it.rcept_dt),
+      });
+    }
+  }
+
+  rows.sort((a, b) => b.rceptDt.getTime() - a.rceptDt.getTime());
+  const limited = rows.slice(0, MAX_REPORTS_PER_STOCK);
+
+  // 유형 분류 후 DART 본문 HTML 스크래핑으로 상세 추출. 실패는 최소 페이로드로 폴백.
+  const detailEntries = await Promise.all(
+    limited.map(async (r) => {
+      const action = classifyTreasuryAction(r.reportNm);
+      try {
+        const d = await fetchTreasuryDetail(r.rcpNo, action);
+        return [r.rcpNo, d ?? emptyTreasuryPayload(action)] as const;
+      } catch (err) {
+        console.warn(`[treasury-detail] failed ${r.rcpNo}:`, err);
+        return [r.rcpNo, emptyTreasuryPayload(action)] as const;
+      }
+    }),
+  );
+  const detailMap = new Map<string, TreasuryPayload>(detailEntries);
+
+  let inserted = 0;
+  let updated = 0;
+  for (const r of limited) {
+    const payload =
+      detailMap.get(r.rcpNo) ?? emptyTreasuryPayload(classifyTreasuryAction(r.reportNm));
+    const existing = await db.disclosure.findUnique({ where: { rcpNo: r.rcpNo } });
+    await db.disclosure.upsert({
+      where: { rcpNo: r.rcpNo },
+      create: {
+        rcpNo: r.rcpNo,
+        code,
+        corpCode,
+        reportNm: r.reportNm,
+        pblntfTy: r.pblntfTy,
+        rceptDt: r.rceptDt,
+        category: "자사주",
+        payload: JSON.stringify(payload),
+      },
+      update: {
+        category: "자사주",
         payload: JSON.stringify(payload),
         fetchedAt: new Date(),
       },
@@ -348,6 +435,101 @@ async function fetchContracts(code: string, corpCode: string): Promise<FetchStat
   return { inserted, updated, failed: 0 };
 }
 
+const MAX_ORDER_REPORTS = 8;
+
+// 정기보고서 본문에서 사업개요·매출(최신 1개) + 수주상황(분기별 누적)을 추출·저장.
+async function fetchBusinessSections(code: string, corpCode: string): Promise<FetchStats> {
+  const { bgnDe, endDe } = todayDateRange();
+  const resp = await fetchDartList({ corpCode, pblntfTy: "A", bgnDe, endDe, pageCount: 100 });
+  if (!resp || resp.status !== "000" || !resp.list) return { inserted: 0, updated: 0, failed: 1 };
+
+  const reports = resp.list
+    .filter((it) => PERIODIC_REPORT_REGEX.test(it.report_nm))
+    .map((it) => ({ rcpNo: it.rcept_no, reportNm: it.report_nm, rceptDt: parseRceptDt(it.rcept_dt) }))
+    .sort((a, b) => b.rceptDt.getTime() - a.rceptDt.getTime())
+    .slice(0, MAX_ORDER_REPORTS);
+  if (reports.length === 0) return emptyStats();
+
+  let inserted = 0;
+  let updated = 0;
+  const periodOf = (reportNm: string): string =>
+    reportNm.match(/\((\d{4}\.\d{2})\)/)?.[1] ?? reportNm;
+
+  for (let i = 0; i < reports.length; i++) {
+    const r = reports[i];
+    const isLatest = i === 0;
+    const ordersRcpNo = `orders-${code}-${r.rcpNo}`;
+    if (!isLatest) {
+      const exists = await db.disclosure.findUnique({ where: { rcpNo: ordersRcpNo } });
+      if (exists) continue;
+    }
+    try {
+      const mainHtml = await fetchDartPage(`https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${r.rcpNo}`);
+      if (!mainHtml) continue;
+      const nodes = parseTreeData(mainHtml);
+
+      const salesNode = findSectionNode(nodes, "sales_orders");
+      if (salesNode) {
+        const sectionHtml = await fetchViewerHtmlByParams({
+          rcpNo: r.rcpNo, dcmNo: salesNode.dcmNo, eleId: salesNode.eleId,
+          offset: salesNode.offset, length: salesNode.length, dtd: salesNode.dtd,
+        });
+        if (sectionHtml) {
+          const { salesHtml, ordersHtml } = splitSalesOrders(sectionHtml);
+          if (ordersHtml) {
+            const payload: SectionPayload = { html: ordersHtml, sourceRcpNo: r.rcpNo, period: periodOf(r.reportNm) };
+            const ex = await db.disclosure.findUnique({ where: { rcpNo: ordersRcpNo } });
+            await db.disclosure.upsert({
+              where: { rcpNo: ordersRcpNo },
+              create: { rcpNo: ordersRcpNo, code, corpCode, reportNm: `${periodOf(r.reportNm)} 수주상황`, pblntfTy: "A", rceptDt: r.rceptDt, category: "수주", payload: JSON.stringify(payload) },
+              update: { payload: JSON.stringify(payload), fetchedAt: new Date() },
+            });
+            if (ex) updated++;
+            else inserted++;
+          }
+          if (isLatest && salesHtml) {
+            const rcpNo = `sales-${code}`;
+            const payload: SectionPayload = { html: salesHtml, sourceRcpNo: r.rcpNo, reportNm: r.reportNm };
+            const ex = await db.disclosure.findUnique({ where: { rcpNo } });
+            await db.disclosure.upsert({
+              where: { rcpNo },
+              create: { rcpNo, code, corpCode, reportNm: "매출", pblntfTy: "A", rceptDt: r.rceptDt, category: "매출", payload: JSON.stringify(payload) },
+              update: { payload: JSON.stringify(payload), rceptDt: r.rceptDt, fetchedAt: new Date() },
+            });
+            if (ex) updated++;
+            else inserted++;
+          }
+        }
+      }
+
+      if (isLatest) {
+        const ovNode = findSectionNode(nodes, "overview");
+        if (ovNode) {
+          const ovHtml = await fetchViewerHtmlByParams({
+            rcpNo: r.rcpNo, dcmNo: ovNode.dcmNo, eleId: ovNode.eleId,
+            offset: ovNode.offset, length: ovNode.length, dtd: ovNode.dtd,
+          });
+          if (ovHtml) {
+            const rcpNo = `bizoverview-${code}`;
+            const payload: SectionPayload = { html: sanitizeHtml(ovHtml), sourceRcpNo: r.rcpNo, reportNm: r.reportNm };
+            const ex = await db.disclosure.findUnique({ where: { rcpNo } });
+            await db.disclosure.upsert({
+              where: { rcpNo },
+              create: { rcpNo, code, corpCode, reportNm: "사업개요", pblntfTy: "A", rceptDt: r.rceptDt, category: "사업개요", payload: JSON.stringify(payload) },
+              update: { payload: JSON.stringify(payload), rceptDt: r.rceptDt, fetchedAt: new Date() },
+            });
+            if (ex) updated++;
+            else inserted++;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[business-sections] ${code} ${r.rcpNo} failed:`, err);
+    }
+  }
+  return { inserted, updated, failed: 0 };
+}
+
 export async function fetchDisclosuresForStock(code: string): Promise<FetchStats> {
   if (!/^\d{6}$/.test(code)) return emptyStats();
 
@@ -356,7 +538,14 @@ export async function fetchDisclosuresForStock(code: string): Promise<FetchStats
   const corpCode = master.corpCode;
 
   let total = emptyStats();
-  for (const fn of [fetchEarnings, fetchOwnership, fetchDividends, fetchContracts]) {
+  for (const fn of [
+    fetchEarnings,
+    fetchOwnership,
+    fetchTreasury,
+    fetchBusinessSections,
+    fetchDividends,
+    fetchContracts,
+  ]) {
     try {
       total = mergeStats(total, await fn(code, corpCode));
     } catch (err) {
@@ -364,5 +553,19 @@ export async function fetchDisclosuresForStock(code: string): Promise<FetchStats
       total.failed++;
     }
   }
+
+  // 자사주 소각 결정 공시 횟수를 종목에 영속화 (리스트 화면 종목명 옆 표시용).
+  try {
+    const cancelCount = await db.disclosure.count({
+      where: { code, category: "자사주", reportNm: { contains: "소각" } },
+    });
+    await db.stockMaster.update({
+      where: { code },
+      data: { treasuryCancelCount: cancelCount },
+    });
+  } catch (err) {
+    console.error(`[disclosures] treasuryCancelCount update failed for ${code}:`, err);
+  }
+
   return total;
 }
