@@ -10,7 +10,8 @@
     "worker": "tsx worker/index.ts",
     "worker:once": "tsx worker/index.ts --once",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.1.0",
