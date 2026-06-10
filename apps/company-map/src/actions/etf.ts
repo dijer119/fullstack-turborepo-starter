@@ -19,6 +19,7 @@ export interface EtfDetailView {
   name: string;
   latestTrdDd: string | null;
   prevTrdDd: string | null;
+  marketValue: number | null; // 최신 스냅샷 시가총액(원). BigInt는 직렬화 불가라 Number 변환
   changes: HoldingChange[];
 }
 
@@ -135,6 +136,7 @@ export async function getEtfDetail(code: string): Promise<EtfDetailView | null> 
     name: watch.name,
     latestTrdDd: snaps[0]?.trdDd ?? null,
     prevTrdDd: snaps[1]?.trdDd ?? null,
+    marketValue: snaps[0]?.marketValue != null ? Number(snaps[0].marketValue) : null,
     changes: latest.length ? diffHoldings(latest, prev) : [],
   };
 }

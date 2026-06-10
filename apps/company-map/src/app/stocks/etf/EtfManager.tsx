@@ -7,6 +7,7 @@ import {
   type EtfWatchView, type EtfDetailView,
 } from "@/actions/etf";
 import { moveCode } from "@/lib/etf/reorder";
+import { formatMarcap } from "@/lib/format-marcap";
 import { triggerRefresh, type RefreshStateView } from "@/actions/refresh-jobs";
 import type { ShareHistory } from "@/lib/etf/history";
 import { ShareHistorySection } from "./ShareHistorySection";
@@ -177,6 +178,7 @@ export function EtfManager({
           <div className="mb-2 text-sm text-gray-500">
             기준일 {detail.latestTrdDd ?? "—"}
             {detail.prevTrdDd ? ` · 직전 ${detail.prevTrdDd} 대비` : " · 비교할 직전 데이터 없음"}
+            {detail.marketValue != null && ` · 시가총액 ${formatMarcap(detail.marketValue)}`}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-separate border-spacing-0">
