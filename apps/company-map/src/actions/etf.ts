@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { diffHoldings } from "@/lib/etf/diff";
 import type { Holding, HoldingChange } from "@/lib/etf/types";
+import { buildShareHistory, type ShareHistory } from "@/lib/etf/history";
 
 export interface EtfWatchView {
   code: string;
@@ -59,6 +60,33 @@ export async function removeEtf(code: string): Promise<{ ok: boolean }> {
   await db.etfWatch.delete({ where: { code } }).catch(() => {});
   revalidatePath("/stocks/etf");
   return { ok: true };
+}
+
+// 최근 N개 스냅샷의 구성종목 주식수 이력 매트릭스. 워치 미등록이면 null.
+export async function getEtfShareHistory(
+  code: string,
+  limit = 30,
+): Promise<ShareHistory | null> {
+  const watch = await db.etfWatch.findUnique({ where: { code } });
+  if (!watch) return null;
+  const snaps = await db.etfPdfSnapshot.findMany({
+    where: { etfCode: code },
+    orderBy: { trdDd: "desc" },
+    take: limit,
+    include: { holdings: true },
+  });
+  return buildShareHistory(
+    snaps.map((s) => ({
+      trdDd: s.trdDd,
+      holdings: s.holdings.map((h) => ({
+        constituentCode: h.constituentCode,
+        constituentName: h.constituentName,
+        weight: h.weight,
+        shares: h.shares,
+        amount: h.amount,
+      })),
+    })),
+  );
 }
 
 export async function getEtfDetail(code: string): Promise<EtfDetailView | null> {
