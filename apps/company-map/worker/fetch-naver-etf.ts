@@ -22,7 +22,7 @@ export function lastBusinessDay(d = new Date()): string {
 
 export async function fetchNaverEtf(
   code: string,
-): Promise<{ name: string; holdings: Holding[]; trdDd: string } | null> {
+): Promise<{ name: string; holdings: Holding[]; marketValue: bigint | null; trdDd: string } | null> {
   try {
     const res = await fetch(
       `https://m.stock.naver.com/api/stock/${encodeURIComponent(code)}/etfAnalysis`,
@@ -33,8 +33,8 @@ export async function fetchNaverEtf(
       return null;
     }
     const json = await res.json();
-    const { name, holdings } = parseNaverEtfAnalysis(json);
-    return { name, holdings, trdDd: lastBusinessDay() };
+    const { name, holdings, marketValue } = parseNaverEtfAnalysis(json);
+    return { name, holdings, marketValue, trdDd: lastBusinessDay() };
   } catch (err) {
     console.warn(`[naver-etf] ${code} fetch failed:`, err instanceof Error ? err.message : err);
     return null;

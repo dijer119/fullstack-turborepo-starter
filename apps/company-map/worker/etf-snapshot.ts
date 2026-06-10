@@ -7,7 +7,7 @@ import { topN } from "@/lib/etf/diff";
 export async function snapshotEtf(
   code: string,
   trdDd = lastBusinessDay(),
-): Promise<"saved" | "skipped" | "failed"> {
+): Promise<"saved" | "skipped" | "updated" | "failed"> {
   try {
     const watch = await db.etfWatch.findUnique({ where: { code } });
     if (!watch) return "failed";
@@ -23,13 +23,23 @@ export async function snapshotEtf(
     const existing = await db.etfPdfSnapshot.findUnique({
       where: { etfCode_trdDd: { etfCode: code, trdDd } },
     });
-    if (existing) return "skipped";
+    if (existing) {
+      if (existing.marketValue == null && res.marketValue != null) {
+        await db.etfPdfSnapshot.update({
+          where: { id: existing.id },
+          data: { marketValue: res.marketValue },
+        });
+        return "updated";
+      }
+      return "skipped";
+    }
 
     const holdings = topN(res.holdings, 10);
     await db.etfPdfSnapshot.create({
       data: {
         etfCode: code,
         trdDd,
+        marketValue: res.marketValue,
         holdings: {
           create: holdings.map((h) => ({
             constituentCode: h.constituentCode,
