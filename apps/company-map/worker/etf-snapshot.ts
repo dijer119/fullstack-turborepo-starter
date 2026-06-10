@@ -2,7 +2,8 @@ import { db } from "./db";
 import { fetchNaverEtf, lastBusinessDay } from "./fetch-naver-etf";
 import { topN } from "@/lib/etf/diff";
 
-// 관심 ETF 1개의 최신 영업일 스냅샷을 저장(상위 10). 이미 있으면 skip.
+// 관심 ETF 1개의 최신 영업일 스냅샷을 저장(상위 10). 이미 있으면 skip
+// (단, marketValue가 비어 있으면 그 필드만 보강 update → "updated").
 // 데이터 소스: Naver 모바일 ETF API (KRX MDC는 이 환경에서 차단됨).
 export async function snapshotEtf(
   code: string,
