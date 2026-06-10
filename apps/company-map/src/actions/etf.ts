@@ -26,7 +26,7 @@ const CODE_RE = /^[0-9A-Z]{6}$/;
 
 export async function listEtfWatches(): Promise<EtfWatchView[]> {
   const rows = await db.etfWatch.findMany({
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     include: { snapshots: { orderBy: { trdDd: "desc" }, take: 1, select: { trdDd: true } } },
   });
   return rows.map((r) => ({
@@ -43,7 +43,10 @@ export async function registerEtf(rawCode: string): Promise<{ ok: boolean; reaso
   const exists = await db.etfWatch.findUnique({ where: { code } });
   if (exists) return { ok: false, reason: "이미 등록됨" };
 
-  await db.etfWatch.create({ data: { code, name: code } }); // name/isin은 스냅샷 잡이 보강
+  const max = await db.etfWatch.aggregate({ _max: { sortOrder: true } });
+  await db.etfWatch.create({
+    data: { code, name: code, sortOrder: (max._max.sortOrder ?? -1) + 1 }, // name/isin은 스냅샷 잡이 보강
+  });
   const child = spawn("npx", ["tsx", "scripts/refresh-etf-pdf.ts"], {
     cwd: process.cwd(),
     detached: true,
@@ -58,6 +61,25 @@ export async function registerEtf(rawCode: string): Promise<{ ok: boolean; reaso
 
 export async function removeEtf(code: string): Promise<{ ok: boolean }> {
   await db.etfWatch.delete({ where: { code } }).catch(() => {});
+  revalidatePath("/stocks/etf");
+  return { ok: true };
+}
+
+// 드래그 정렬 결과 저장. codes는 등록된 전체 코드 집합과 정확히 일치해야 한다(중복·누락 불가).
+export async function reorderEtfWatches(codes: string[]): Promise<{ ok: boolean }> {
+  const rows = await db.etfWatch.findMany({ select: { code: true } });
+  const existing = new Set(rows.map((r) => r.code));
+  const unique = new Set(codes);
+  if (
+    unique.size !== codes.length ||
+    unique.size !== existing.size ||
+    !codes.every((c) => existing.has(c))
+  ) {
+    return { ok: false };
+  }
+  await db.$transaction(
+    codes.map((code, i) => db.etfWatch.update({ where: { code }, data: { sortOrder: i } })),
+  );
   revalidatePath("/stocks/etf");
   return { ok: true };
 }
