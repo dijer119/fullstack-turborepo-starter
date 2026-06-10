@@ -1,4 +1,5 @@
 import type { Holding } from "./types";
+import { parseKoreanMarketValue } from "@/lib/stocks/parse-market-value";
 
 // Naver 모바일 ETF API(etfAnalysis) 응답에서 상위 10 구성종목을 파싱하는 순수 함수.
 // KRX MDC가 이 환경에서 차단되어, 동작하는 Naver API로 데이터 소스를 전환했다.
@@ -22,6 +23,7 @@ interface NaverConstituent {
 
 interface NaverEtfAnalysis {
   itemName?: string;
+  marketValue?: string;
   etfTop10MajorConstituentAssets?: NaverConstituent[];
   [k: string]: unknown;
 }
@@ -29,6 +31,7 @@ interface NaverEtfAnalysis {
 export function parseNaverEtfAnalysis(json: NaverEtfAnalysis): {
   name: string;
   holdings: Holding[];
+  marketValue: bigint | null; // 시가총액 (원). etfAnalysis의 "1,128억" 문자열 파싱
 } {
   const name = (json.itemName ?? "").toString().trim();
   const rows = Array.isArray(json.etfTop10MajorConstituentAssets)
@@ -47,5 +50,5 @@ export function parseNaverEtfAnalysis(json: NaverEtfAnalysis): {
       };
     })
     .filter((h): h is Holding => h !== null);
-  return { name, holdings };
+  return { name, holdings, marketValue: parseKoreanMarketValue(json.marketValue) };
 }

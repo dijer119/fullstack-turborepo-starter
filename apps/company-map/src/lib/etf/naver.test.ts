@@ -5,6 +5,7 @@ import { parseNaverEtfAnalysis } from "./naver";
 const sample = {
   itemCode: "0074K0",
   itemName: "KoAct K수출핵심기업TOP30액티브",
+  marketValue: "1,128억",
   etfTop10MajorConstituentAssets: [
     { seq: 1, itemCode: "000660", itemName: "SK하이닉스", stockCount: "74", etfWeight: "15.83%" },
     { seq: 2, itemCode: "005930", itemName: "삼성전자", stockCount: "331", etfWeight: "10.82%" },
@@ -35,5 +36,20 @@ describe("parseNaverEtfAnalysis", () => {
   it("구성종목이 없으면 빈 배열", () => {
     const { holdings } = parseNaverEtfAnalysis({ itemName: "x" });
     expect(holdings).toEqual([]);
+  });
+
+  it("marketValue를 BigInt 원 단위로 파싱한다", () => {
+    const { marketValue } = parseNaverEtfAnalysis(sample);
+    expect(marketValue).toBe(112_800_000_000n);
+  });
+
+  it("marketValue 필드가 없으면 null", () => {
+    const { marketValue } = parseNaverEtfAnalysis({ itemName: "x" });
+    expect(marketValue).toBeNull();
+  });
+
+  it("조 단위 marketValue도 파싱한다", () => {
+    const { marketValue } = parseNaverEtfAnalysis({ itemName: "x", marketValue: "1.2조" });
+    expect(marketValue).toBe(1_200_000_000_000n);
   });
 });
