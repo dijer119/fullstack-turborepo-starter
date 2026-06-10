@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listEtfWatches, getEtfDetail } from "@/actions/etf";
+import { listEtfWatches, getEtfDetail, getEtfShareHistory } from "@/actions/etf";
 import { listRefreshStates } from "@/actions/refresh-jobs";
 import { EtfManager } from "./EtfManager";
 
@@ -13,7 +13,12 @@ export default async function EtfPage({
   const { code } = await searchParams;
   const watches = await listEtfWatches();
   const selected = code ?? watches[0]?.code ?? null;
-  const detail = selected ? await getEtfDetail(selected) : null;
+  const [detail, history] = selected
+    ? await Promise.all([
+        getEtfDetail(selected),
+        getEtfShareHistory(selected).catch(() => null),
+      ])
+    : [null, null];
   const refreshStates = await listRefreshStates();
   const refreshState = refreshStates.find((s) => s.kind === "etf_pdf") ?? null;
 
@@ -27,6 +32,7 @@ export default async function EtfPage({
         watches={watches}
         selected={selected}
         detail={detail}
+        history={history}
         refreshState={refreshState}
       />
     </main>

@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { registerEtf, removeEtf, type EtfWatchView, type EtfDetailView } from "@/actions/etf";
 import { triggerRefresh, type RefreshStateView } from "@/actions/refresh-jobs";
+import type { ShareHistory } from "@/lib/etf/history";
+import { ShareHistorySection } from "./ShareHistorySection";
 
 function pct(v: number | null): string { return v == null ? "—" : `${v.toFixed(2)}%`; }
 function deltaP(v: number | null): string { return v == null ? "" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%p`; }
@@ -38,11 +40,12 @@ function refreshTone(state: RefreshStateView): { label: string; cls: string } {
 }
 
 export function EtfManager({
-  watches, selected, detail, refreshState,
+  watches, selected, detail, history, refreshState,
 }: {
   watches: EtfWatchView[];
   selected: string | null;
   detail: EtfDetailView | null;
+  history: ShareHistory | null;
   refreshState: RefreshStateView | null;
 }) {
   const router = useRouter();
@@ -165,6 +168,8 @@ export function EtfManager({
           </div>
         </section>
       )}
+
+      {detail && history && <ShareHistorySection history={history} />}
     </div>
   );
 }

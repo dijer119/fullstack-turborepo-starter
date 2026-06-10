@@ -57,11 +57,15 @@ export function ShareHistorySection({ history }: { history: ShareHistory }) {
                 <tr
                   key={key}
                   onClick={() => setOpenKey(openKey === key ? null : key)}
-                  className={`cursor-pointer border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900 ${
+                  className={`group cursor-pointer border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900 ${
                     r.inLatest ? "" : "text-gray-400"
                   } ${openKey === key ? "bg-blue-50 dark:bg-blue-950/30" : ""}`}
                 >
-                  <td className="sticky left-0 z-10 whitespace-nowrap bg-white p-2 dark:bg-gray-950">
+                  <td
+                    className={`sticky left-0 z-10 whitespace-nowrap p-2 group-hover:bg-gray-50 dark:group-hover:bg-gray-900 ${
+                      openKey === key ? "bg-blue-50 dark:bg-blue-950" : "bg-white dark:bg-gray-950"
+                    }`}
+                  >
                     {r.constituentName}
                   </td>
                   {r.cells.map((c, i) => (
