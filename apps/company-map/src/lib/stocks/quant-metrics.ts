@@ -1,13 +1,19 @@
 /** 종목 상세 퀀트 대시보드 지표 계산 — 모두 순수 함수. */
 
-/** 수동 ROE 우선, 없으면 PBR/PER×100 (단위 %). StockDetailHeader·탐색기와 공유. */
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+/** 수동 ROE 우선(NaN/Infinity는 무시하고 auto 폴백), 없으면 PBR/PER×100 (단위 %). StockDetailHeader·탐색기와 공유. */
 export function resolveRoe(
   manualRoe: number | null,
   per: number | null,
   pbr: number | null,
 ): number | null {
-  if (manualRoe != null) return manualRoe;
-  if (per != null && pbr != null && per > 0 && pbr > 0) return (pbr / per) * 100;
+  if (isFiniteNumber(manualRoe)) return manualRoe;
+  if (isFiniteNumber(per) && isFiniteNumber(pbr) && per > 0 && pbr > 0) {
+    return (pbr / per) * 100;
+  }
   return null;
 }
 
@@ -17,7 +23,9 @@ export function week52Position(
   low: number | null,
   high: number | null,
 ): number | null {
-  if (current == null || low == null || high == null) return null;
+  if (!isFiniteNumber(current) || !isFiniteNumber(low) || !isFiniteNumber(high)) {
+    return null;
+  }
   if (!(high > low)) return null;
   const pct = ((current - low) / (high - low)) * 100;
   return Math.min(100, Math.max(0, pct));
@@ -28,7 +36,11 @@ export function bondDividendRatio(
   divYieldPct: number | null,
   treasuryYieldPct: number | null,
 ): number | null {
-  if (divYieldPct == null || treasuryYieldPct == null || treasuryYieldPct <= 0) {
+  if (
+    !isFiniteNumber(divYieldPct) ||
+    !isFiniteNumber(treasuryYieldPct) ||
+    treasuryYieldPct <= 0
+  ) {
     return null;
   }
   return divYieldPct / treasuryYieldPct;
@@ -43,7 +55,7 @@ export function seoJunsikReturn(
   pbr: number | null,
   roePct: number | null,
 ): number | null {
-  if (pbr == null || pbr <= 0 || roePct == null) return null;
+  if (!isFiniteNumber(pbr) || pbr <= 0 || !isFiniteNumber(roePct)) return null;
   const roe = roePct / 100;
   if (roe <= -1) return null;
   const ratio = Math.pow(1 + roe, 10) / pbr;

@@ -20,6 +20,9 @@ describe("resolveRoe", () => {
     expect(resolveRoe(null, 10, -1)).toBeNull();
     expect(resolveRoe(null, null, 2)).toBeNull();
   });
+  it("NaN 수동값은 무시하고 auto 계산으로 폴백", () => {
+    expect(resolveRoe(NaN, 10, 2)).toBeCloseTo(20);
+  });
 });
 
 describe("week52Position", () => {
@@ -38,6 +41,9 @@ describe("week52Position", () => {
     expect(week52Position(100, 200, 200)).toBeNull();
     expect(week52Position(null, 100, 200)).toBeNull();
   });
+  it("NaN 입력이면 null", () => {
+    expect(week52Position(NaN, 58000, 88200)).toBeNull();
+  });
 });
 
 describe("bondDividendRatio", () => {
@@ -48,6 +54,9 @@ describe("bondDividendRatio", () => {
     expect(bondDividendRatio(4, 0)).toBeNull();
     expect(bondDividendRatio(4, null)).toBeNull();
     expect(bondDividendRatio(null, 3)).toBeNull();
+  });
+  it("NaN 입력이면 null", () => {
+    expect(bondDividendRatio(4, NaN)).toBeNull();
   });
 });
 
@@ -66,6 +75,9 @@ describe("seoJunsikReturn", () => {
     expect(seoJunsikReturn(1, -100)).toBeNull();
     expect(seoJunsikReturn(1, null)).toBeNull();
   });
+  it("NaN 입력이면 null", () => {
+    expect(seoJunsikReturn(NaN, 10)).toBeNull();
+  });
 });
 
 describe("isFresh", () => {
@@ -77,6 +89,10 @@ describe("isFresh", () => {
   it("TTL 경과면 false", () => {
     const now = new Date("2026-06-10T12:00:00Z");
     expect(isFresh(new Date("2026-06-09T11:59:00Z"), now, ttl)).toBe(false);
+  });
+  it("정확히 TTL 경과 시점이면 false", () => {
+    const now = new Date("2026-06-10T12:00:00Z");
+    expect(isFresh(new Date("2026-06-09T12:00:00Z"), now, ttl)).toBe(false);
   });
 });
 
