@@ -27,7 +27,9 @@ export function GaugeChart({
   subRight,
 }: Props) {
   const ratio =
-    value == null ? 0 : Math.min(1, Math.max(0, (value - min) / (max - min)));
+    value == null || max <= min
+      ? 0
+      : Math.min(1, Math.max(0, (value - min) / (max - min)));
   const data = [{ v: ratio }, { v: 1 - ratio }];
 
   return (
