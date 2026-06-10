@@ -78,8 +78,8 @@ export function QuantDashboard({
       : null;
 
   return (
-    <section id="dashboard" className="space-y-4">
-      <h2 className="text-lg font-bold">퀀트 대시보드</h2>
+    <section id="dashboard" className="scroll-mt-6 space-y-4">
+      <h2 className="text-lg font-semibold">퀀트 대시보드</h2>
 
       <div className="grid grid-cols-2 gap-3">
         <StatCard
@@ -89,7 +89,7 @@ export function QuantDashboard({
         <StatCard title="시가총액" value={formatMarcap(marcap)} />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
           <div className="text-sm font-semibold">
             52주 저가 대비 위치{" "}
@@ -136,7 +136,7 @@ export function QuantDashboard({
         <StatCard
           title="국채시가배당률"
           value={fmt(bondDiv, 2, "배")}
-          sub={treasuryYieldPct != null ? `국채금리 ${treasuryYieldPct}%` : "국채금리 미설정"}
+          sub={treasuryYieldPct != null ? `국채금리 ${fmt(treasuryYieldPct, 2, "%")}` : "국채금리 미설정"}
         />
         <StatCard
           title={
