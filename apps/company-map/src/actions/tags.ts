@@ -1,5 +1,6 @@
 "use server";
 
+import { isValidStockCode } from "@/lib/stocks/stock-code";
 import { db } from "@/lib/db";
 
 export interface TagView {
@@ -23,7 +24,7 @@ export async function addTagToStock(
 ): Promise<TagView | null> {
   const name = tagName.trim();
   if (!name) return null;
-  if (!/^\d{6}$/.test(stockCode)) return null;
+  if (!isValidStockCode(stockCode)) return null;
 
   const tag = await db.tag.upsert({
     where: { name },
@@ -42,6 +43,6 @@ export async function removeTagFromStock(
   stockCode: string,
   tagId: number,
 ): Promise<void> {
-  if (!/^\d{6}$/.test(stockCode)) return;
+  if (!isValidStockCode(stockCode)) return;
   await db.stockTag.deleteMany({ where: { stockCode, tagId } });
 }

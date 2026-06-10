@@ -1,5 +1,6 @@
 "use server";
 
+import { isValidStockCode } from "@/lib/stocks/stock-code";
 import { db } from "@/lib/db";
 import { fetchDartList } from "@/lib/dart/list";
 import {
@@ -531,7 +532,7 @@ async function fetchBusinessSections(code: string, corpCode: string): Promise<Fe
 }
 
 export async function fetchDisclosuresForStock(code: string): Promise<FetchStats> {
-  if (!/^\d{6}$/.test(code)) return emptyStats();
+  if (!isValidStockCode(code)) return emptyStats();
 
   const master = await db.stockMaster.findUnique({ where: { code } });
   if (!master?.corpCode) return emptyStats();

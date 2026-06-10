@@ -1,5 +1,6 @@
 "use server";
 
+import { isValidStockCode } from "@/lib/stocks/stock-code";
 import { db } from "@/lib/db";
 
 export interface VipHoldingDetailRow {
@@ -16,7 +17,7 @@ export interface VipHoldingDetailRow {
 export async function getVipHoldingsByCode(
   code: string,
 ): Promise<VipHoldingDetailRow[]> {
-  if (!/^\d{6}$/.test(code)) return [];
+  if (!isValidStockCode(code)) return [];
 
   const rows = await db.vipHolding.findMany({
     where: { code },

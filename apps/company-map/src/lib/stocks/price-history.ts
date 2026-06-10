@@ -1,3 +1,4 @@
+import { isValidStockCode } from "./stock-code";
 import { parseKoreanMarketValue } from "./parse-market-value";
 
 const API = "https://api.finance.naver.com/siseJson.naver";
@@ -12,7 +13,7 @@ export interface PriceChange3M {
 
 /** 네이버 모바일 stock integration API → 시가총액(BigInt 원 단위). */
 export async function fetchMarketValue(code: string): Promise<bigint | null> {
-  if (!/^\d{6}$/.test(code)) return null;
+  if (!isValidStockCode(code)) return null;
   const res = await fetch(`${INTEGRATION_API}/${code}/integration`, {
     headers: { "User-Agent": "Mozilla/5.0" },
   });
@@ -36,7 +37,7 @@ export function toYyyymmdd(d: Date): string {
 
 /** 네이버 일별 시세에서 3개월 전 종가와 현재 종가 추출. */
 export async function fetchPriceChange3M(code: string): Promise<PriceChange3M | null> {
-  if (!/^\d{6}$/.test(code)) return null;
+  if (!isValidStockCode(code)) return null;
   const now = new Date();
   const past = new Date(now);
   past.setMonth(past.getMonth() - 3);

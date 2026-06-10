@@ -1,3 +1,4 @@
+import { isValidStockCode } from "@/lib/stocks/stock-code";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
@@ -27,7 +28,7 @@ export default async function StockDetailPage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-  if (!/^\d{6}$/.test(code)) notFound();
+  if (!isValidStockCode(code)) notFound();
 
   const master = await db.stockMaster.findUnique({
     where: { code },

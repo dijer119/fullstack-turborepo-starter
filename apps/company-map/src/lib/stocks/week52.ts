@@ -1,3 +1,4 @@
+import { isValidStockCode } from "./stock-code";
 import { db } from "@/lib/db";
 import { isFresh } from "./quant-metrics";
 import { toYyyymmdd } from "./price-history";
@@ -45,7 +46,7 @@ export function parseWeek52(text: string): Week52Range | null {
 
 /** 네이버 일별 시세 1년 범위 조회 → 52주 고저. 실패 시 null. */
 export async function fetchWeek52Range(code: string): Promise<Week52Range | null> {
-  if (!/^\d{6}$/.test(code)) return null;
+  if (!isValidStockCode(code)) return null;
   const now = new Date();
   const past = new Date(now);
   past.setFullYear(past.getFullYear() - 1);

@@ -1,5 +1,6 @@
 "use server";
 
+import { isValidStockCode } from "@/lib/stocks/stock-code";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
@@ -11,7 +12,7 @@ export async function setManualRoe(
   code: string,
   roe: number | null,
 ): Promise<void> {
-  if (!/^\d{6}$/.test(code)) return;
+  if (!isValidStockCode(code)) return;
 
   if (roe === null) {
     await db.stockOverride.deleteMany({ where: { code } });

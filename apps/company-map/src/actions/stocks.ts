@@ -1,5 +1,6 @@
 "use server";
 
+import { isValidStockCode } from "@/lib/stocks/stock-code";
 import { db } from "@/lib/db";
 import { analyzeStock } from "@/lib/stocks/analyze-stock";
 import type { TopStockRow } from "@/types/stocks";
@@ -17,7 +18,7 @@ export async function searchStocks(keyword: string): Promise<StockListItem[]> {
   const trimmed = keyword.trim();
   if (!trimmed) return [];
 
-  const isCode = /^\d{6}$/.test(trimmed);
+  const isCode = isValidStockCode(trimmed);
   const where = isCode
     ? { code: trimmed }
     : {
@@ -124,7 +125,7 @@ export async function getTopStocks(opts: {
 /** 즉시 네이버 크롤링 + DB 갱신. 워커 안 도는 환경에서 사용. */
 export async function analyzeStockOnDemand(code: string): Promise<TopStockRow> {
   const trimmed = code.trim();
-  if (!/^\d{6}$/.test(trimmed))
+  if (!isValidStockCode(trimmed))
     throw new Error("종목코드는 6자리 숫자여야 합니다");
 
   const r = await analyzeStock(trimmed);

@@ -1,5 +1,6 @@
 "use server";
 
+import { isValidStockCode } from "@/lib/stocks/stock-code";
 import { db } from "@/lib/db";
 
 export type Grade = "high" | "mid" | "low";
@@ -12,7 +13,7 @@ function isGrade(v: string | null): v is Grade {
 
 /** 종목 등급 조회. 없으면 null. */
 export async function getRatingByCode(code: string): Promise<Grade | null> {
-  if (!/^\d{6}$/.test(code)) return null;
+  if (!isValidStockCode(code)) return null;
   const row = await db.stockRating.findUnique({ where: { code } });
   return isGrade(row?.grade ?? null) ? (row!.grade as Grade) : null;
 }
@@ -23,7 +24,7 @@ export async function setRating(
   code: string,
   grade: Grade | null,
 ): Promise<{ grade: Grade | null }> {
-  if (!/^\d{6}$/.test(code)) return { grade: null };
+  if (!isValidStockCode(code)) return { grade: null };
   if (grade === null) {
     await db.stockRating.deleteMany({ where: { code } });
     return { grade: null };

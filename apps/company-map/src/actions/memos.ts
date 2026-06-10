@@ -1,10 +1,11 @@
 "use server";
 
+import { isValidStockCode } from "@/lib/stocks/stock-code";
 import { db } from "@/lib/db";
 
 /** 종목 메모 본문 조회. 없으면 null. */
 export async function getMemoByCode(code: string): Promise<string | null> {
-  if (!/^\d{6}$/.test(code)) return null;
+  if (!isValidStockCode(code)) return null;
   const row = await db.stockMemo.findUnique({ where: { code } });
   return row?.text ?? null;
 }
@@ -15,7 +16,7 @@ export async function setMemo(
   code: string,
   text: string,
 ): Promise<{ hasMemo: boolean }> {
-  if (!/^\d{6}$/.test(code)) return { hasMemo: false };
+  if (!isValidStockCode(code)) return { hasMemo: false };
   const trimmed = text.trim();
   if (!trimmed) {
     await db.stockMemo.deleteMany({ where: { code } });

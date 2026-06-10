@@ -1,5 +1,6 @@
 "use server";
 
+import { isValidStockCode } from "@/lib/stocks/stock-code";
 import { Prisma } from "@prisma-clients/company-map";
 import { db } from "@/lib/db";
 import {
@@ -46,7 +47,7 @@ function toView(row: StockLinkRow): StockLinkView {
 
 /** 종목별 링크 목록 (최신순). */
 export async function listLinksByCode(code: string): Promise<StockLinkView[]> {
-  if (!/^\d{6}$/.test(code)) return [];
+  if (!isValidStockCode(code)) return [];
   const rows = await db.stockLink.findMany({
     where: { code },
     orderBy: { createdAt: "desc" },
@@ -63,7 +64,7 @@ export async function addLink(
   code: string,
   rawUrl: string,
 ): Promise<AddLinkResult> {
-  if (!/^\d{6}$/.test(code)) return { ok: false, error: "잘못된 종목 코드" };
+  if (!isValidStockCode(code)) return { ok: false, error: "잘못된 종목 코드" };
   const url = rawUrl.trim();
   if (!/^https?:\/\//i.test(url)) {
     return { ok: false, error: "http(s) URL만 저장할 수 있습니다" };

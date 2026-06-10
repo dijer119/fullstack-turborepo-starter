@@ -1,5 +1,6 @@
 "use client";
 
+import { isValidStockCode } from "@/lib/stocks/stock-code";
 import { useEffect, useState, useTransition } from "react";
 import { Search, Loader2 } from "lucide-react";
 import {
@@ -38,7 +39,7 @@ export function StockSearch({ onSelect }: Props) {
 
   const handleAnalyzeDirect = async () => {
     const trimmed = input.trim();
-    if (!/^\d{6}$/.test(trimmed)) return;
+    if (!isValidStockCode(trimmed)) return;
     startAnalyze(async () => {
       try {
         const row = await analyzeStockOnDemand(trimmed);
@@ -69,7 +70,7 @@ export function StockSearch({ onSelect }: Props) {
             className="absolute right-24 top-1/2 -translate-y-1/2 animate-spin text-gray-400"
           />
         )}
-        {/^\d{6}$/.test(input.trim()) && (
+        {isValidStockCode(input.trim()) && (
           <button
             type="button"
             onClick={handleAnalyzeDirect}
