@@ -145,7 +145,11 @@ export function EtfManager({
           <span
             key={w.code}
             draggable
-            onDragStart={() => setDragCode(w.code)}
+            onDragStart={(e) => {
+              e.dataTransfer.setData("text/plain", w.code);
+              e.dataTransfer.effectAllowed = "move";
+              setDragCode(w.code);
+            }}
             onDragOver={(e) => { e.preventDefault(); setOverCode(w.code); }}
             onDragLeave={() => setOverCode((c) => (c === w.code ? null : c))}
             onDrop={(e) => { e.preventDefault(); drop(w.code); }}
