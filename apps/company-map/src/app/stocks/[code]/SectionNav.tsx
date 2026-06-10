@@ -9,6 +9,7 @@ interface Item {
 }
 
 const ITEMS: Item[] = [
+  { id: "dashboard", label: "대시보드", dotClass: "bg-sky-500" },
   { id: "links", label: "관련 링크", dotClass: "bg-rose-500" },
   { id: "bizoverview", label: "사업개요", dotClass: "bg-teal-500" },
   { id: "sales", label: "매출", dotClass: "bg-lime-500" },

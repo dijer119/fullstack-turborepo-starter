@@ -15,6 +15,9 @@ import { DisclosureTimeline } from "./DisclosureTimeline";
 import { SectionNav } from "./SectionNav";
 import { RelatedLinksCard } from "./RelatedLinksCard";
 import { listLinksByCode } from "@/actions/stock-links";
+import { QuantDashboard } from "./QuantDashboard";
+import { getWeek52Price } from "@/lib/stocks/week52";
+import { getTreasuryYield } from "@/lib/rates/ecos";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +31,19 @@ export default async function StockDetailPage({
 
   const master = await db.stockMaster.findUnique({
     where: { code },
-    include: { analysis: true, priceChange: true, override: true },
+    include: {
+      analysis: true,
+      priceChange: true,
+      override: true,
+      financialSnapshot: true,
+    },
   });
   if (!master) notFound();
+
+  const [week52, treasuryYieldPct] = await Promise.all([
+    getWeek52Price(code),
+    getTreasuryYield(),
+  ]);
 
   let allDisclosures = await db.disclosure.findMany({
     where: { code },
@@ -129,6 +142,37 @@ export default async function StockDetailPage({
             per={master.analysis?.per ?? null}
             pbr={master.analysis?.pbr ?? null}
             manualRoe={master.override?.manualRoe ?? null}
+          />
+          <QuantDashboard
+            currentPrice={
+              master.priceChange?.currentPrice ?? master.analysis?.currentPrice ?? null
+            }
+            marcap={
+              master.priceChange?.marcap != null
+                ? Number(master.priceChange.marcap)
+                : master.marcap != null
+                  ? Number(master.marcap)
+                  : null
+            }
+            per={master.analysis?.per ?? null}
+            pbr={master.analysis?.pbr ?? null}
+            manualRoe={master.override?.manualRoe ?? null}
+            dividendYield={master.analysis?.dividendYield ?? null}
+            week52={
+              week52
+                ? { low: week52.low, high: week52.high, asOfDate: week52.asOfDate }
+                : null
+            }
+            treasuryYieldPct={treasuryYieldPct}
+            yoy={
+              master.financialSnapshot
+                ? {
+                    pct: master.financialSnapshot.netIncomeYoyPct,
+                    year: master.financialSnapshot.latestBsnsYear,
+                    reprtCode: master.financialSnapshot.latestReprtCode,
+                  }
+                : null
+            }
           />
           <RelatedLinksCard code={master.code} initialLinks={links} />
           <DisclosureTimeline
