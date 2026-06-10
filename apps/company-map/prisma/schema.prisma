@@ -315,6 +315,7 @@ model EtfWatch {
   code      String   @id
   isin      String?  @map("isin")
   name      String
+  sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at")
 
   snapshots EtfPdfSnapshot[]
