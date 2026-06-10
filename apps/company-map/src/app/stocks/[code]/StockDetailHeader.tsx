@@ -1,4 +1,5 @@
 import { formatMarcap } from "@/lib/format-marcap";
+import { resolveRoe } from "@/lib/stocks/quant-metrics";
 import { RefreshButton } from "./RefreshButton";
 
 interface Props {
@@ -12,15 +13,6 @@ interface Props {
   manualRoe: number | null;
 }
 
-function effectiveRoePct(
-  manualRoe: number | null,
-  per: number | null,
-  pbr: number | null,
-): number | null {
-  if (manualRoe != null) return manualRoe;
-  if (per != null && pbr != null && per > 0 && pbr > 0) return (pbr / per) * 100;
-  return null;
-}
 
 export function StockDetailHeader({
   code,
@@ -32,7 +24,7 @@ export function StockDetailHeader({
   pbr,
   manualRoe,
 }: Props) {
-  const roe = effectiveRoePct(manualRoe, per, pbr);
+  const roe = resolveRoe(manualRoe, per, pbr);
   return (
     <header className="space-y-2">
       <div className="flex items-center gap-3">

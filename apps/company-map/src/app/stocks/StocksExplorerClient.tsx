@@ -16,6 +16,7 @@ import {
 } from "@/actions/vip-holdings";
 import { formatMarcap } from "@/lib/format-marcap";
 import { formatStockRatio, ratioColorClass } from "@/lib/format-ratio";
+import { resolveRoe } from "@/lib/stocks/quant-metrics";
 import { computeGrowth, formatGrowth, growthColorClass } from "@/lib/format-growth";
 import {
   addTagToStock,
@@ -596,10 +597,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                   <td className="p-2 text-right">{num(r.per)}</td>
                   <td className="p-2 text-right">{num(r.pbr, 2)}</td>
                   {(() => {
-                    const autoRoe =
-                      r.per != null && r.pbr != null && r.per > 0 && r.pbr > 0
-                        ? (r.pbr / r.per) * 100
-                        : null;
+                    const autoRoe = resolveRoe(null, r.per, r.pbr);
                     return (
                       <RoeCell
                         code={r.code}
