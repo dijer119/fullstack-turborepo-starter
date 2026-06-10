@@ -30,7 +30,7 @@ export async function fetchMarketValue(code: string): Promise<bigint | null> {
   return parseKoreanMarketValue(mv);
 }
 
-function toYyyymmdd(d: Date): string {
+export function toYyyymmdd(d: Date): string {
   return d.toISOString().slice(0, 10).replace(/-/g, "");
 }
 
