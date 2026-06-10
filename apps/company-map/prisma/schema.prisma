@@ -73,6 +73,7 @@ model StockMaster {
   disclosures           Disclosure[]
   links                 StockLink[]
   rating                StockRating?
+  week52Price           Week52Price?
 
   @@index([name])
   @@index([market])
@@ -348,4 +349,24 @@ model EtfPdfHolding {
 
   @@index([snapshotId])
   @@map("etf_pdf_holdings")
+}
+
+model Week52Price {
+  code      String   @id
+  high      Float
+  low       Float
+  asOfDate  DateTime @map("as_of_date")
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  master StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+
+  @@map("week52_prices")
+}
+
+model MarketRate {
+  kind      String   @id
+  ratePct   Float    @map("rate_pct")
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  @@map("market_rates")
 }
