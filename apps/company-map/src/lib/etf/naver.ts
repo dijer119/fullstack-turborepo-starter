@@ -50,5 +50,9 @@ export function parseNaverEtfAnalysis(json: NaverEtfAnalysis): {
       };
     })
     .filter((h): h is Holding => h !== null);
-  return { name, holdings, marketValue: parseKoreanMarketValue(json.marketValue) };
+  return {
+    name,
+    holdings,
+    marketValue: parseKoreanMarketValue(json.marketValue == null ? null : String(json.marketValue)),
+  };
 }
