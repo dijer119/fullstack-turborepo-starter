@@ -4,7 +4,7 @@ import { toYyyymmdd } from "@/lib/stocks/price-history";
 
 const BASE = "https://ecos.bok.or.kr/api/StatisticSearch";
 // 시장금리(일별) 통계표. 항목 기본값은 국고채(10년).
-// 실호출 미검증 — ECOS_API_KEY 설정 후 응답 row의 ITEM_NAME1이 "국고채(10년)"인지 1회 확인할 것.
+// 2026-06-10 실호출 검증 완료: ITEM_NAME1="국고채(10년)", row는 TIME 오름차순(마지막 행이 최신).
 const STAT_CODE = process.env.ECOS_TREASURY_STAT_CODE ?? "817Y002";
 const ITEM_CODE = process.env.ECOS_TREASURY_ITEM_CODE ?? "010210000";
 const RATE_KIND = "treasury_10y";
