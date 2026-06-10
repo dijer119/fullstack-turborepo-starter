@@ -2,7 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { registerEtf, removeEtf, type EtfWatchView, type EtfDetailView } from "@/actions/etf";
+import {
+  registerEtf, removeEtf, reorderEtfWatches,
+  type EtfWatchView, type EtfDetailView,
+} from "@/actions/etf";
+import { moveCode } from "@/lib/etf/reorder";
 import { triggerRefresh, type RefreshStateView } from "@/actions/refresh-jobs";
 import type { ShareHistory } from "@/lib/etf/history";
 import { ShareHistorySection } from "./ShareHistorySection";
@@ -52,6 +56,34 @@ export function EtfManager({
   const [code, setCode] = useState("");
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+
+  // DnD 순서 변경: localOrder는 낙관적 표시 순서. effect 없이 렌더 시 watches와 조합한다.
+  const [localOrder, setLocalOrder] = useState<string[] | null>(null);
+  const [dragCode, setDragCode] = useState<string | null>(null);
+  const [overCode, setOverCode] = useState<string | null>(null);
+
+  const byCode = new Map(watches.map((w) => [w.code, w]));
+  const ordered = localOrder
+    ? [
+        ...localOrder.map((c) => byCode.get(c)).filter((w): w is EtfWatchView => w != null),
+        ...watches.filter((w) => !localOrder.includes(w.code)),
+      ]
+    : watches;
+
+  const drop = (dropCode: string) => {
+    if (!dragCode || dragCode === dropCode) return;
+    const next = moveCode(ordered.map((w) => w.code), dragCode, dropCode);
+    setLocalOrder(next); // 낙관적 반영
+    start(async () => {
+      try {
+        const r = await reorderEtfWatches(next);
+        if (!r.ok) setLocalOrder(null); // 코드 집합 불일치 → 서버 상태로 복원
+      } catch {
+        setLocalOrder(null);
+      }
+      router.refresh();
+    });
+  };
 
   const add = () => start(async () => {
     const r = await registerEtf(code);
@@ -109,8 +141,19 @@ export function EtfManager({
       )}
 
       <div className="flex flex-wrap gap-2">
-        {watches.map((w) => (
-          <span key={w.code} className="inline-flex items-center gap-1">
+        {ordered.map((w) => (
+          <span
+            key={w.code}
+            draggable
+            onDragStart={() => setDragCode(w.code)}
+            onDragOver={(e) => { e.preventDefault(); setOverCode(w.code); }}
+            onDragLeave={() => setOverCode((c) => (c === w.code ? null : c))}
+            onDrop={(e) => { e.preventDefault(); drop(w.code); }}
+            onDragEnd={() => { setDragCode(null); setOverCode(null); }}
+            className={`inline-flex cursor-grab items-center gap-1 ${
+              dragCode === w.code ? "opacity-50" : ""
+            } ${overCode === w.code && dragCode !== null && dragCode !== w.code ? "border-l-2 border-blue-500 pl-1" : ""}`}
+          >
             <button
               onClick={() => router.push(`/stocks/etf?code=${w.code}`)}
               className={`rounded px-2 py-1 text-sm ${
