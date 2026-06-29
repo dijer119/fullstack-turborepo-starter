@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>무한매수법 자동매매 (토스 연동) 설계</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .warn { border-left: 3px solid #c53030; background: #fff5f5; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+</style>
+</head>
+<body>
+<h1>무한매수법 자동매매 (토스증권 연동) 설계</h1>
+<p><strong>날짜</strong>: 2026-06-29 · <strong>앱</strong>: company-map · <strong>출처</strong>: 라오어 「미국주식 무한매수법」 (블로그 리뷰 jykang73/224324707916)</p>
+
+<h2>1. 목표</h2>
+<p>미국 3배 레버리지 ETF(TQQQ 등)를 대상으로 라오어 무한매수법의 <strong>핵심 사이클</strong>을 토스증권 Open API로 <strong>완전 무인 자동</strong> 실행하고, 종목별 진행 현황을 대시보드로 본다.</p>
+<p>성공 기준:</p>
+<ul>
+  <li>active 사이클에 대해 worker가 US 거래일마다 1회 자동으로 그날의 LOC 매수·목표 매도 주문을 제출한다(또는 dryRun이면 로깅).</li>
+  <li>대시보드에서 종목별 진행 회차·라이브 평단·보유·평가수익률·오늘 주문·다음 매도가를 확인한다.</li>
+  <li>전략 코어가 순수 함수로 분리되어 Vitest로 검증된다.</li>
+</ul>
+
+<div class="warn">
+<strong>실자금 자동매매 경고.</strong> 매수/매도는 실제 라이브 계좌에서 체결된다. 본 기능은 사이클별 <strong>dryRun 기본 ON</strong>으로 시작하며, 모의 주문 로그 확인 + CLS(LOC) 소액 실거래 1회 검증 후 사용자가 LIVE로 전환한다. 전역 킬스위치로 전체 중단 가능.
+</div>
+
+<h2>2. 무한매수법 핵심 사이클 (구현 범위 = 상황1)</h2>
+<table>
+  <tr><th>요소</th><th>규칙</th></tr>
+  <tr><td>자금 분할</td><td><code>dailyAmount = 원금 / 분할수</code> (기본 분할수 40)</td></tr>
+  <tr><td>1회차</td><td>장중 <strong>MARKET 매수</strong> 1회 분량으로 사이클 시작</td></tr>
+  <tr><td>2회차~</td><td>dailyAmount 절반 → <code>BUY LIMIT CLS @ 평단</code>(LOC 평단), 절반 → <code>BUY LIMIT CLS @ 현재가×(1+큰수%)</code>(LOC 큰수). 각 ≥1주</td></tr>
+  <tr><td>매일 매도</td><td>보유 전량 <code>SELL LIMIT DAY @ 평단×(1+익절%)</code> (기본 +10%). 당일 만료 → 매일 재등록</td></tr>
+  <tr><td>40회차 소진 후</td><td>매수 중단, 매도 목표가만 유지. <code>평가수익률 ≤ -10%</code>면 MARKET 전량 손절. 익절 체결(보유 0) 또는 손절 시 → round 0으로 리셋(재시작)</td></tr>
+</table>
+<p><strong>제외(범위 밖)</strong>: 상황2(원금 소진 후 -10% 초과 폭락 시 동결 + 새 계좌 + 손익통산). 다계좌·복잡도 큼 → 후속 작업.</p>
+<p>LOC 구현: 토스 <code>createOrder</code>의 <code>timeInForce: "CLS"</code> + <code>orderType: "LIMIT"</code> = Limit On Close. (LOC 매수=지정가보다 종가 낮으면 체결 / LOC 매도=지정가보다 종가 높으면 체결.)</p>
+
+<h2>3. 데이터 모델 (company-map SQLite, 신규)</h2>
+<pre><code>model InfiniteBuyCycle {
+  id            String   @id @default(uuid())
+  symbol        String                        // 토스 심볼 (US 티커, 예: TQQQ)
+  name          String                        // 표시용 종목명
+  accountSeq    Int?                          // 토스 계좌(null=기본계좌)
+  principal     Float                         // 원금 (USD)
+  splits        Int      @default(40)         // 분할 회차 수
+  profitTarget  Float    @default(10)         // 익절 % (평단 대비)
+  bigBuyPremium Float    @default(12)         // "큰수" LOC 매수 프리미엄 %
+  lossCut       Float    @default(10)         // 소진 후 손절 기준 % (수익률 ≤ -lossCut)
+  status        String   @default("active")   // active | paused | completed | stopped
+  dryRun        Boolean  @default(true)       // 모의(주문 미제출) 기본 ON
+  round         Int      @default(0)          // 현재까지 매수 완료 회차
+  lastRunDate   String?                       // 마지막 실행 US 거래일 YYYYMMDD (멱등)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  orders        InfiniteBuyOrder[]
+  @@map("infinite_buy_cycles")
+}
+
+model InfiniteBuyOrder {
+  id          String   @id @default(uuid())
+  cycleId     String
+  tradeDate   String                          // US 거래일 YYYYMMDD
+  round       Int
+  side        String                          // BUY | SELL
+  kind        String                          // loc_avg | loc_big | target_sell | first_market | reset_sell
+  orderType   String                          // LIMIT | MARKET
+  tif         String                          // CLS | DAY
+  price       Float?
+  quantity    Float
+  tossOrderId String?                         // 실제 주문 ID (dryRun이면 null)
+  dryRun      Boolean
+  status      String                          // submitted | failed | simulated
+  error       String?
+  createdAt   DateTime @default(now())
+  cycle       InfiniteBuyCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  @@index([cycleId, tradeDate])
+  @@map("infinite_buy_orders")
+}</code></pre>
+<p>평단·보유수량·평가수익률은 저장하지 않고 <strong>토스 보유종목 API에서 라이브 조회</strong>한다(사이클은 설정 + 회차 + 주문이력만 보관).</p>
+
+<h2>4. 전략 코어 (순수 함수)</h2>
+<p><code>src/lib/infinite-buy/strategy.ts</code> — <code>computeDailyOrders(state)</code>. 토스 의존 없는 순수 계산이라 Vitest로 단위 검증.</p>
+<pre><code>interface CycleState {
+  round: number; splits: number; principalUsd: number;
+  profitTarget: number; bigBuyPremium: number; lossCut: number;
+  avgPrice: number | null;     // 토스 라이브 평단 (보유 없으면 null)
+  currentPrice: number;        // 토스 라이브 현재가
+  holdingQty: number;          // 토스 라이브 보유수량
+  pnlPct: number | null;       // 토스 라이브 평가수익률
+}
+interface IntendedOrder {
+  side: "BUY"|"SELL"; kind: string; orderType: "LIMIT"|"MARKET";
+  tif: "CLS"|"DAY"; price: number | null; quantity: number;
+}
+function computeDailyOrders(s: CycleState): {
+  orders: IntendedOrder[];
+  nextRound: number;           // 매수 발생 시 round+1, 아니면 동일
+  resetAfter: boolean;         // 손절/익절완료로 리셋해야 하면 true
+}</code></pre>
+<p>로직 분기:</p>
+<ul>
+  <li><strong>round &lt; splits</strong> (매수 단계):
+    <ul>
+      <li>round==0 → <code>first_market</code> BUY MARKET (qty = floor(dailyAmount/currentPrice), ≥1)</li>
+      <li>round≥1 → <code>loc_avg</code> BUY LIMIT CLS @ avgPrice (qty = floor((dailyAmount/2)/avgPrice), ≥1) + <code>loc_big</code> BUY LIMIT CLS @ currentPrice×(1+bigBuyPremium/100) (qty ≥1)</li>
+      <li>+ <code>target_sell</code> SELL LIMIT DAY @ avgPrice×(1+profitTarget/100), qty = holdingQty (보유&gt;0일 때)</li>
+      <li>nextRound = round+1</li>
+    </ul>
+  </li>
+  <li><strong>round ≥ splits</strong> (소진 후, 상황1):
+    <ul>
+      <li>holdingQty==0 → 익절 완료로 간주 → resetAfter=true (주문 없음)</li>
+      <li>pnlPct ≤ -lossCut → <code>reset_sell</code> SELL MARKET 전량 → resetAfter=true</li>
+      <li>그 외 → <code>target_sell</code> SELL LIMIT DAY @ avgPrice×(1+profitTarget/100) 유지</li>
+    </ul>
+  </li>
+</ul>
+<p>금액·수량은 USD 기준. 매수 가능금액 부족 시 해당 주문 skip + 로깅(코어는 의도만 계산, 가용성 체크는 실행기에서).</p>
+
+<h2>5. Worker 루프 (완전 무인)</h2>
+<p><code>worker/infinite-buy-loop.ts</code> (기존 <code>etf-pdf-loop</code> 패턴, <code>worker/index.ts</code>에 등록). 주기 폴링하며 <strong>US 정규장 세션 + 거래일당 1회</strong> 실행:</p>
+<ol>
+  <li><code>getMarketStatuses</code>(US 세션)·<code>getMarketCalendarUS</code>로 정규장/개장일 확인, 주말·휴장 skip.</li>
+  <li>각 <code>status==active</code> 사이클: <code>lastRunDate != 오늘(US 거래일)</code>이면 실행.</li>
+  <li>토스 라이브(보유·현재가·평단·수익률) 조회 → <code>computeDailyOrders</code> → 주문 제출(dryRun이면 로깅만, <code>status:"simulated"</code>).</li>
+  <li>매수가능금액(<code>getBuyingPower</code>) 부족분 주문은 skip+로깅. round/lastRunDate/리셋 반영.</li>
+</ol>
+<p>실행 코어는 <code>src/lib/infinite-buy/run.ts</code>의 <code>runCycle(db, toss, cycle)</code>로 분리해 worker·수동 트리거·테스트가 공유한다.</p>
+
+<h2>6. UI 대시보드 <code>/stocks/infinite-buy</code></h2>
+<ul>
+  <li>사이클 목록(종목별 카드/행): 종목·심볼, status, <strong>dryRun/LIVE 배지</strong>, 원금, 진행 <code>N/40</code>(진행바), 라이브 평단·보유수량·평가수익률, 다음 매도 목표가, 오늘 주문 요약.</li>
+  <li>사이클 상세: 주문 이력 테이블(거래일·회차·kind·가격·수량·상태·dryRun), 라이브 지표.</li>
+  <li>등록 폼: 종목 검색(<code>naver-search</code>로 이름→US 심볼), 원금/분할/익절%/큰수%/손절% 입력.</li>
+  <li>조작: dryRun 토글, 일시정지/중지/삭제, <strong>"지금 실행"</strong>(수동 트리거 — 검증용).</li>
+  <li><code>AppMenu</code> 사이드바 메뉴 + <code>/stocks</code> 링크 추가.</li>
+</ul>
+<p>서버액션 <code>src/actions/infinite-buy.ts</code>: <code>listCycles</code>, <code>getCycleDetail</code>(라이브 보유 병합), <code>createCycle</code>, <code>updateCycle</code>(dryRun·status·파라미터), <code>deleteCycle</code>, <code>runCycleNow</code>.</p>
+
+<h2>7. 안전장치 (실자금 필수)</h2>
+<ul>
+  <li><strong>dryRun 기본 ON</strong> (사이클별). LIVE 전환은 명시적 토글.</li>
+  <li><strong>전역 킬스위치</strong>: 환경변수(예: <code>INFINITE_BUY_DISABLED=1</code>) 또는 설정행 → 모든 자동 제출 차단(dryRun 강제).</li>
+  <li>거래일당 멱등(<code>lastRunDate</code>) — 중복 주문 방지.</li>
+  <li>원금·40회차 상한 준수, 매수가능금액 초과 주문 차단.</li>
+  <li>모든 주문(모의 포함) <code>InfiniteBuyOrder</code> 로깅 + 에러 기록.</li>
+  <li>고액주문(<code>confirmHighValueOrder</code>) 플래그 적절히 전달.</li>
+</ul>
+
+<h2>8. 파일 구성</h2>
+<table>
+  <tr><th>파일</th><th>역할</th></tr>
+  <tr><td><code>src/lib/infinite-buy/strategy.ts</code> + <code>.test.ts</code></td><td>순수 전략 코어 + Vitest</td></tr>
+  <tr><td><code>src/lib/infinite-buy/run.ts</code></td><td>라이브 조회+코어+주문제출 실행기(db·toss 주입)</td></tr>
+  <tr><td><code>worker/infinite-buy-loop.ts</code></td><td>무인 스케줄 루프 (index.ts 등록)</td></tr>
+  <tr><td><code>src/actions/infinite-buy.ts</code></td><td>대시보드 서버액션</td></tr>
+  <tr><td><code>src/app/stocks/infinite-buy/page.tsx</code> + 클라이언트 컴포넌트</td><td>대시보드 UI</td></tr>
+  <tr><td><code>src/components/layout/AppMenu.tsx</code>, <code>src/app/stocks/page.tsx</code></td><td>메뉴·링크</td></tr>
+  <tr><td><code>prisma/schema.prisma</code> + 마이그레이션</td><td>InfiniteBuyCycle/Order</td></tr>
+</table>
+
+<h2>9. 검증 계획</h2>
+<ul>
+  <li>전략 코어: Vitest — 1회차 MARKET, 2회차 LOC 평단/큰수 수량·가격, 목표 매도가, 소진 후 손절/익절리셋, 경계(보유 0, 평단 null, 가용금액 부족).</li>
+  <li>실행기: dryRun 모드로 <code>runCycle</code> 실행 → 주문 미제출 + <code>InfiniteBuyOrder</code> simulated 로깅 확인(라이브 토스 조회는 읽기 전용).</li>
+  <li>UI: HMR 반영, 대시보드 렌더·등록·토글 확인. (스키마 변경 후 dev 서버 재시작 필수.)</li>
+  <li>LIVE 검증: 사용자가 소액 1종목으로 dryRun→LIVE 전환 후 CLS 주문 1회 실제 제출·체결 확인.</li>
+  <li>lint: 변경 파일만 <code>npx eslint &lt;files&gt;</code> (워크스페이스 lint는 기존 에러로 게이트 불가).</li>
+</ul>
+
+<h2>10. 가정 / 범위 밖</h2>
+<ul>
+  <li><strong>1종목 = 1 활성 사이클·전용 계좌/보유</strong> — 평단·보유를 토스 라이브로 쓰므로 전략 밖 동일종목 보유 시 평단이 섞임.</li>
+  <li><strong>CLS(LOC) 실동작 미검증</strong> — 타입엔 존재. LIVE 전 소액 1회 실거래로 검증 필요.</li>
+  <li>스케줄: US 정규장 게이트로 거래일당 1회. (DST 변동은 세션 상태로 흡수.)</li>
+  <li>범위 밖: 상황2(동결/새 계좌/손익통산), 주문 정정·취소·체결 추적, 환전 자동화, 한국 종목.</li>
+  <li>company-map 주의: Prisma 스키마 변경 후 dev 서버 재시작 필수, dev 백그라운드 금지(turbo가 3004 관리).</li>
+</ul>
+</body>
+</html>
