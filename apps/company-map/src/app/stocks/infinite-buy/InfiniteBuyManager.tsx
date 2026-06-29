@@ -3,9 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  createCycle, updateCycle, deleteCycle, runCycleNow, getCycleOrders,
+  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, ReferenceLine,
+} from "recharts";
+import {
+  createCycle, updateCycle, deleteCycle, runCycleNow, getCycleOrders, getPriceHistory,
   type CycleView, type OrderView,
 } from "@/actions/infinite-buy";
+import type { DailyCandle } from "@/lib/toss/client";
 
 function usd(v: number | null): string {
   return v == null ? "—" : `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -14,7 +18,13 @@ function pct(v: number | null): string {
   return v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
 }
 
-export function InfiniteBuyManager({ cycles }: { cycles: CycleView[] }) {
+export function InfiniteBuyManager({
+  cycles,
+  usdBuyingPower,
+}: {
+  cycles: CycleView[];
+  usdBuyingPower: number | null;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [symbol, setSymbol] = useState("");
@@ -22,6 +32,7 @@ export function InfiniteBuyManager({ cycles }: { cycles: CycleView[] }) {
   const [principal, setPrincipal] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [openOrders, setOpenOrders] = useState<Record<string, OrderView[]>>({});
+  const [charts, setCharts] = useState<Record<string, DailyCandle[]>>({});
 
   const onCreate = () =>
     start(async () => {
@@ -63,8 +74,33 @@ export function InfiniteBuyManager({ cycles }: { cycles: CycleView[] }) {
       setOpenOrders((p) => ({ ...p, [c.id]: orders }));
     });
 
+  const loadChart = (c: CycleView) =>
+    start(async () => {
+      if (charts[c.id]) { setCharts((p) => { const n = { ...p }; delete n[c.id]; return n; }); return; }
+      const data = await getPriceHistory(c.symbol);
+      setCharts((p) => ({ ...p, [c.id]: data }));
+    });
+
   return (
     <div className="space-y-6">
+      {/* USD 잔고 + 갱신 */}
+      <section className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-900/40">
+        <div className="text-sm">
+          <span className="text-gray-500">USD 매수가능금액</span>{" "}
+          <span className="font-semibold tabular-nums">{usd(usdBuyingPower)}</span>
+          {usdBuyingPower == null && (
+            <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">(토스 조회 실패/미설정)</span>
+          )}
+        </div>
+        <button
+          onClick={() => start(() => router.refresh())}
+          disabled={pending}
+          className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800"
+        >
+          {pending ? "갱신 중…" : "갱신"}
+        </button>
+      </section>
+
       {/* 등록 폼 */}
       <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
         <h2 className="mb-2 text-sm font-semibold">새 사이클</h2>
@@ -135,9 +171,45 @@ export function InfiniteBuyManager({ cycles }: { cycles: CycleView[] }) {
                 <div><span className="text-gray-500">마지막실행</span> {c.lastRunDate ?? "—"}</div>
               </div>
 
-              <button onClick={() => loadOrders(c)} disabled={pending} className="mt-2 text-xs text-blue-600 hover:underline dark:text-blue-400">
-                {openOrders[c.id] ? "주문 이력 닫기" : "주문 이력 보기"}
-              </button>
+              <div className="mt-2 flex gap-3">
+                <button onClick={() => loadChart(c)} disabled={pending} className="text-xs text-blue-600 hover:underline dark:text-blue-400">
+                  {charts[c.id] ? "가격 차트 닫기" : "가격 차트 보기"}
+                </button>
+                <button onClick={() => loadOrders(c)} disabled={pending} className="text-xs text-blue-600 hover:underline dark:text-blue-400">
+                  {openOrders[c.id] ? "주문 이력 닫기" : "주문 이력 보기"}
+                </button>
+              </div>
+
+              {charts[c.id] && (
+                charts[c.id].length === 0 ? (
+                  <p className="mt-2 text-xs text-gray-500">가격 데이터를 불러올 수 없습니다 (토스 미설정/조회 실패).</p>
+                ) : (
+                  <div className="mt-2">
+                    <p className="mb-1 text-xs text-gray-500">
+                      일별 종가 (최근 {charts[c.id].length}거래일) · <span className="text-green-600 dark:text-green-400">초록=평단 {usd(c.avgPrice)}</span> · <span className="text-red-600 dark:text-red-400">빨강=익절목표 {usd(c.targetSellPrice)}</span>
+                    </p>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={charts[c.id].map((d) => ({ date: d.date.slice(5), close: d.close }))} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" fontSize={11} minTickGap={28} />
+                          <YAxis fontSize={11} width={56} domain={["auto", "auto"]} tickFormatter={(v: number) => `$${v}`} />
+                          <Tooltip formatter={(v) => (typeof v === "number" ? `$${v.toFixed(2)}` : v)} />
+                          <Line type="monotone" dataKey="close" name="종가" stroke="#2563eb" dot={false} strokeWidth={1.6} />
+                          {c.avgPrice != null && (
+                            <ReferenceLine y={c.avgPrice} stroke="#16a34a" strokeDasharray="4 2"
+                              label={{ value: `평단 ${usd(c.avgPrice)}`, position: "insideTopLeft", fontSize: 10, fill: "#16a34a" }} />
+                          )}
+                          {c.targetSellPrice != null && (
+                            <ReferenceLine y={c.targetSellPrice} stroke="#dc2626" strokeDasharray="2 2"
+                              label={{ value: `익절 ${usd(c.targetSellPrice)}`, position: "insideBottomLeft", fontSize: 10, fill: "#dc2626" }} />
+                          )}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )
+              )}
               {openOrders[c.id] && (
                 <div className="mt-2 overflow-x-auto">
                   <table className="w-full text-xs">

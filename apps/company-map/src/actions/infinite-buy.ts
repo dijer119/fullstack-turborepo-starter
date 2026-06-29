@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { getHoldings, getDefaultAccountSeq, isTossConfigured } from "@/lib/toss/client";
+import {
+  getHoldings, getDefaultAccountSeq, getBuyingPower, getDailyCandles,
+  isTossConfigured, type DailyCandle,
+} from "@/lib/toss/client";
 import { runCycle, type CycleConfig } from "@/lib/infinite-buy/run";
 import { tossRunDeps, prismaPersistence, isKilled } from "@/lib/infinite-buy/toss-adapter";
 
@@ -43,6 +46,27 @@ async function liveHoldingMap(): Promise<Map<string, { avg: number; qty: number;
     /* 토스 조회 실패는 무시(라이브 필드 null) */
   }
   return map;
+}
+
+// 종목 일별 종가 시계열(차트용). 기본 90거래일. 미설정/실패 시 빈 배열.
+export async function getPriceHistory(symbol: string, count = 90): Promise<DailyCandle[]> {
+  if (!isTossConfigured()) return [];
+  try {
+    return await getDailyCandles(symbol, count);
+  } catch {
+    return [];
+  }
+}
+
+// 기본 계좌의 USD 매수가능금액(달러 잔고). 토스 미설정/조회 실패 시 null.
+export async function getUsdBuyingPower(): Promise<number | null> {
+  if (!isTossConfigured()) return null;
+  try {
+    const accountSeq = await getDefaultAccountSeq();
+    return await getBuyingPower(accountSeq, "USD");
+  } catch {
+    return null;
+  }
 }
 
 export async function listCycles(): Promise<CycleView[]> {
