@@ -323,6 +323,21 @@ model EtfWatch {
   @@map("etf_watches")
 }
 
+// 관심종목. 토스증권 심볼(KR 6자리 또는 US 티커)을 저장. 현재가·통화는 토스 API로
+// 실시간 조회하므로 여기엔 보관하지 않음. StockMaster(KR 전용)에 FK로 묶지 않는다.
+model StockWatch {
+  symbol        String   @id
+  name          String
+  market        String?  // KOSPI/KOSDAQ/NASDAQ/NYSE 등
+  currency      String?  // KRW/USD
+  purchasePrice Float?   @map("purchase_price") // 사용자 입력 구매가(종목 통화 기준). 미입력 시 null
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([sortOrder])
+  @@map("stock_watches")
+}
+
 model EtfPdfSnapshot {
   id          String   @id @default(uuid())
   etfCode     String   @map("etf_code")
@@ -351,6 +366,91 @@ model EtfPdfHolding {
 
   @@index([snapshotId])
   @@map("etf_pdf_holdings")
+}
+
+// KB증권 펀드(단일, VIP한국형가치투자) 추적. ETF와 달리 보유종목은 운용보고서
+// 기준이라 드물게 바뀌므로, snapshotFund()가 내용이 바뀔 때만 새 스냅샷을 남긴다.
+model FundSnapshot {
+  id        String   @id @default(uuid())
+  fundCode  String   @map("fund_code") // KB amak_stnd_cd
+  trdDd     String   @map("trd_dd") // 생성일 YYYYMMDD (KST)
+  nav       Float? // 스냅샷 시점 최신 기준가(참고용)
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+
+  holdings FundHolding[]
+
+  @@unique([fundCode, trdDd])
+  @@index([fundCode, trdDd])
+  @@map("fund_snapshots")
+}
+
+model FundHolding {
+  id         String @id @default(uuid())
+  snapshotId String @map("snapshot_id")
+  name       String
+  weight     Float? // 비중 %
+  rank       Int // 1-based
+
+  snapshot FundSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+  @@map("fund_holdings")
+}
+
+model FundNav {
+  id       String @id @default(uuid())
+  fundCode String @map("fund_code")
+  date     String // YYYYMMDD
+  nav      Float // 기준가(원)
+
+  @@unique([fundCode, date])
+  @@map("fund_navs")
+}
+
+// 무한매수법 자동매매 사이클. 평단·보유·수익률은 토스 라이브 조회, 여기엔 설정·회차·주문이력만.
+model InfiniteBuyCycle {
+  id            String   @id @default(uuid())
+  symbol        String                          // 토스 심볼(US 티커, 예: TQQQ)
+  name          String                          // 표시용 종목명
+  accountSeq    Int?     @map("account_seq")    // 토스 계좌(null=기본계좌)
+  principal     Float                           // 원금(USD)
+  splits        Int      @default(40)
+  profitTarget  Float    @default(10) @map("profit_target")   // 익절 %
+  bigBuyPremium Float    @default(12) @map("big_buy_premium")  // 큰수 LOC 프리미엄 %
+  lossCut       Float    @default(10) @map("loss_cut")         // 소진 후 손절 기준 %
+  status        String   @default("active")     // active | paused | completed | stopped
+  dryRun        Boolean  @default(true) @map("dry_run")
+  round         Int      @default(0)
+  lastRunDate   String?  @map("last_run_date")  // 마지막 실행 US 거래일
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  orders InfiniteBuyOrder[]
+
+  @@map("infinite_buy_cycles")
+}
+
+model InfiniteBuyOrder {
+  id          String   @id @default(uuid())
+  cycleId     String   @map("cycle_id")
+  tradeDate   String   @map("trade_date")       // US 거래일
+  round       Int
+  side        String                            // BUY | SELL
+  kind        String                            // first_market|loc_avg|loc_big|target_sell|reset_sell
+  orderType   String   @map("order_type")       // LIMIT | MARKET
+  tif         String                            // CLS | DAY
+  price       Float?
+  quantity    Float
+  tossOrderId String?  @map("toss_order_id")
+  dryRun      Boolean  @map("dry_run")
+  status      String                            // submitted | failed | simulated | skipped
+  error       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  cycle InfiniteBuyCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+
+  @@index([cycleId, tradeDate])
+  @@map("infinite_buy_orders")
 }
 
 model Week52Price {
