@@ -19,6 +19,13 @@ function parseOptionalNumber(v: string | undefined): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+// 최소값 필터용: 0과 음수도 허용(예: 순이익 최소 0 = 흑자만). 빈 값/NaN은 null.
+function parseMinNumber(v: string | undefined): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 export default async function StocksPage({
   searchParams,
 }: {
@@ -55,6 +62,11 @@ export default async function StocksPage({
     maxMarcapEok: parseOptionalNumber(sp.maxMarcap),
     perMax: parseOptionalNumber(sp.perMax),
     pbrMax: parseOptionalNumber(sp.pbrMax),
+    netIncomeYoyMin: parseMinNumber(sp.netYoyMin),
+    opIncomeYoyMin: parseMinNumber(sp.opYoyMin),
+    dividendYieldMin: parseMinNumber(sp.divMin),
+    seojunsikIndexMin: parseMinNumber(sp.seojunsikMin),
+    excludeLoss: sp.excludeLoss === "1",
     analyzedOnly: sp.analyzed === "1",
     vipOnly: sp.vip === "1",
     memoOnly: sp.memo === "1",
@@ -77,9 +89,23 @@ export default async function StocksPage({
           <p className="mt-1 text-sm text-gray-500">
             KOSPI · KOSDAQ 전체 상장 종목. 필터·정렬로 탐색하세요.
           </p>
-          <Link href="/stocks/etf" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
-            액티브 ETF 구성종목 변화 →
-          </Link>
+          <div className="flex gap-3">
+            <Link href="/stocks/etf" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
+              액티브 ETF 구성종목 변화 →
+            </Link>
+            <Link href="/stocks/toss-holdings" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
+              토스증권 보유종목 →
+            </Link>
+            <Link href="/stocks/watchlist" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
+              관심종목 →
+            </Link>
+            <Link href="/stocks/funds" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
+              VIP 펀드 →
+            </Link>
+            <Link href="/stocks/infinite-buy" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
+              무한매수법 →
+            </Link>
+          </div>
         </div>
         <RefreshMenu initialStates={refreshStates} />
       </header>

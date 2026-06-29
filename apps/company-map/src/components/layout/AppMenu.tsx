@@ -17,6 +17,10 @@ import {
   Upload,
   Cpu,
   Search,
+  Wallet,
+  Star,
+  Landmark,
+  Repeat,
 } from "lucide-react";
 
 type Service = {
@@ -115,6 +119,34 @@ const TOOLS: Tool[] = [
     description: "관심 ETF 구성종목·비중 변화 추적",
     path: "/stocks/etf",
     icon: Layers,
+  },
+  {
+    key: "toss-holdings",
+    name: "토스증권 보유종목",
+    description: "토스증권 Open API 실시간 보유 현황",
+    path: "/stocks/toss-holdings",
+    icon: Wallet,
+  },
+  {
+    key: "watchlist",
+    name: "관심종목",
+    description: "관심 종목 저장 + 토스증권 현재가",
+    path: "/stocks/watchlist",
+    icon: Star,
+  },
+  {
+    key: "funds",
+    name: "VIP 펀드",
+    description: "VIP한국형가치투자 보유종목·기준가 추적",
+    path: "/stocks/funds",
+    icon: Landmark,
+  },
+  {
+    key: "infinite-buy",
+    name: "무한매수법",
+    description: "미국 3배 레버리지 무한매수 자동매매",
+    path: "/stocks/infinite-buy",
+    icon: Repeat,
   },
 ];
 
