@@ -5,6 +5,17 @@ import type { PrismaClient } from "@prisma-clients/company-map";
 import type { RunDeps, RunPersistence, HoldingSnapshot, OrderLog } from "./run";
 import type { IntendedOrder } from "./strategy";
 
+// 실주문 직전 방어 가드: 비정상 주문(수량/가격)이 실제 브로커로 가지 않도록 throw.
+// run.ts가 throw를 잡아 status:"failed"로 로깅하므로 잘못된 주문은 제출되지 않는다.
+export function assertSubmittable(o: IntendedOrder): void {
+  if (!Number.isFinite(o.quantity) || o.quantity <= 0) {
+    throw new Error(`invalid order quantity: ${o.quantity}`);
+  }
+  if (o.orderType === "LIMIT" && (o.price == null || !Number.isFinite(o.price) || o.price <= 0)) {
+    throw new Error(`invalid LIMIT price: ${o.price}`);
+  }
+}
+
 // 토스 클라이언트 → RunDeps. profitLoss.rate는 소수(0.05=5%)라 *100 하여 %로 변환.
 export function tossRunDeps(): RunDeps {
   return {
@@ -28,6 +39,7 @@ export function tossRunDeps(): RunDeps {
       return getBuyingPower(accountSeq, "USD");
     },
     async submitOrder(accountSeq, o: IntendedOrder, symbol) {
+      assertSubmittable(o);
       const r = await createOrder(accountSeq, {
         symbol,
         side: o.side,
