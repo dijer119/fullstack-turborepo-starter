@@ -118,6 +118,7 @@ export async function runCycleNow(id: string): Promise<{ ok: boolean; reason?: s
   if (!isTossConfigured()) return { ok: false, reason: "토스 미설정" };
   const c = await db.infiniteBuyCycle.findUnique({ where: { id } });
   if (!c) return { ok: false, reason: "사이클 없음" };
+  if (c.status !== "active") return { ok: false, reason: "active 사이클만 실행 가능 (재개 후 시도)" };
   const config: CycleConfig = {
     id: c.id, symbol: c.symbol, accountSeq: c.accountSeq, principalUsd: c.principal,
     splits: c.splits, profitTarget: c.profitTarget, bigBuyPremium: c.bigBuyPremium,
