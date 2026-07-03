@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>무한매수법 V2.1 규칙 정리 (학습 노트)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .warn { border-left: 3px solid #c53030; background: #fff5f5; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .ok { border-left: 3px solid #38a169; background: #f0fff4; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+</style>
+</head>
+<body>
+<h1>무한매수법 V2.1 규칙 정리 (학습 노트)</h1>
+<p>출처: 라오어 무한매수법 카페 V2.1 공지(2021-11-13) + 요약 이미지(매도과정 요약·게으른마리 종합표·콩나물 매수도). 본 문서는 <strong>구현 전 학습·확인용</strong>이며 실제 구현은 별도 spec/plan으로 진행.</p>
+
+<h2>0. 핵심 개념: 전반전 / 후반전</h2>
+<p><strong>원금소진 50%</strong>를 기준으로 나눈다. 40분할이면 하루치 = 원금/40 = 원금의 2.5%이므로:</p>
+<ul>
+  <li><strong>전반전</strong> = 원금소진 &lt; 50% (실무상 회차 &lt; 20, 즉 round 1~19)</li>
+  <li><strong>후반전</strong> = 원금소진 ≥ 50% (회차 ≥ 20, 즉 round 20~40)</li>
+</ul>
+<p>전반전/후반전은 <strong>매수·매도 모두</strong>에 적용된다. 종목은 현재 TQQQ 위주 권장.</p>
+
+<h2>1. 매수 (V2.0과 동일)</h2>
+<p>하루치(원금의 2.5%)를 다음과 같이 <strong>LOC 매수</strong>로 건다. (LOC 매수 = 종가가 주문가보다 낮을 때 체결)</p>
+<table>
+  <tr><th>구간</th><th>비중</th><th>주문가</th><th>주문유형</th></tr>
+  <tr><td rowspan="2">전반전</td><td>0.5회치(원금 1.25%)</td><td>내 평단가 +0% (평단)</td><td>LOC 평단매수</td></tr>
+  <tr><td>0.5회치(원금 1.25%)</td><td>내 평단가 +5%</td><td>LOC 큰수매수</td></tr>
+  <tr><td>후반전</td><td>1회치(원금 2.5%) 전액</td><td>내 평단가 +0% (평단)</td><td>LOC 평단매수</td></tr>
+</table>
+<p>1회차(최초)는 평단이 없으므로 시장가로 1회치 매수해 사이클을 시작(우리 구현 관례).</p>
+<blockquote><strong>큰수매수 상한 = 평단+5%.</strong> 평단+5% 초과 가격에는 매수하지 않는다. LOC 매수는 종가가 주문가보다 낮을 때만 체결되므로, 주문가를 평단×1.05로 고정하면 이 상한이 내재적으로 보장된다(코드에도 assert로 못박음).</blockquote>
+
+<h2>2. 매도 (V2.1 신규 — LOC 매도를 한 칸 세분화)</h2>
+<p>매도가는 전부 <strong>내 평단가 대비</strong>. 지정가매도(=AFTER 지정가)는 장중 도달 시 체결, LOC매도는 종가가 주문가보다 높을 때 체결.</p>
+<h3>전반전 매도 (원금소진 50% 이전)</h3>
+<table>
+  <tr><th>비중(전체물량 기준)</th><th>매도가</th><th>주문유형</th></tr>
+  <tr><td>25%</td><td>평단 +5%</td><td>LOC 매도</td></tr>
+  <tr><td>75%</td><td>평단 +10%</td><td>지정가매도</td></tr>
+</table>
+<h3>후반전 매도 (원금소진 50% 이후)</h3>
+<table>
+  <tr><th>비중(전체물량 기준)</th><th>매도가</th><th>주문유형</th></tr>
+  <tr><td>25%</td><td>평단 +0% (평단)</td><td>LOC 매도</td></tr>
+  <tr><td>25%</td><td>평단 +5%</td><td>지정가매도</td></tr>
+  <tr><td>50%</td><td>평단 +10%</td><td>지정가매도</td></tr>
+</table>
+<p>즉 전반→후반으로 가면 +10% 비중이 75%→50%로 줄고, 후반전엔 <strong>평단(0%) LOC 매도 25%가 신설</strong>되어 현금흐름이 개선된다.</p>
+
+<h2>3. 예시 (원문)</h2>
+<ul>
+  <li><strong>전반전</strong>: SOXL 평단 $50, 100주, 15회차 → $52.5(+5%)에 LOC 25주 + $55(+10%)에 지정가 75주.</li>
+  <li><strong>후반전</strong>: SOXL 평단 $50, 200주, 30회차 → $55(+10%) 지정가 100주 + $52.5(+5%) 지정가 50주 + $50(평단) LOC 50주.</li>
+</ul>
+
+<h2>4. Q&A 요점</h2>
+<ul>
+  <li>전반전에서 LOC +5% 매도만 되고 넘어가도, 다음날 남은 물량으로 <strong>또 +5% LOC를 건다</strong>(같은 규칙 반복).</li>
+  <li>+5% LOC만 2~3일 연속 걸려도 그대로 진행. 3배 레버리지 특성상 곧 구간을 벗어남.</li>
+  <li>후반전 0% LOC 매도만 이어진 뒤엔, <strong>남은 물량이 전반전인지 후반전인지 보고 그에 맞는 매수</strong>로 진행.</li>
+  <li>지정가 +10%만 걸리고 급락해 LOC가 안 걸리면, <strong>남은 물량 기준으로 무매법 이어감</strong>.</li>
+  <li>LOC 매도로 의도보다 높은 가격(수익률 +10% 초과) 매도가 종종 발생 → 백테스트상 수익률은 V2.0과 거의 비슷.</li>
+</ul>
+
+<h2>5. 현재 우리 구현(v1 성격)과의 차이 — 중요</h2>
+<div class="warn">
+현재 company-map 무한매수 구현은 V2.1과 <strong>매수·매도 모두 다르다.</strong> "현재 기능 유지 + V2.1 도입"이므로 V2.1은 별도 모드로 신규 구현해야 함.
+</div>
+<table>
+  <tr><th>항목</th><th>현재 구현</th><th>V2.1</th></tr>
+  <tr><td>매수 큰수</td><td>현재가 × (1+12%)</td><td>평단 × 1.05 (평단+5%)</td></tr>
+  <tr><td>매수 후반전</td><td>항상 평단/큰수 반반</td><td>전액 평단(+0%) LOC</td></tr>
+  <tr><td>매도</td><td>보유 전량 평단+10% 1건(LIMIT DAY)</td><td>전반 2단(25%/75%)·후반 3단(25%/25%/50%), LOC+지정가 혼합</td></tr>
+  <tr><td>전반/후반 구분</td><td>없음</td><td>원금소진 50% 기준</td></tr>
+</table>
+
+<h2>6. Toss API 매핑 (구현 관점)</h2>
+<ul>
+  <li>LOC 매수/매도 → <code>LIMIT + timeInForce:"CLS"</code> (검증됨)</li>
+  <li>지정가매도(AFTER 지정가) → <code>LIMIT + timeInForce:"DAY"</code> (장중 도달 체결)</li>
+  <li>후반전은 동일 종목에 <strong>동시 3개 매도 주문</strong> 필요 → 매도가능수량/동시주문 허용 여부 확인 필요.</li>
+</ul>
+
+<h2>7. 미확인 / 확인 필요 항목</h2>
+<ol>
+  <li><strong>쿼터손절(+쿼터손절)</strong>: 사용자가 언급했으나 규칙 미제공. 손절을 4분할로 나눠 실행하는 방식으로 추정되나 <strong>정확한 트리거·비율·절차 미상</strong> → 자료 필요.</li>
+  <li><strong>전반/후반 경계 측정</strong>: 회차(round ≥ splits/2) 기준으로 구현할지, 실제 투입현금 기준으로 할지.</li>
+  <li><strong>버전 병행 방식</strong>: 사이클마다 v1/v2.1 선택(cycle.version 필드)로 볼지.</li>
+  <li><strong>동시 다중 매도 주문</strong>: Toss가 같은 보유에 2~3개 매도를 동시에 받는지(매도가능수량 분할).</li>
+  <li><strong>가상증액/가상시드</strong>: 적용 여부(원문은 20% 이내 권장, 선택 사항).</li>
+</ol>
+</body>
+</html>

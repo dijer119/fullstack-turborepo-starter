@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>무한매수법 V2.1 도입 설계</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .warn { border-left: 3px solid #c53030; background: #fff5f5; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+</style>
+</head>
+<body>
+<h1>무한매수법 V2.1 도입 설계</h1>
+<p><strong>날짜</strong>: 2026-07-04 · <strong>앱</strong>: company-map · <strong>규칙 출처</strong>: <code>docs/superpowers/specs/2026-07-04-infinite-buy-v2.1-reference.html</code></p>
+
+<h2>1. 목표</h2>
+<p>기존 무한매수 자동매매(v1)를 <strong>그대로 유지</strong>하면서, 라오어 <strong>V2.1</strong>을 사이클별로 선택 가능한 별도 전략 버전으로 추가한다. 매수·매도 로직만 V2.1을 따르고, 손절/원금소진 후 처리는 v1과 동일(쿼터손절 제외).</p>
+<p>성공 기준:</p>
+<ul>
+  <li>사이클 등록 시 v1/v2.1 선택 → worker가 버전에 맞는 일일 주문을 생성.</li>
+  <li>V2.1 전략 코어가 순수 함수로 분리되어 Vitest로 검증(전반/후반, 매수 2종, 매도 2·3분할, 정수 반올림, 큰수 상한).</li>
+  <li>기존 v1 사이클·테스트·데이터는 회귀 없이 동작.</li>
+</ul>
+
+<h2>2. 확정 사항</h2>
+<ul>
+  <li><strong>전반/후반 = 회차 기준</strong>: <code>round &lt; splits/2</code> 전반, <code>round ≥ splits/2</code> 후반 (40분할이면 20).</li>
+  <li><strong>버전 병행</strong>: <code>InfiniteBuyCycle.version</code> 컬럼 추가(<code>"v1"</code> 기본 / <code>"v2.1"</code>).</li>
+  <li><strong>큰수매수 상한 = 평단+5%</strong> (LOC 주문가 고정으로 내재 보장 + assert).</li>
+  <li><strong>정수 반올림</strong>: LIMIT 주문은 정수 수량만 → 분할 합계 = 보유수량 보장.</li>
+  <li>손절/원금소진 후 = v1과 동일. <strong>쿼터손절·가상증액 제외</strong>.</li>
+  <li>동시 다중 매도(후반 3건)는 구현 후 소액 실거래로 검증.</li>
+</ul>
+
+<h2>3. 전략 코어 (순수 함수, 신규)</h2>
+<p><code>src/lib/infinite-buy/strategy-v21.ts</code> — <code>computeDailyOrdersV21(state)</code>. 기존 <code>strategy.ts</code>(v1)는 손대지 않는다. 반환 타입은 v1의 <code>DailyPlan</code>/<code>IntendedOrder</code> 재사용.</p>
+
+<h3>3.1 매수 (전부 LOC = LIMIT+CLS)</h3>
+<pre><code>const daily = principalUsd / splits;           // 1회치
+const isSecondHalf = round >= splits / 2;       // 후반전
+const capBig = avgPrice * 1.05;                 // 큰수 상한(평단+5%)
+
+if (round === 0) {
+  // 최초: 시장가 1회치 (first_market)
+  qty = floor(daily / currentPrice); // ≥1이면 BUY MARKET DAY
+} else if (!isSecondHalf) {
+  // 전반: 0.5회치 평단 LOC + 0.5회치 평단+5% LOC
+  half = daily / 2;
+  loc_avg:  qty = floor(half / avgPrice)  @ avgPrice        (LIMIT CLS)
+  loc_big:  qty = floor(half / capBig)    @ capBig          (LIMIT CLS)  // 주문가 = 평단×1.05 고정
+} else {
+  // 후반: 1회치 전액 평단 LOC
+  loc_avg:  qty = floor(daily / avgPrice) @ avgPrice        (LIMIT CLS)
+}
+</code></pre>
+<p>큰수매수 주문가는 <strong>항상 평단×1.05</strong>(현재가 기반 아님) → 평단+5% 초과 매수 불가.</p>
+
+<h3>3.2 매도 (보유 &gt; 0일 때, 전체 보유수량 기준 분할)</h3>
+<p>LOC = LIMIT+CLS, 지정가 = LIMIT+DAY. 정수 반올림: 작은 구간 <code>floor</code>, 나머지를 +10% 구간에.</p>
+<table>
+  <tr><th>구간</th><th>분할</th></tr>
+  <tr><td>전반전</td><td>25% LOC @ 평단×1.05(+5%) · 나머지(≈75%) 지정가 @ 평단×1.10(+10%)</td></tr>
+  <tr><td>후반전</td><td>25% LOC @ 평단(0%) · 25% 지정가 @ 평단×1.05(+5%) · 나머지(≈50%) 지정가 @ 평단×1.10(+10%)</td></tr>
+</table>
+<pre><code>// 전반: q5 = floor(N*0.25); q10 = N - q5;
+//   sell_loc_5 (LIMIT CLS @ avg*1.05, qty q5)  — q5≥1일 때만
+//   sell_lim_10 (LIMIT DAY @ avg*1.10, qty q10)
+// 후반: q0 = floor(N*0.25); q5 = floor(N*0.25); q10 = N - q0 - q5;
+//   sell_loc_0 (LIMIT CLS @ avg,      qty q0)
+//   sell_lim_5 (LIMIT DAY @ avg*1.05, qty q5)
+//   sell_lim_10 (LIMIT DAY @ avg*1.10, qty q10)
+// 각 구간 qty 0이면 생략. 합계는 항상 N.
+</code></pre>
+<p>매도 <code>kind</code> 신규: <code>sell_loc_5</code>·<code>sell_lim_10</code>·<code>sell_loc_0</code>·<code>sell_lim_5</code>. (v1의 <code>target_sell</code>/<code>reset_sell</code>은 유지; 체결 동기화·이력은 side=SELL 전체를 대상으로 하므로 신규 kind도 자동 포함.)</p>
+
+<h3>3.3 원금소진 후 / 손절</h3>
+<p>v1과 동일: <code>round ≥ splits</code>에서 보유 0이면 리셋, <code>pnlPct ≤ -lossCut</code>이면 시장가 전량 손절(<code>reset_sell</code>) 후 리셋, 그 외엔 위 매도 분할 유지. round 진행/리셋 규칙 동일.</p>
+
+<h2>4. 실행기 분기</h2>
+<p><code>src/lib/infinite-buy/run.ts</code>의 <code>CycleConfig</code>에 <code>version: "v1" | "v2.1"</code> 추가. <code>runCycle</code>이 버전 보고 <code>computeDailyOrders</code>(v1) 또는 <code>computeDailyOrdersV21</code> 호출. <strong>그 외 로직(가용금액 체크, dryRun/killed, 제출, 로깅, round/리셋 갱신, assertSubmittable)은 전부 공유·불변.</strong></p>
+<p>매수 가용금액 체크·avgCost 기록·체결 동기화 등 기존 안전장치는 그대로 적용된다.</p>
+
+<h2>5. 데이터 모델</h2>
+<pre><code>model InfiniteBuyCycle {
+  ...
+  version String @default("v1")   // "v1" | "v2.1"
+  ...
+}</code></pre>
+<p>주문 모델(<code>InfiniteBuyOrder</code>)은 변경 없음(kind는 String이라 신규 값 그대로 저장).</p>
+
+<h2>6. UI</h2>
+<ul>
+  <li>등록 폼에 <strong>버전 선택</strong>(v1 / v2.1) 추가. 기본 v1.</li>
+  <li>사이클 카드에 <strong>버전 배지</strong> 표시(예: v2.1).</li>
+  <li>주문 이력·매도 체결 이력·가격 차트·USD 잔고 등은 기존 그대로 재사용.</li>
+</ul>
+
+<h2>7. 파일 구성</h2>
+<table>
+  <tr><th>파일</th><th>변경</th></tr>
+  <tr><td><code>prisma/schema.prisma</code> + 마이그레이션</td><td><code>version</code> 컬럼 추가</td></tr>
+  <tr><td><code>src/lib/infinite-buy/strategy-v21.ts</code> + <code>.test.ts</code></td><td>신규 코어 + Vitest</td></tr>
+  <tr><td><code>src/lib/infinite-buy/run.ts</code></td><td><code>CycleConfig.version</code> + 버전 분기</td></tr>
+  <tr><td><code>src/lib/infinite-buy/toss-adapter.ts</code>, <code>worker/infinite-buy-loop.ts</code></td><td>version을 config에 전달</td></tr>
+  <tr><td><code>src/actions/infinite-buy.ts</code></td><td>createCycle에 version 파라미터, CycleView에 version</td></tr>
+  <tr><td><code>src/app/stocks/infinite-buy/InfiniteBuyManager.tsx</code></td><td>버전 선택 UI + 배지</td></tr>
+</table>
+
+<h2>8. 검증 계획</h2>
+<ul>
+  <li>코어 Vitest: 1회차 시장가, 전반 매수 2종·큰수 주문가=평단×1.05, 후반 매수 전액 평단, 전반 매도 25/75, 후반 매도 25/25/50, 정수 반올림 합계=N, 보유 1~2주 degenerate, 큰수 상한(현재가 높아도 주문가 평단×1.05).</li>
+  <li>회귀: 기존 v1 테스트 15개 유지. tsc 0.</li>
+  <li>실행기: dryRun으로 v2.1 사이클 1회 실행 → simulated 주문이 규칙대로 로깅되는지.</li>
+  <li>UI: 버전 선택·배지 렌더. (스키마 변경 → dev 서버 재시작 필요.)</li>
+  <li>LIVE 검증(사용자): 소액 v2.1 사이클로 후반전 3건 동시 매도가 Toss에 접수되는지 확인.</li>
+</ul>
+
+<h2>9. 범위 밖 / 주의</h2>
+<ul>
+  <li>쿼터손절·가상증액 제외.</li>
+  <li>동시 다중 매도 수용은 문서 미명시 → 실거래 검증 전제. 제출 실패는 건별 로깅(하나 실패가 나머지 막지 않음).</li>
+  <li>Prisma 스키마 변경 후 dev 서버·worker 재시작 필요. worker는 정확히 1개만.</li>
+</ul>
+</body>
+</html>
