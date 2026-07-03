@@ -420,6 +420,7 @@ model InfiniteBuyCycle {
   lossCut       Float    @default(10) @map("loss_cut")         // 소진 후 손절 기준 %
   status        String   @default("active")     // active | paused | completed | stopped
   dryRun        Boolean  @default(true) @map("dry_run")
+  version       String   @default("v1")          // "v1" | "v2.1" 전략 버전
   round         Int      @default(0)
   lastRunDate   String?  @map("last_run_date")  // 마지막 실행 US 거래일
   createdAt     DateTime @default(now()) @map("created_at")
