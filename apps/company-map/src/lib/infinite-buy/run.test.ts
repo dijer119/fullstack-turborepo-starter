@@ -4,7 +4,7 @@ import { runCycle, type RunDeps, type RunPersistence, type CycleConfig } from ".
 const cycle: CycleConfig = {
   id: "c1", symbol: "TQQQ", accountSeq: 7,
   principalUsd: 4000, splits: 40, profitTarget: 10, bigBuyPremium: 12, lossCut: 10,
-  round: 0, dryRun: true,
+  round: 0, dryRun: true, version: "v1",
 };
 
 function fakeDeps(over: Partial<RunDeps> = {}): RunDeps {

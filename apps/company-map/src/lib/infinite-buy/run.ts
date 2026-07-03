@@ -1,4 +1,5 @@
 import { computeDailyOrders, type CycleState, type IntendedOrder } from "./strategy";
+import { computeDailyOrdersV21 } from "./strategy-v21";
 
 export interface CycleConfig {
   id: string;
@@ -11,6 +12,7 @@ export interface CycleConfig {
   lossCut: number;
   round: number;
   dryRun: boolean;
+  version: "v1" | "v2.1";
 }
 
 export interface HoldingSnapshot {
@@ -81,7 +83,22 @@ export async function runCycle(
     pnlPct: holding?.pnlPct ?? null,
   };
 
-  const plan = computeDailyOrders(state);
+  const rawPlan =
+    cycle.version === "v2.1" ? computeDailyOrdersV21(state) : computeDailyOrders(state);
+  // v1(IntendedOrder)/v2.1(V21Order)은 kind 유니온만 다름. 실행부는 kind를 string으로만 읽고
+  // submitOrder는 kind를 사용하지 않으므로, 공통 구조로 정규화해 분기 결과를 통일한다.
+  const plan: {
+    orders: Array<{
+      side: "BUY" | "SELL";
+      kind: string;
+      orderType: "LIMIT" | "MARKET";
+      tif: "CLS" | "DAY";
+      price: number | null;
+      quantity: number;
+    }>;
+    nextRound: number;
+    resetAfter: boolean;
+  } = rawPlan;
   const result: RunResult = { placed: 0, simulated: 0, skipped: 0, failed: 0 };
   const simulate = cycle.dryRun || killed;
 
@@ -118,7 +135,8 @@ export async function runCycle(
     }
 
     try {
-      const { tossOrderId } = await deps.submitOrder(accountSeq, o, cycle.symbol);
+      // submitOrder는 kind를 읽지 않음. v1/v2.1 공통 구조라 IntendedOrder로 좁혀 전달.
+      const { tossOrderId } = await deps.submitOrder(accountSeq, o as IntendedOrder, cycle.symbol);
       await persist.logOrder({ ...base, status: "submitted", tossOrderId });
       result.placed++;
     } catch (e) {

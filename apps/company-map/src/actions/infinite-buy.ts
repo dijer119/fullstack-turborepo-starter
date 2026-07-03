@@ -231,7 +231,7 @@ export async function runCycleNow(id: string): Promise<{ ok: boolean; reason?: s
   const config: CycleConfig = {
     id: c.id, symbol: c.symbol, accountSeq: c.accountSeq, principalUsd: c.principal,
     splits: c.splits, profitTarget: c.profitTarget, bigBuyPremium: c.bigBuyPremium,
-    lossCut: c.lossCut, round: c.round, dryRun: c.dryRun,
+    lossCut: c.lossCut, round: c.round, dryRun: c.dryRun, version: "v1",
   };
   const tradeDate = new Date().toISOString().slice(0, 10);
   await runCycle(prismaPersistence(db), tossRunDeps(), config, tradeDate, isKilled());
