@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import {
-  getHoldings, getDefaultAccountSeq, getBuyingPower, getDailyCandles,
+  getHoldings, getDefaultAccountSeq, getBuyingPower, getDailyCandles, getOrders,
   isTossConfigured, type DailyCandle,
 } from "@/lib/toss/client";
 import { runCycle, type CycleConfig } from "@/lib/infinite-buy/run";
@@ -29,12 +29,27 @@ export interface CycleView {
   targetSellPrice: number | null;
 }
 
+// 토스 읽기 호출 재시도. worker와 토큰/요청한도 경합으로 간헐 실패 시 대시보드가
+// "—"로 비는 것을 막는다. 읽기 전용에만 사용(주문 경로엔 적용 안 함).
+async function retryRead<T>(fn: () => Promise<T>, tries = 3, delayMs = 400): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      if (i < tries - 1) await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 async function liveHoldingMap(): Promise<Map<string, { avg: number; qty: number; pnl: number }>> {
   const map = new Map<string, { avg: number; qty: number; pnl: number }>();
   if (!isTossConfigured()) return map;
   try {
     const accountSeq = await getDefaultAccountSeq();
-    const overview = await getHoldings(accountSeq);
+    const overview = await retryRead(() => getHoldings(accountSeq));
     for (const i of overview.items) {
       map.set(i.symbol, {
         avg: Number(i.averagePurchasePrice),
@@ -52,7 +67,7 @@ async function liveHoldingMap(): Promise<Map<string, { avg: number; qty: number;
 export async function getPriceHistory(symbol: string, count = 90): Promise<DailyCandle[]> {
   if (!isTossConfigured()) return [];
   try {
-    return await getDailyCandles(symbol, count);
+    return await retryRead(() => getDailyCandles(symbol, count));
   } catch {
     return [];
   }
@@ -63,7 +78,7 @@ export async function getUsdBuyingPower(): Promise<number | null> {
   if (!isTossConfigured()) return null;
   try {
     const accountSeq = await getDefaultAccountSeq();
-    return await getBuyingPower(accountSeq, "USD");
+    return await retryRead(() => getBuyingPower(accountSeq, "USD"));
   } catch {
     return null;
   }
@@ -124,17 +139,87 @@ export interface OrderView {
   id: string; tradeDate: string; round: number; side: string; kind: string;
   price: number | null; quantity: number; status: string; dryRun: boolean; error: string | null;
   createdAt: string;
+  avgCost: number | null; // SELL 시점 평단
+  filledQty: number | null; // 실제 체결 수량(토스 동기화)
+  filledPrice: number | null; // 평균 체결가
+  filledAt: string | null; // 체결 시각
+  realizedPnl: number | null; // (체결가 − 평단) × 체결수량. 체결 확인된 SELL만.
+}
+
+function toOrderView(o: {
+  id: string; tradeDate: string; round: number; side: string; kind: string;
+  price: number | null; quantity: number; status: string; dryRun: boolean;
+  error: string | null; createdAt: Date; avgCost: number | null;
+  filledQty: number | null; filledPrice: number | null; filledAt: string | null;
+}): OrderView {
+  const sellPrice = o.filledPrice ?? o.price;
+  const sellQty = o.filledQty ?? o.quantity;
+  const realizedPnl =
+    o.side === "SELL" && o.avgCost != null && sellPrice != null
+      ? (sellPrice - o.avgCost) * sellQty
+      : null;
+  return {
+    id: o.id, tradeDate: o.tradeDate, round: o.round, side: o.side, kind: o.kind,
+    price: o.price, quantity: o.quantity, status: o.status, dryRun: o.dryRun,
+    error: o.error, createdAt: o.createdAt.toISOString(),
+    avgCost: o.avgCost, filledQty: o.filledQty, filledPrice: o.filledPrice,
+    filledAt: o.filledAt, realizedPnl,
+  };
 }
 
 export async function getCycleOrders(id: string, limit = 100): Promise<OrderView[]> {
   const rows = await db.infiniteBuyOrder.findMany({
     where: { cycleId: id }, orderBy: { createdAt: "desc" }, take: limit,
   });
-  return rows.map((o) => ({
-    id: o.id, tradeDate: o.tradeDate, round: o.round, side: o.side, kind: o.kind,
-    price: o.price, quantity: o.quantity, status: o.status, dryRun: o.dryRun,
-    error: o.error, createdAt: o.createdAt.toISOString(),
-  }));
+  return rows.map(toOrderView);
+}
+
+// 실제 체결(status=filled)된 매도만. 자동 리셋 뒤에도 같은 사이클에 누적.
+export async function getSellHistory(id: string, limit = 200): Promise<OrderView[]> {
+  const rows = await db.infiniteBuyOrder.findMany({
+    where: { cycleId: id, side: "SELL", status: "filled" },
+    orderBy: { filledAt: "desc" },
+    take: limit,
+  });
+  return rows.map(toOrderView);
+}
+
+// 토스 주문내역과 대조해, 우리가 낸 매도 주문의 실제 체결을 확인·저장(status=filled).
+// dryRun/미체결/취소는 filled로 바뀌지 않아 매도 이력에서 자연히 제외된다.
+export async function syncSellFills(id: string): Promise<{ ok: boolean; updated: number; reason?: string }> {
+  if (!isTossConfigured()) return { ok: false, updated: 0, reason: "토스 미설정" };
+  const cycle = await db.infiniteBuyCycle.findUnique({ where: { id } });
+  if (!cycle) return { ok: false, updated: 0, reason: "사이클 없음" };
+  try {
+    const accountSeq = cycle.accountSeq ?? (await getDefaultAccountSeq());
+    const from = cycle.createdAt.toISOString().slice(0, 10);
+    const orders = await retryRead(() =>
+      getOrders(accountSeq, { status: "CLOSED", symbol: cycle.symbol, from }),
+    );
+    let updated = 0;
+    for (const to of orders) {
+      if (to.side !== "SELL" || to.filledQuantity <= 0) continue; // 체결된 매도만
+      const our = await db.infiniteBuyOrder.findFirst({
+        where: { cycleId: id, tossOrderId: to.orderId },
+      });
+      if (!our) continue;
+      if (our.status === "filled" && our.filledQty === to.filledQuantity) continue; // 이미 반영
+      await db.infiniteBuyOrder.update({
+        where: { id: our.id },
+        data: {
+          status: "filled",
+          filledQty: to.filledQuantity,
+          filledPrice: to.averageFilledPrice,
+          filledAt: to.filledAt,
+        },
+      });
+      updated++;
+    }
+    revalidatePath("/stocks/infinite-buy");
+    return { ok: true, updated };
+  } catch (e) {
+    return { ok: false, updated: 0, reason: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 // 수동 트리거(검증용). lastRunDate 무시하고 1회 실행.

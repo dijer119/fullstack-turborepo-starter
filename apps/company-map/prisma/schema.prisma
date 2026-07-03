@@ -441,9 +441,13 @@ model InfiniteBuyOrder {
   tif         String                            // CLS | DAY
   price       Float?
   quantity    Float
+  avgCost     Float?   @map("avg_cost")          // SELL 시점 평단(실현손익 계산용)
+  filledQty   Float?   @map("filled_qty")        // 실제 체결 수량(토스 동기화)
+  filledPrice Float?   @map("filled_price")      // 평균 체결가(토스 동기화)
+  filledAt    String?  @map("filled_at")         // 체결 시각(토스, ISO KST)
   tossOrderId String?  @map("toss_order_id")
   dryRun      Boolean  @map("dry_run")
-  status      String                            // submitted | failed | simulated | skipped
+  status      String                            // submitted | filled | failed | simulated | skipped
   error       String?
   createdAt   DateTime @default(now()) @map("created_at")
 

@@ -38,6 +38,7 @@ export interface OrderLog {
   tif: string;
   price: number | null;
   quantity: number;
+  avgCost: number | null; // SELL 시점 평단(실현손익 계산용)
   tossOrderId: string | null;
   dryRun: boolean;
   status: "submitted" | "failed" | "simulated" | "skipped";
@@ -91,7 +92,11 @@ export async function runCycle(
   for (const o of plan.orders) {
     const base: OrderLog = {
       cycleId: cycle.id, tradeDate, round: cycle.round, side: o.side, kind: o.kind,
-      orderType: o.orderType, tif: o.tif, price: o.price, quantity: o.quantity,
+      orderType: o.orderType, tif: o.tif,
+      // reset_sell(시장가 매도)은 체결 추정가로 현재가를 남겨 실현손익 계산 가능하게.
+      price: o.kind === "reset_sell" ? currentPrice : o.price,
+      quantity: o.quantity,
+      avgCost: o.side === "SELL" ? state.avgPrice : null,
       tossOrderId: null, dryRun: cycle.dryRun, status: "simulated", error: null,
     };
 

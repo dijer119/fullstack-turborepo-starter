@@ -61,8 +61,8 @@ export function prismaPersistence(db: PrismaClient): RunPersistence {
         data: {
           cycleId: o.cycleId, tradeDate: o.tradeDate, round: o.round, side: o.side,
           kind: o.kind, orderType: o.orderType, tif: o.tif, price: o.price,
-          quantity: o.quantity, tossOrderId: o.tossOrderId, dryRun: o.dryRun,
-          status: o.status, error: o.error,
+          quantity: o.quantity, avgCost: o.avgCost, tossOrderId: o.tossOrderId,
+          dryRun: o.dryRun, status: o.status, error: o.error,
         },
       });
     },

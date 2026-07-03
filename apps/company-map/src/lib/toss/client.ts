@@ -435,3 +435,65 @@ export async function createOrder(
   });
   return json.result;
 }
+
+// 주문 목록 조회(체결 확인용). status는 필수(OPEN=미체결/진행, CLOSED=완료/취소).
+export interface TossOrder {
+  orderId: string;
+  symbol: string;
+  side: OrderSide;
+  status: string; // FILLED | PARTIAL_FILLED | CANCELED | REJECTED | ...
+  filledQuantity: number; // 체결 수량(미체결이면 0)
+  averageFilledPrice: number | null; // 평균 체결가
+  filledAmount: number | null;
+  commission: number | null;
+  tax: number | null;
+  filledAt: string | null; // 최종 체결 시각 (ISO, KST)
+}
+
+interface RawOrder {
+  orderId: string;
+  symbol: string;
+  side: OrderSide;
+  status: string;
+  execution?: {
+    filledQuantity?: string;
+    averageFilledPrice?: string | null;
+    filledAmount?: string | null;
+    commission?: string | null;
+    tax?: string | null;
+    filledAt?: string | null;
+  };
+}
+
+function num(v: string | null | undefined): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+export async function getOrders(
+  accountSeq: number,
+  opts: { status: "OPEN" | "CLOSED"; symbol?: string; from?: string; to?: string; limit?: number },
+): Promise<TossOrder[]> {
+  const qs = new URLSearchParams({ status: opts.status });
+  if (opts.symbol) qs.set("symbol", opts.symbol);
+  if (opts.from) qs.set("from", opts.from);
+  if (opts.to) qs.set("to", opts.to);
+  qs.set("limit", String(opts.limit ?? 100));
+  const json = await tossFetch<{ result: { orders: RawOrder[] } }>(
+    `/api/v1/orders?${qs.toString()}`,
+    { accountSeq },
+  );
+  return (json.result.orders ?? []).map((o) => ({
+    orderId: o.orderId,
+    symbol: o.symbol,
+    side: o.side,
+    status: o.status,
+    filledQuantity: num(o.execution?.filledQuantity) ?? 0,
+    averageFilledPrice: num(o.execution?.averageFilledPrice),
+    filledAmount: num(o.execution?.filledAmount),
+    commission: num(o.execution?.commission),
+    tax: num(o.execution?.tax),
+    filledAt: o.execution?.filledAt ?? null,
+  }));
+}

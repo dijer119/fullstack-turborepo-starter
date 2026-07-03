@@ -6,7 +6,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import {
-  createCycle, updateCycle, deleteCycle, runCycleNow, getCycleOrders, getPriceHistory,
+  createCycle, updateCycle, deleteCycle, runCycleNow, getCycleOrders, getPriceHistory, getSellHistory, syncSellFills,
   type CycleView, type OrderView,
 } from "@/actions/infinite-buy";
 import type { DailyCandle } from "@/lib/toss/client";
@@ -32,6 +32,7 @@ export function InfiniteBuyManager({
   const [principal, setPrincipal] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [openOrders, setOpenOrders] = useState<Record<string, OrderView[]>>({});
+  const [sells, setSells] = useState<Record<string, OrderView[]>>({});
   const [charts, setCharts] = useState<Record<string, DailyCandle[]>>({});
 
   const onCreate = () =>
@@ -79,6 +80,22 @@ export function InfiniteBuyManager({
       if (charts[c.id]) { setCharts((p) => { const n = { ...p }; delete n[c.id]; return n; }); return; }
       const data = await getPriceHistory(c.symbol);
       setCharts((p) => ({ ...p, [c.id]: data }));
+    });
+
+  const loadSells = (c: CycleView) =>
+    start(async () => {
+      if (sells[c.id]) { setSells((p) => { const n = { ...p }; delete n[c.id]; return n; }); return; }
+      const data = await getSellHistory(c.id);
+      setSells((p) => ({ ...p, [c.id]: data }));
+    });
+
+  const syncSells = (c: CycleView) =>
+    start(async () => {
+      setMsg(null);
+      const r = await syncSellFills(c.id);
+      setMsg(r.ok ? `${c.symbol} 체결 동기화: ${r.updated}건 반영` : (r.reason ?? "실패"));
+      const data = await getSellHistory(c.id);
+      setSells((p) => ({ ...p, [c.id]: data }));
     });
 
   return (
@@ -175,10 +192,54 @@ export function InfiniteBuyManager({
                 <button onClick={() => loadChart(c)} disabled={pending} className="text-xs text-blue-600 hover:underline dark:text-blue-400">
                   {charts[c.id] ? "가격 차트 닫기" : "가격 차트 보기"}
                 </button>
+                <button onClick={() => loadSells(c)} disabled={pending} className="text-xs text-blue-600 hover:underline dark:text-blue-400">
+                  {sells[c.id] ? "매도 이력 닫기" : "매도 이력 보기"}
+                </button>
                 <button onClick={() => loadOrders(c)} disabled={pending} className="text-xs text-blue-600 hover:underline dark:text-blue-400">
                   {openOrders[c.id] ? "주문 이력 닫기" : "주문 이력 보기"}
                 </button>
               </div>
+
+              {sells[c.id] && (
+                <div className="mt-2 overflow-x-auto">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="text-xs text-gray-500">
+                      매도 <b>체결</b> 이력 (익절/손절) · 자동 리셋 후에도 누적
+                      {sells[c.id].length > 0 && (() => {
+                        const sum = sells[c.id].reduce((a, o) => a + (o.realizedPnl ?? 0), 0);
+                        return <> · 실현손익 합계 <span className={sum >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>{sum >= 0 ? "+" : ""}${sum.toFixed(2)}</span></>;
+                      })()}
+                    </p>
+                    <button onClick={() => syncSells(c)} disabled={pending} className="shrink-0 rounded border border-gray-300 px-2 py-0.5 text-xs hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800">
+                      토스 체결 동기화
+                    </button>
+                  </div>
+                  <table className="w-full text-xs">
+                    <thead><tr className="text-left text-gray-500">
+                      <th className="p-1">체결일</th><th className="p-1">회차</th><th className="p-1">종류</th>
+                      <th className="p-1 text-right">평단</th><th className="p-1 text-right">체결가</th>
+                      <th className="p-1 text-right">체결수량</th><th className="p-1 text-right">실현손익</th>
+                    </tr></thead>
+                    <tbody>
+                      {sells[c.id].length === 0 ? (
+                        <tr><td colSpan={7} className="p-2 text-gray-500">체결된 매도 없음. 상단 동기화 버튼으로 확인하세요.</td></tr>
+                      ) : sells[c.id].map((o) => (
+                        <tr key={o.id} className="border-t border-gray-100 dark:border-gray-800">
+                          <td className="p-1">{o.filledAt ? o.filledAt.slice(0, 10) : o.tradeDate}</td>
+                          <td className="p-1">{o.round}</td>
+                          <td className="p-1">{o.kind === "reset_sell" ? "손절" : o.kind === "target_sell" ? "익절" : o.kind}</td>
+                          <td className="p-1 text-right">{usd(o.avgCost)}</td>
+                          <td className="p-1 text-right">{usd(o.filledPrice ?? o.price)}</td>
+                          <td className="p-1 text-right">{o.filledQty ?? o.quantity}</td>
+                          <td className={`p-1 text-right ${o.realizedPnl == null ? "" : o.realizedPnl >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                            {o.realizedPnl == null ? "—" : `${o.realizedPnl >= 0 ? "+" : ""}$${o.realizedPnl.toFixed(2)}`}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
               {charts[c.id] && (
                 charts[c.id].length === 0 ? (
