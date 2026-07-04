@@ -84,6 +84,28 @@ describe("computeDailyOrdersV21 매도", () => {
     expect(sells.find((o) => o.kind === "sell_lim_10")?.quantity).toBe(5);
   });
 
+  it("소량 degenerate: 후반 보유 1주는 +10% 지정가 1건만 (합계 유지)", () => {
+    const p = computeDailyOrdersV21({
+      ...base, round: 20, avgPrice: 50, currentPrice: 50, holdingQty: 1,
+    });
+    const sells = p.orders.filter((o) => o.side === "SELL");
+    // q0=floor(0.25)=0, q5=0, q10=1 → sell_lim_10 1건만
+    expect(sells).toEqual([
+      { side: "SELL", kind: "sell_lim_10", orderType: "LIMIT", tif: "DAY", price: 55, quantity: 1 },
+    ]);
+  });
+
+  it("소량 degenerate: 전반 보유 2주는 +10% 지정가 2건만 (25%=0 생략)", () => {
+    const p = computeDailyOrdersV21({
+      ...base, round: 1, avgPrice: 50, currentPrice: 50, holdingQty: 2,
+    });
+    const sells = p.orders.filter((o) => o.side === "SELL");
+    // q5=floor(2*.25)=0 생략, q10=2
+    expect(sells).toEqual([
+      { side: "SELL", kind: "sell_lim_10", orderType: "LIMIT", tif: "DAY", price: 55, quantity: 2 },
+    ]);
+  });
+
   it("소진 후 -10% 이하: 시장가 전량 손절 + 리셋 (v1과 동일)", () => {
     const p = computeDailyOrdersV21({
       ...base, round: 40, avgPrice: 50, currentPrice: 44, holdingQty: 80, pnlPct: -12,
