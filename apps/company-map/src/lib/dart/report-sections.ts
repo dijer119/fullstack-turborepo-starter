@@ -55,6 +55,9 @@ export function sanitizeHtml(html: string): string {
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<(link|meta)\b[^>]*>/gi, "")
+    // img 제거: DART 본문 이미지는 상대경로 src(/report/download.do…)라 localhost에서
+    // 404가 나고, 인라인 onerror fallback(/images/common/no_link.gif)도 상대경로라 또 404.
+    .replace(/<img\b[^>]*>/gi, "")
     // 문서 래퍼 제거: viewer.do는 전체 문서(<body bgcolor=...>)를 반환하므로
     // html/head/body/doctype를 제거하지 않으면 페이지 body 속성과 충돌해 hydration 불일치 발생.
     .replace(/<!doctype[^>]*>/gi, "")

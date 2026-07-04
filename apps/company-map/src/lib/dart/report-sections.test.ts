@@ -66,6 +66,15 @@ describe("sanitizeHtml", () => {
     expect(out).not.toContain("onclick");
   });
 
+  it("img 태그를 제거한다 (상대경로 src/onerror로 인한 404 방지)", () => {
+    const out = sanitizeHtml(
+      '<td><img src="/report/download.do?dcmNo=1&flNm=x.jpg" width=\'600\' alt="이미지: 판매조직"onerror="this.src=\'/images/common/no_link.gif\'"></td>',
+    );
+    expect(out).not.toMatch(/<img/i);
+    expect(out).not.toContain("no_link.gif");
+    expect(out).toContain("<td");
+  });
+
   it("문서 래퍼(html/head/body/doctype)를 제거하고 내용은 보존한다", () => {
     const out = sanitizeHtml(
       '<!DOCTYPE html><HTML><HEAD><title>x</title></HEAD><BODY bgcolor="#FFFFFF"><p>내용</p></BODY></HTML>',
