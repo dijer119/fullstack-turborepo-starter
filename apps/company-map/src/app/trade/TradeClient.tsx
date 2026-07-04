@@ -80,6 +80,10 @@ function SyncPanel() {
   const [month, setMonth] = useState(recent[0]);
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // 전체 상품 동기화: 외부 API 부하를 피하려 카테고리를 순차 처리하며 진행률 표시
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+  const busy = pending || syncingAll;
 
   const handleSync = () => {
     setMsg(null);
@@ -97,13 +101,44 @@ function SyncPanel() {
     });
   };
 
+  const handleSyncAll = async () => {
+    setMsg(null);
+    setSyncingAll(true);
+    let totalSaved = 0;
+    const failed: string[] = [];
+    for (let i = 0; i < CATEGORIES.length; i += 1) {
+      const c = CATEGORIES[i];
+      setProgress(`${i + 1}/${CATEGORIES.length} ${c.label}…`);
+      try {
+        const r = await syncTradeMonth(c.key, month);
+        totalSaved += r.saved;
+      } catch {
+        failed.push(c.label);
+      }
+    }
+    setProgress(null);
+    setSyncingAll(false);
+    setMsg(
+      failed.length
+        ? {
+            ok: false,
+            text: `${formatYm(month)} 전체: ${totalSaved}건 갱신 · 실패 ${failed.length}건 (${failed.join(", ")})`,
+          }
+        : {
+            ok: true,
+            text: `${formatYm(month)} 전체 ${CATEGORIES.length}개 상품: ${totalSaved}건 갱신`,
+          },
+    );
+    router.refresh();
+  };
+
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
       <span className="text-xs font-medium text-gray-500">동기화</span>
       <select
         value={sector}
         onChange={(e) => setSector(e.target.value as CategoryKey)}
-        disabled={pending}
+        disabled={busy}
         className="rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-950"
       >
         {CATEGORIES.map((c) => (
@@ -115,7 +150,7 @@ function SyncPanel() {
       <select
         value={month}
         onChange={(e) => setMonth(e.target.value)}
-        disabled={pending}
+        disabled={busy}
         className="rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-950"
       >
         {recent.map((m) => (
@@ -127,7 +162,7 @@ function SyncPanel() {
       <button
         type="button"
         onClick={handleSync}
-        disabled={pending}
+        disabled={busy}
         className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
       >
         <RefreshCw
@@ -135,6 +170,16 @@ function SyncPanel() {
           className={pending ? "animate-spin" : ""}
         />
         {pending ? "동기화 중..." : "동기화"}
+      </button>
+      <button
+        type="button"
+        onClick={handleSyncAll}
+        disabled={busy}
+        title={`${formatYm(month)} 전체 ${CATEGORIES.length}개 상품 동기화`}
+        className="inline-flex items-center gap-1 rounded border border-blue-600 px-3 py-1 text-sm font-medium text-blue-600 transition hover:bg-blue-50 disabled:opacity-60 dark:text-blue-400 dark:hover:bg-blue-950/40"
+      >
+        <RefreshCw size={14} className={syncingAll ? "animate-spin" : ""} />
+        {syncingAll ? (progress ?? "전체 동기화 중...") : "모든 상품 동기화"}
       </button>
       {msg && (
         <span

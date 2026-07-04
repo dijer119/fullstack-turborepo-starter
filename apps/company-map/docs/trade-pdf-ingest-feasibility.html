@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>관세청 旬報 PDF 데이터 적재 가능성 검토</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .verdict-yes { color: #2f855a; font-weight: 700; }
+  .verdict-no { color: #c53030; font-weight: 700; }
+  .verdict-partial { color: #b7791f; font-weight: 700; }
+  .tag { display: inline-block; font-size: 0.75rem; padding: 0.05rem 0.4rem; border-radius: 3px; background: #edf2f7; color: #4a5568; }
+</style>
+</head>
+<body>
+<h1>관세청 旬報 PDF 데이터 적재 가능성 검토</h1>
+<p>
+  대상 파일: <code>korea.kr download.do?fileId=198487132&amp;tblKey=GMN</code><br>
+  실제 내용: 관세청 <strong>「2026년 6월 1일~6월 10일 수출입 현황 [잠정치]」</strong> 보도자료 (배포 2026.6.11)<br>
+  검토일: 2026-06-16
+</p>
+
+<blockquote>
+  <strong>결론 한 줄:</strong> PDF 다운로드 &amp; 텍스트 추출 자체는 <span class="verdict-yes">가능</span>하지만,
+  현재 <code>trade_stats</code> 테이블에 그대로 넣는 것은 <span class="verdict-no">권장하지 않음</span>.
+  PDF가 가진 데이터의 <strong>입도(granularity)·분류체계·집계방식</strong>이 앱 모델과 근본적으로 다르고,
+  세부 품목/국가 수치는 <strong>차트 이미지</strong>라 텍스트로 추출되지 않는다.
+</blockquote>
+
+<h2>1. PDF에서 실제로 추출되는 것</h2>
+<p><code>pdftotext -layout</code>로 추출 검증 완료. 텍스트 레이어가 살아있어 OCR은 불필요하나, 추출 가능 범위가 제한적이다.</p>
+
+<table>
+  <thead>
+    <tr><th>항목</th><th>추출 가능?</th><th>형태</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>총괄 수출/수입/무역수지 (국가 전체 합계)</td><td><span class="verdict-yes">가능</span></td><td>총괄 표 텍스트 (당월·연간누계·전월 금액)</td></tr>
+    <tr><td>주요품목 증감률 (반도체 205.8%, 석유제품 68.7% …)</td><td><span class="verdict-partial">일부</span></td><td>본문 산문 속 % 만. 금액·비중은 차트 이미지</td></tr>
+    <tr><td>주요국가 증감률 (중국 101.4%, 미국 54.4% …)</td><td><span class="verdict-partial">일부</span></td><td>본문 산문 속 % 만</td></tr>
+    <tr><td>품목별 <strong>금액·비중</strong> 표</td><td><span class="verdict-no">불가</span></td><td>"주요품목 수출현황(억달러, 비중%)" 아래가 전부 <strong>차트 그래픽</strong> — 텍스트 0</td></tr>
+    <tr><td>국가별 <strong>금액</strong> 표</td><td><span class="verdict-no">불가</span></td><td>마찬가지로 차트 이미지</td></tr>
+  </tbody>
+</table>
+
+<p>추출된 총괄 표 예시(2026년 당월 = 6.1~10일, 단위 백만 달러):</p>
+<pre><code>수출  28,635  (전년동기 23,352 대비 +85.9%)   연간누계 423,096
+수입  23,352(전월)/실제 ...  (+35.6%)          연간누계 315,642
+무역수지  5,282                                연간누계 107,454</code></pre>
+<p class="tag">주의: 컬럼이 △·괄호·줄바꿈으로 흩어져 파싱 로직이 까다롭고, 월마다 레이아웃이 흔들릴 수 있음.</p>
+
+<h2>2. 앱 데이터 모델과의 불일치 (핵심 장애)</h2>
+
+<h3>2-1. 입도(granularity) 불일치</h3>
+<p>현재 <code>trade_stats</code> 모델은 <strong>HS코드 × 국가 × 월</strong> 단위로 금액을 저장한다.</p>
+<pre><code>@@unique([category, yearMonth, hsCode, countryCd])
+expDlr / impDlr / expWgt / impWgt / balPayments  (모두 행 단위 금액)</code></pre>
+<p>
+  그러나 PDF 旬報는 <strong>국가 전체 총괄</strong> + <strong>품목군 단위 증감률</strong>만 텍스트로 제공한다.
+  HS코드별·국가별 금액(= 이 테이블의 한 행을 채우는 데 필요한 값)은 PDF에 텍스트로 존재하지 않는다.
+</p>
+
+<h3>2-2. 분류체계 불일치</h3>
+<p>
+  앱 카테고리(<code>semiconductor, cosmetics, power-equipment, transformer, defense, shipbuilding, battery, ess, nuclear</code>)는
+  <strong>HS코드 리스트</strong>로 정의된다. PDF는 관세청 <strong>"성질별 분류체계"</strong>(반도체·석유제품·승용차·원유 등)로 집계되며, 두 분류는 1:1로 매핑되지 않는다.
+  (PDF 각주: <em>"주요품목은 관세청 성질별 분류체계 기준으로 집계"</em>)
+</p>
+
+<h3>2-3. 집계방식·기간 불일치</h3>
+<table>
+  <thead><tr><th>구분</th><th>앱 사용 소스 (<code>nitemtrade</code> API)</th><th>이 PDF (旬報)</th></tr></thead>
+  <tbody>
+    <tr><td>기간</td><td>월 전체 (확정/잠정 월간)</td><td>1~10일 등 <strong>10일 단위 단기</strong></td></tr>
+    <tr><td>성격</td><td>품목·국가별 월간 통계</td><td>국가 총괄 <strong>속보 잠정치</strong></td></tr>
+    <tr><td>확정 시점</td><td>익월 중순경</td><td>2027.2월 연간확정까지 수시 정정</td></tr>
+  </tbody>
+</table>
+<blockquote>
+  두 데이터를 같은 <code>trade_stats</code>에 섞으면 월간 합계·비중 계산이 오염된다 (서로 다른 기간·방법론).
+</blockquote>
+
+<h2>3. 선택지</h2>
+
+<table>
+  <thead><tr><th>안</th><th>내용</th><th>평가</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>A. 구조화 소스 우선 탐색</strong> <span class="tag">권장</span></td>
+      <td>관세청/data.go.kr에 旬報(1~10·1~20일 수출입현황)를 제공하는 <strong>API·CSV·OpenAPI</strong>가 있는지 먼저 확인. 있으면 PDF 파싱 불필요.</td>
+      <td><span class="verdict-yes">최선</span> — 견고함. PDF 레이아웃 깨짐 리스크 0</td>
+    </tr>
+    <tr>
+      <td><strong>B. 총괄만 별도 모델로 적재</strong></td>
+      <td>PDF에서 <strong>국가 총괄 수출/수입/무역수지</strong>만 추출해 신규 <code>TradeProvisional</code> 모델에 저장. "진행 중인 월의 잠정 속보" 배너/카드로 표시. <code>trade_stats</code>는 건드리지 않음.</td>
+      <td><span class="verdict-partial">제한적 가능</span> — 품목/국가 세부는 못 넣음. 새 의존성(pdf 파서) 필요</td>
+    </tr>
+    <tr>
+      <td><strong>C. trade_stats에 직접 적재</strong></td>
+      <td>PDF 데이터를 기존 테이블에 삽입.</td>
+      <td><span class="verdict-no">불가/비권장</span> — 2장의 3가지 불일치로 데이터 오염</td>
+    </tr>
+    <tr>
+      <td><strong>D. OCR/이미지 파싱으로 세부 표 복원</strong></td>
+      <td>차트 이미지에서 품목/국가 금액을 OCR.</td>
+      <td><span class="verdict-no">비권장</span> — 신뢰도 낮고 유지보수 부담 큼</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>4. 권장 경로</h2>
+<ol>
+  <li><strong>먼저 구조화 소스 확인(안 A)</strong>: data.go.kr에서 "수출입 현황 / 旬報 / 10일" 관련 OpenAPI 유무 조사. 있으면 그걸로 진행.</li>
+  <li>없다면 <strong>안 B</strong>: PDF에서 <em>총괄 3개 지표만</em> 뽑아 별도 <code>TradeProvisional</code>에 저장하고, /trade에 "6월 잠정(1~10일)" 보조 표시. 품목/국가 세부는 "확정통계 발표 후 제공"으로 안내.</li>
+  <li>구현 시 신규 런타임 의존성(예: <code>unpdf</code> / <code>pdf-parse</code>) 1개 추가 필요 — 현재 프로젝트엔 Adobe PDF 파서가 없음 (기존 "etf_pdf"는 KRX의 Portfolio Deposit File로, 동명이의).</li>
+</ol>
+
+<h2>5. 검증에 사용한 명령</h2>
+<pre><code>curl -sL "https://www.korea.kr/common/download.do?fileId=198487132&tblKey=GMN" -o korea_trade.pdf
+file korea_trade.pdf          # PDF 1.6, 텍스트 추출 가능
+pdftotext -layout korea_trade.pdf korea_trade.txt
+# → 총괄 표 텍스트 OK / 품목·국가 표는 차트 이미지라 텍스트 없음</code></pre>
+</body>
+</html>
