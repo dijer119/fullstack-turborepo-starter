@@ -30,6 +30,7 @@ export function InfiniteBuyManager({
   const [symbol, setSymbol] = useState("");
   const [name, setName] = useState("");
   const [principal, setPrincipal] = useState("");
+  const [version, setVersion] = useState<"v1" | "v2.1">("v1");
   const [msg, setMsg] = useState<string | null>(null);
   const [openOrders, setOpenOrders] = useState<Record<string, OrderView[]>>({});
   const [sells, setSells] = useState<Record<string, OrderView[]>>({});
@@ -38,9 +39,9 @@ export function InfiniteBuyManager({
   const onCreate = () =>
     start(async () => {
       setMsg(null);
-      const r = await createCycle({ symbol, name, principal: Number(principal) });
+      const r = await createCycle({ symbol, name, principal: Number(principal), version });
       if (!r.ok) { setMsg(r.reason ?? "실패"); return; }
-      setSymbol(""); setName(""); setPrincipal("");
+      setSymbol(""); setName(""); setPrincipal(""); setVersion("v1");
       router.refresh();
     });
 
@@ -137,6 +138,14 @@ export function InfiniteBuyManager({
             <input type="number" value={principal} onChange={(e) => setPrincipal(e.target.value)} placeholder="4000"
               className="w-28 rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900" />
           </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500">전략</span>
+            <select value={version} onChange={(e) => setVersion(e.target.value as "v1" | "v2.1")}
+              className="w-28 rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900">
+              <option value="v1">v1</option>
+              <option value="v2.1">v2.1</option>
+            </select>
+          </label>
           <button onClick={onCreate} disabled={pending}
             className="rounded bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700 disabled:opacity-50">
             추가 (dryRun)
@@ -164,6 +173,9 @@ export function InfiniteBuyManager({
                   </span>
                   <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
                     {c.status}
+                  </span>
+                  <span className="rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                    {c.version}
                   </span>
                 </div>
                 <div className="flex items-center gap-1 text-xs">
