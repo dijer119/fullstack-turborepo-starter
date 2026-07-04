@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETF 구성종목 주식수 변경 이력 — 설계 명세 (2026-06-10)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .up { color: #2f855a; font-weight: 600; }
+  .down { color: #c53030; font-weight: 600; }
+  .muted { color: #a0aec0; }
+</style>
+</head>
+<body>
+
+<h1>ETF 구성종목 주식수 변경 이력 — 설계 명세</h1>
+<p><strong>작성일:</strong> 2026-06-10 · <strong>대상 앱:</strong> <code>apps/company-map</code> · <strong>페이지:</strong> <code>/stocks/etf?code=&lt;ETF코드&gt;</code></p>
+
+<h2>1. 목적</h2>
+<p>관심 ETF 상세 화면에서 <strong>각 구성종목의 보유 주식수가 날짜별로 어떻게 변해왔는지</strong>를 한눈에 보고, 종목별 추이를 차트로 확인한다. 현재 화면은 최신 vs 직전 스냅샷 2개만 비교하므로 그 이전의 흐름(점진적 매집/매도 패턴)을 볼 수 없다.</p>
+
+<h2>2. 전제 (변경 없음)</h2>
+<ul>
+  <li>일별 스냅샷은 이미 <code>EtfPdfSnapshot</code> + <code>EtfPdfHolding</code>에 누적되고 있다 (worker <code>etf-pdf-loop</code> + 수동 갱신). <strong>스키마·수집 로직 변경 없음.</strong></li>
+  <li>데이터 소스는 Naver 모바일 ETF API의 <strong>Top10 구성종목</strong>뿐이다. 따라서 어떤 종목이 Top10 밖으로 밀려난 날짜의 주식수는 알 수 없다 → 이력에 공백이 생기며 <code>—</code>로 정직하게 노출한다.</li>
+</ul>
+
+<h2>3. 아키텍처 (A안)</h2>
+<table>
+  <tr><th>구성요소</th><th>위치</th><th>역할</th></tr>
+  <tr><td><code>buildShareHistory()</code></td><td><code>src/lib/etf/history.ts</code> (신규)</td><td>스냅샷 배열 → 종목×날짜 매트릭스 pivot. <strong>순수 함수</strong>, DB·React 무관.</td></tr>
+  <tr><td><code>history.test.ts</code></td><td><code>src/lib/etf/history.test.ts</code> (신규)</td><td>Vitest 단위 테스트 (기존 <code>diff.test.ts</code> 패턴).</td></tr>
+  <tr><td><code>getEtfShareHistory()</code></td><td><code>src/actions/etf.ts</code> (추가)</td><td>최근 N개 스냅샷 + holdings 조회 후 <code>buildShareHistory()</code> 결과 반환.</td></tr>
+  <tr><td>페이지 연결</td><td><code>src/app/stocks/etf/page.tsx</code> (수정)</td><td><code>getEtfDetail</code>과 병렬(<code>Promise.all</code>)로 호출, <code>EtfManager</code>에 prop 전달.</td></tr>
+  <tr><td>이력 섹션 UI</td><td><code>src/app/stocks/etf/ShareHistorySection.tsx</code> (신규, client)</td><td>매트릭스 표 + 행 클릭 시 Recharts 라인 차트. <code>EtfManager</code>에서 렌더.</td></tr>
+</table>
+<p>기존 <code>getEtfDetail</code>(최신 2개 diff)은 손대지 않는다 — 비교표와 이력은 관심사가 다르므로 액션을 분리한다.</p>
+
+<h2>4. 데이터 계약</h2>
+<pre><code>// src/lib/etf/history.ts
+export interface ShareHistoryRow {
+  constituentCode: string;
+  constituentName: string;
+  latestWeight: number | null;   // 정렬 기준 (최신 스냅샷 비중)
+  inLatest: boolean;             // 최신 Top10 포함 여부
+  cells: (ShareHistoryCell | null)[]; // dates와 같은 길이, 해당 날짜 Top10에 없으면 null
+}
+
+export interface ShareHistoryCell {
+  shares: number | null;
+  delta: number | null; // 직전 "데이터가 있는" 셀 대비 증감. 첫 등장이면 null
+}
+
+export interface ShareHistory {
+  dates: string[];               // trdDd 오름차순 (좌→우 시간순)
+  rows: ShareHistoryRow[];       // 정렬: inLatest 우선, latestWeight 내림차순, 이탈 종목은 하단
+}
+
+export function buildShareHistory(
+  snapshots: { trdDd: string; holdings: Holding[] }[], // 순서 무관, 내부에서 trdDd 정렬
+): ShareHistory;
+</code></pre>
+<ul>
+  <li><code>delta</code>는 <strong>직전 데이터가 있는 셀</strong> 대비로 계산한다 (중간 공백을 건너뜀). Top10 재진입 시 마지막 관측치와 비교하는 것이 "변경 이력" 목적에 부합.</li>
+  <li>종목 식별은 <code>constituentCode</code> 기준. 코드가 빈 문자열인 행(파서가 이름만 준 경우)은 <code>constituentName</code>으로 fallback 식별.</li>
+  <li>액션 시그니처: <code>getEtfShareHistory(code: string, limit = 30): Promise&lt;ShareHistory | null&gt;</code> — 워치 없으면 <code>null</code>, 스냅샷 0개면 <code>{ dates: [], rows: [] }</code>.</li>
+</ul>
+
+<h2>5. UI 설계</h2>
+<h3>5.1 매트릭스 표</h3>
+<p>기존 비교표 아래에 새 섹션 <strong>"주식수 변경 이력"</strong>을 추가한다.</p>
+<table>
+  <tr><th>종목</th><th>06-05</th><th>06-08</th><th>06-09</th><th>06-10</th></tr>
+  <tr><td>삼성전자</td><td>120,000</td><td>120,000</td><td class="up">125,000 ▲5,000</td><td>125,000</td></tr>
+  <tr><td>SK하이닉스</td><td>45,000</td><td class="down">43,000 ▼2,000</td><td>43,000</td><td class="up">48,000 ▲5,000</td></tr>
+  <tr><td>현대차</td><td class="muted">—</td><td class="muted">—</td><td class="up">12,000 신규</td><td>12,000</td></tr>
+</table>
+<ul>
+  <li>열 = 최근 30개 스냅샷의 <code>trdDd</code>, 좌→우 시간순. <code>overflow-x-auto</code> 가로 스크롤, 종목명 첫 열은 <code>sticky left-0</code> 고정.</li>
+  <li>셀 = <code>shares.toLocaleString()</code>. delta가 있으면 증감 수치를 작게 병기하고 기존 <code>deltaColor</code> 컨벤션(증가=초록, 감소=빨강) 적용. 첫 등장 셀은 "신규" 표기. 데이터 없는 날짜는 <code>—</code> (회색).</li>
+  <li>행 정렬: 최신 Top10 포함 종목을 최신 비중 내림차순으로 먼저, 이탈 종목(최신 미포함)은 하단에 회색 톤으로.</li>
+  <li>스냅샷이 1개 이하면 "이력이 쌓이는 중입니다 (스냅샷 N개)" 안내만 표시.</li>
+</ul>
+
+<h3>5.2 종목별 라인 차트</h3>
+<ul>
+  <li>행 클릭 → 표 아래에 해당 종목의 주식수 추이 Recharts <code>LineChart</code> 확장 (X=trdDd, Y=shares). 다시 클릭하면 접힘. 한 번에 1종목만.</li>
+  <li>데이터 없는 날짜는 <code>connectNulls</code>로 선을 이어 추세를 보이게 하되, 점은 관측치에만 찍는다.</li>
+  <li>recharts <code>^3.8.1</code> 기설치 — 의존성 추가 없음. 차트 컴포넌트는 client component인 <code>ShareHistorySection</code> 내부에 둔다.</li>
+</ul>
+
+<h2>6. 에러 처리</h2>
+<ul>
+  <li>이력 조회 실패가 페이지 전체를 깨지 않도록 <code>page.tsx</code>에서 <code>getEtfShareHistory</code> 실패 시 <code>null</code>로 처리하고 섹션만 숨긴다 (기존 detail 영역은 영향 없음).</li>
+  <li><code>buildShareHistory</code>는 입력 스냅샷이 비어 있어도 throw하지 않고 빈 결과를 반환한다.</li>
+</ul>
+
+<h2>7. 테스트 계획</h2>
+<table>
+  <tr><th>케이스</th><th>검증 내용</th></tr>
+  <tr><td>기본 pivot</td><td>스냅샷 3개 → dates 오름차순, 종목별 cells 길이 = dates 길이</td></tr>
+  <tr><td>delta 계산</td><td>연속 관측 시 직전 대비 증감, 변동 없으면 delta 0</td></tr>
+  <tr><td>신규 진입</td><td>첫 등장 셀 delta = null, 이전 날짜 셀 = null</td></tr>
+  <tr><td>이탈 후 재진입</td><td>공백 셀 = null, 재진입 delta는 마지막 관측치 대비</td></tr>
+  <tr><td>정렬</td><td>최신 포함 종목이 비중 내림차순으로 먼저, 이탈 종목 하단</td></tr>
+  <tr><td>빈 입력</td><td>스냅샷 0개 → <code>{ dates: [], rows: [] }</code></td></tr>
+  <tr><td>코드 없는 종목</td><td>constituentCode가 빈 문자열이어도 이름으로 행 병합</td></tr>
+</table>
+<p><strong>완료 기준:</strong> <code>yarn workspace company-map vitest run src/lib/etf/history.test.ts</code> 통과 → <code>yarn workspace company-map lint</code> 통과 → dev 서버에서 <code>/stocks/etf?code=0167A0</code> 열어 표·차트 동작 확인.</p>
+
+<h2>8. 범위 제외 (YAGNI)</h2>
+<ul>
+  <li>ETF 자체 상장주식수(CU 설정/환매) 추적 — 별도 작업으로 분리.</li>
+  <li>비중(weight) 이력 매트릭스 — 이번엔 주식수만. 구조상 추후 확장 용이.</li>
+  <li>기간 선택 UI — 최근 30 스냅샷 고정. 필요해지면 추가.</li>
+  <li>스키마·worker 수집 로직 변경 — 없음.</li>
+</ul>
+
+<blockquote><strong>알려진 한계:</strong> Naver Top10 기반 수집이므로 Top10 밖 기간은 이력 공백(<code>—</code>)으로 표시된다. 또한 스냅샷 수집이 시작된 날짜 이전의 이력은 존재하지 않는다.</blockquote>
+
+</body>
+</html>

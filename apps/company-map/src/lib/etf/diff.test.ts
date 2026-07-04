@@ -31,6 +31,22 @@ describe("diffHoldings", () => {
     expect(changes[changes.length - 1].constituentCode).toBe("D"); // 이탈은 맨 뒤
   });
 
+  it("코드가 빈 해외주식은 종목명으로 식별해 증감을 계산한다", () => {
+    // 해외주식 ETF는 constituentCode가 모두 "" → 코드로 식별하면 한 종목으로 뭉개진다.
+    const f = (name: string, shares: number): Holding => ({
+      constituentCode: "", constituentName: name, weight: null, shares, amount: null,
+    });
+    const latest = [f("INTEL CORP", 360), f("NVIDIA CORP", 177)];
+    const prev = [f("INTEL CORP", 351), f("NVIDIA CORP", 180)];
+    const changes = diffHoldings(latest, prev);
+
+    expect(changes).toHaveLength(2);
+    const byName = Object.fromEntries(changes.map((c) => [c.constituentName, c]));
+    expect(byName["INTEL CORP"].status).toBe("유지");
+    expect(byName["INTEL CORP"].sharesDelta).toBe(9); // 360-351 (NVIDIA와 교차계산되면 안 됨)
+    expect(byName["NVIDIA CORP"].sharesDelta).toBe(-3); // 177-180
+  });
+
   it("직전 스냅샷이 없으면 전부 유지로 표기하고 증감은 null", () => {
     const latest = [mk("A", 60), mk("B", 40)];
     const changes = diffHoldings(latest, null);

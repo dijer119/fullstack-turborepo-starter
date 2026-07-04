@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETF 시가총액 표시 — 설계 명세 (2026-06-11)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+</style>
+</head>
+<body>
+
+<h1>ETF 시가총액 표시 — 설계 명세</h1>
+<p><strong>작성일:</strong> 2026-06-11 · <strong>대상 앱:</strong> <code>apps/company-map</code> · <strong>페이지:</strong> <code>/stocks/etf?code=&lt;ETF코드&gt;</code></p>
+
+<h2>1. 목적</h2>
+<p>관심 ETF 상세 화면 헤더에 해당 ETF의 <strong>시가총액</strong>을 한국식 단위("1,128억")로 표시한다. 현재 값 표시만 — 이력 UI는 범위 외 (단, 일별 스냅샷에 저장되므로 이력 데이터는 자동 축적).</p>
+
+<h2>2. 데이터 소스 (라이브 확인 완료)</h2>
+<ul>
+  <li>이미 일별 수집 중인 Naver 모바일 <code>etfAnalysis</code> 응답에 <code>marketValue</code> 필드가 한국어 단위 문자열로 존재 — 예: <code>"1,128억"</code> (476850에서 2026-06-11 확인). 새 외부 API 불필요.</li>
+  <li>참고: ETF는 일반 주식과 달리 <code>integration</code> API의 <code>totalInfos</code>에 marketValue가 <strong>없다</strong> — 기존 <code>fetchMarketValue()</code>(<code>lib/stocks/price-history.ts</code>)는 ETF에 재사용 불가.</li>
+  <li>파싱·포맷 유틸 재사용: <code>parseKoreanMarketValue()</code>(<code>lib/stocks/parse-market-value.ts</code>, "1,128억" → BigInt 원), <code>formatMarcap()</code>(<code>lib/format-marcap.ts</code>, BigInt/number → "1,128억").</li>
+</ul>
+
+<h2>3. 아키텍처 (A안: 스냅샷 저장)</h2>
+<table>
+  <tr><th>구성요소</th><th>변경</th></tr>
+  <tr><td><code>prisma/schema.prisma</code></td><td><code>EtfPdfSnapshot</code>에 <code>marketValue BigInt? @map("market_value")</code> 추가 (nullable — 과거 스냅샷은 null). 마이그레이션 1회.</td></tr>
+  <tr><td><code>src/lib/etf/naver.ts</code></td><td><code>parseNaverEtfAnalysis()</code> 반환에 <code>marketValue: bigint | null</code> 추가 — <code>parseKoreanMarketValue(json.marketValue)</code> 위임. 단위 테스트 추가.</td></tr>
+  <tr><td><code>worker/fetch-naver-etf.ts</code></td><td><code>fetchNaverEtf()</code> 반환에 <code>marketValue</code> 전달.</td></tr>
+  <tr><td><code>worker/etf-snapshot.ts</code></td><td>① 스냅샷 create 시 <code>marketValue</code> 저장. ② <strong>당일 스냅샷이 이미 있고 <code>marketValue</code>가 null이면 그 필드만 update 후 <code>"saved"</code> 대신 <code>"updated"</code> 반환</strong> (없으면 기존 skip 로직 때문에 다음 영업일까지 값이 안 들어옴).</td></tr>
+  <tr><td><code>src/actions/etf.ts</code></td><td><code>getEtfDetail()</code>이 최신 스냅샷의 <code>marketValue</code>를 <code>EtfDetailView.marketValue: number | null</code>로 추가. BigInt → <code>Number()</code> 변환 (server→client 직렬화에 BigInt 불가; 시총 규모 ≪ 2^53이라 정밀도 안전).</td></tr>
+  <tr><td><code>src/app/stocks/etf/EtfManager.tsx</code></td><td>기준일 줄에 <code>· 시가총액 1,128억</code> 병기 — <code>formatMarcap(detail.marketValue)</code>. null이면 해당 조각 생략.</td></tr>
+</table>
+
+<h2>4. 동작 상세</h2>
+<ul>
+  <li><strong>snapshotEtf 상태값</strong>: 기존 <code>"saved" | "skipped" | "failed"</code>에 <code>"updated"</code> 추가 (당일 스냅샷의 marketValue 보강 시). 로그 출력 외 소비자 없음 — 호환성 영향 없음.</li>
+  <li>marketValue 파싱 실패(필드 없음/형식 불일치) 시 <code>null</code> 저장 — 스냅샷 저장 자체는 실패하지 않는다.</li>
+  <li>UI: <code>detail.marketValue == null</code>이면 "시가총액" 조각을 렌더하지 않음 (— 표시도 하지 않음; 과거 스냅샷만 있는 ETF에서 불필요한 빈 표기 방지).</li>
+</ul>
+
+<h2>5. 표시 예</h2>
+<pre><code>기준일 20260610 · 직전 20260609 대비 · 시가총액 1,128억</code></pre>
+
+<h2>6. 테스트 계획</h2>
+<table>
+  <tr><th>대상</th><th>방법</th></tr>
+  <tr><td><code>parseNaverEtfAnalysis</code></td><td>Vitest: marketValue 정상 파싱("1,128억" → 112_800_000_000n), 필드 없음 → null, "1.2조" 복합 단위, 기존 holdings 파싱 회귀</td></tr>
+  <tr><td>마이그레이션</td><td>migrate dev 성공 + 기존 스냅샷 행 <code>market_value IS NULL</code> 확인</td></tr>
+  <tr><td>워커 보강 로직</td><td>dev 서버 재시작 → "구성종목 갱신" 실행 → 당일 스냅샷에 marketValue 채워짐 (sqlite 확인, "updated" 로그)</td></tr>
+  <tr><td>UI</td><td><code>?code=476850</code> 헤더에 "시가총액 1,1XX억" 표시 확인</td></tr>
+  <tr><td>회귀</td><td><code>yarn workspace company-map test</code> 전체 + 변경 파일 eslint 0 (워크스페이스 lint는 pre-existing 에러로 게이트 불가)</td></tr>
+</table>
+
+<blockquote><strong>⚠️ 주의:</strong> 마이그레이션 후 dev 서버 재시작 필수 (PrismaClient 싱글턴). 워커 프로세스가 떠 있다면 그것도 재시작 대상.</blockquote>
+
+<h2>7. 범위 제외 (YAGNI)</h2>
+<ul>
+  <li>시가총액 이력 UI (데이터는 쌓이므로 추후 별도 작업 가능)</li>
+  <li>순자산(totalNav)·괴리율 표시</li>
+  <li>ETF 버튼 목록에 시총 표시</li>
+  <li>과거 스냅샷 marketValue 백필</li>
+</ul>
+
+</body>
+</html>

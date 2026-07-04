@@ -2,13 +2,19 @@
 
 import { useState } from "react";
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Legend,
 } from "recharts";
 import type { ShareHistory, ShareHistoryRow } from "@/lib/etf/history";
 
 function deltaColor(v: number): string {
   return v > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
 }
+
+// 멀티라인 차트 색상 팔레트 (최신 Top10 종목 구분용)
+const LINE_COLORS = [
+  "#2563eb", "#dc2626", "#16a34a", "#d97706", "#9333ea",
+  "#0891b2", "#db2777", "#65a30d", "#4f46e5", "#ea580c",
+];
 
 // "20260610" → "06-10"
 function fmtDate(trdDd: string): string {
@@ -19,6 +25,10 @@ const rowKey = (r: ShareHistoryRow) => r.constituentCode || r.constituentName;
 
 export function ShareHistorySection({ history }: { history: ShareHistory }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [view, setView] = useState<"table" | "chart">("table");
+  // 그래프 모드에서 강조 중인 종목 (범례/선 클릭으로 토글)
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const toggleActive = (k: string) => setActiveKey((cur) => (cur === k ? null : k));
 
   if (history.dates.length <= 1) {
     return (
@@ -33,9 +43,101 @@ export function ShareHistorySection({ history }: { history: ShareHistory }) {
 
   const open = history.rows.find((r) => rowKey(r) === openKey) ?? null;
 
+  // 그래프 모드: 최신 Top10 종목 전체의 주식수 추이를 한 차트에 겹쳐 표시
+  const chartRows = history.rows.filter((r) => r.inLatest).slice(0, LINE_COLORS.length);
+  const chartData = history.dates.map((d, i) => {
+    const point: Record<string, number | string | null> = { date: fmtDate(d) };
+    for (const r of chartRows) point[rowKey(r)] = r.cells[i]?.shares ?? null;
+    return point;
+  });
+  // ETF 전환 등으로 activeKey가 현재 라인 집합에 없으면 강조 해제로 간주
+  const active = chartRows.some((r) => rowKey(r) === activeKey) ? activeKey : null;
+
+  // 범례: 강조 종목은 굵게, 그 외엔 흐리게. 클릭 시 토글.
+  const renderLegend = (value: string, entry: { dataKey?: unknown }) => {
+    const k = String(entry?.dataKey ?? "");
+    const isActive = k === active;
+    return (
+      <span
+        style={{
+          cursor: "pointer",
+          fontWeight: isActive ? 700 : 400,
+          opacity: active && !isActive ? 0.4 : 1,
+        }}
+      >
+        {value}
+      </span>
+    );
+  };
+
   return (
     <section>
-      <h2 className="mb-2 text-base font-semibold">주식수 변경 이력</h2>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="text-base font-semibold">주식수 변경 이력</h2>
+        <div className="inline-flex overflow-hidden rounded border border-gray-300 text-xs dark:border-gray-700">
+          <button
+            onClick={() => setView("table")}
+            className={`px-2.5 py-1 ${view === "table" ? "bg-blue-600 text-white" : "text-gray-600 dark:text-gray-300"}`}
+          >
+            테이블
+          </button>
+          <button
+            onClick={() => setView("chart")}
+            className={`px-2.5 py-1 ${view === "chart" ? "bg-blue-600 text-white" : "text-gray-600 dark:text-gray-300"}`}
+          >
+            그래프
+          </button>
+        </div>
+      </div>
+
+      {view === "chart" ? (
+        <div>
+          <p className="mb-2 text-xs text-gray-500">
+            최근 {history.dates.length}개 스냅샷 · 최신 Top10 종목의 주식수 추이 · 끊긴 구간은 해당일 Top10 밖
+          </p>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" fontSize={11} />
+                <YAxis
+                  fontSize={11}
+                  width={72}
+                  domain={["auto", "auto"]}
+                  tickFormatter={(v: number) => v.toLocaleString()}
+                />
+                <Tooltip formatter={(v) => (typeof v === "number" ? v.toLocaleString() : v)} />
+                <Legend
+                  wrapperStyle={{ fontSize: 11 }}
+                  formatter={renderLegend}
+                  onClick={(o: { dataKey?: unknown }) => toggleActive(String(o?.dataKey ?? ""))}
+                />
+                {chartRows.map((r, idx) => {
+                  const k = rowKey(r);
+                  const isActive = k === active;
+                  return (
+                    <Line
+                      key={k}
+                      type="monotone"
+                      dataKey={k}
+                      name={r.constituentName}
+                      stroke={LINE_COLORS[idx % LINE_COLORS.length]}
+                      strokeWidth={isActive ? 3 : 1.5}
+                      strokeOpacity={active && !isActive ? 0.18 : 1}
+                      dot={{ r: 1.5 }}
+                      activeDot={{ r: 4, onClick: () => toggleActive(k) }}
+                      onClick={() => toggleActive(k)}
+                      style={{ cursor: "pointer" }}
+                      connectNulls
+                    />
+                  );
+                })}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      ) : (
+      <>
       <p className="mb-2 text-xs text-gray-500">
         최근 {history.dates.length}개 스냅샷 · 행 클릭 시 추이 차트 · — 는 해당일 Top10 밖
       </p>
@@ -119,6 +221,8 @@ export function ShareHistorySection({ history }: { history: ShareHistory }) {
             </ResponsiveContainer>
           </div>
         </div>
+      )}
+      </>
       )}
     </section>
   );

@@ -1,5 +1,10 @@
 import type { Holding, HoldingChange } from "./types";
 
+// 해외주식 등은 constituentCode가 빈 문자열이라 코드로 식별하면 한 종목으로 뭉개진다.
+// 코드가 없으면 종목명으로 식별한다 (history.ts의 keyOf와 동일 규칙).
+const idOf = (h: { constituentCode: string; constituentName: string }) =>
+  h.constituentCode || h.constituentName;
+
 export function topN(holdings: Holding[], n: number): Holding[] {
   return [...holdings]
     .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))
@@ -11,11 +16,11 @@ export function diffHoldings(
   latest: Holding[],
   prev: Holding[] | null,
 ): HoldingChange[] {
-  const prevByCode = new Map((prev ?? []).map((h) => [h.constituentCode, h]));
-  const latestCodes = new Set(latest.map((h) => h.constituentCode));
+  const prevById = new Map((prev ?? []).map((h) => [idOf(h), h]));
+  const latestIds = new Set(latest.map((h) => idOf(h)));
 
   const present: HoldingChange[] = latest.map((h) => {
-    const p = prevByCode.get(h.constituentCode);
+    const p = prevById.get(idOf(h));
     const isNew = prev != null && !p;
     return {
       ...h,
@@ -27,7 +32,7 @@ export function diffHoldings(
   present.sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
 
   const dropped: HoldingChange[] = (prev ?? [])
-    .filter((h) => !latestCodes.has(h.constituentCode))
+    .filter((h) => !latestIds.has(idOf(h)))
     .map((h) => ({
       constituentCode: h.constituentCode,
       constituentName: h.constituentName,

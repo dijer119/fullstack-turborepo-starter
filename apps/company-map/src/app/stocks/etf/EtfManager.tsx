@@ -116,6 +116,11 @@ export function EtfManager({
           className="rounded border border-blue-500 px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40">
           구성종목 갱신
         </button>
+        <button
+          onClick={() => router.push("/stocks/etf/combined")}
+          className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
+          비중 합산 보기
+        </button>
         {msg && <span className="text-xs text-gray-500">{msg}</span>}
       </div>
 
@@ -194,7 +199,7 @@ export function EtfManager({
               </thead>
               <tbody>
                 {detail.changes.map((c) => (
-                  <tr key={c.constituentCode} className="border-b border-gray-100 dark:border-gray-800">
+                  <tr key={c.constituentCode || c.constituentName} className="border-b border-gray-100 dark:border-gray-800">
                     <td className="p-2">{c.constituentName}</td>
                     <td className="p-2 text-right">{pct(c.weight)}</td>
                     <td className={`p-2 text-right ${deltaColor(c.weightDelta)}`}>{deltaP(c.weightDelta)}</td>
