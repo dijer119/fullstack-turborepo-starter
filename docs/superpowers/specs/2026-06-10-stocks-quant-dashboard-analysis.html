@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>퀀트 대시보드 이미지 분석 — /stocks/[code] 추가 검토</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .ok { color: #276749; font-weight: 600; }
+  .partial { color: #b7791f; font-weight: 600; }
+  .missing { color: #c53030; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>퀀트 대시보드 이미지 분석</h1>
+<p>대상: <code>http://localhost:3004/stocks/383220</code> (company-map 종목 상세 페이지)에 "Value Sheet 퀀트 대시보드" 스타일 섹션 추가 검토. 작성일: 2026-06-10.</p>
+
+<h2>1. 이미지 구성 요소 분해</h2>
+
+<table>
+  <tr><th>영역</th><th>항목</th><th>예시 값</th><th>비고</th></tr>
+  <tr><td rowspan="2">헤더</td><td>종목 선택 드롭다운</td><td>F&amp;F (종합 7위, 상대 7위, YoY 9위)</td><td>유니버스 47종목 내 순위 병기</td></tr>
+  <tr><td>순위 기준 토글</td><td>종합평균점수 / 상대순위 / YoY순위</td><td>3개 정렬 기준</td></tr>
+  <tr><td rowspan="4">상단 카드</td><td>기준가</td><td>72,900원</td><td>현재가</td></tr>
+  <tr><td>시가총액</td><td>2조7,926억</td><td>—</td></tr>
+  <tr><td>RRR (Return / Risk)</td><td>14.78</td><td>공식 불명 — 확인 필요</td></tr>
+  <tr><td>종합 평균점수</td><td>89.68점 (7위/47)</td><td>하위 지표 점수의 평균으로 추정</td></tr>
+  <tr><td rowspan="3">게이지 3종</td><td>52주 저가 대비 현재가 위치</td><td>49.3% (저가 58,000 / 고가 88,200)</td><td>스케일 0~100, 기준일 표기</td></tr>
+  <tr><td>ROE</td><td>21.97% (전체 4위/47)</td><td>스케일 -10~40</td></tr>
+  <tr><td>PBR</td><td>1.23x (전체 11위/47)</td><td>스케일 0~3</td></tr>
+  <tr><td rowspan="5">세부 평가 지표</td><td>예상 시가배당률</td><td>4.12%</td><td>—</td></tr>
+  <tr><td>국채시가배당률</td><td>1.1배</td><td>배당수익률 ÷ 국채금리로 추정</td></tr>
+  <tr><td>국채배당 점수</td><td>75.84점 (11위/47)</td><td>위 배수의 점수화</td></tr>
+  <tr><td>YoY (EPS, 분기보고서)</td><td>139% (9위/47)</td><td>분기보고서 기준 EPS 증감률</td></tr>
+  <tr><td>상대순위</td><td>+7 (전체 7위/47)</td><td>의미 불명 — 순위 변동으로 추정</td></tr>
+</table>
+
+<h2>2. company-map 데이터 가용성 매핑</h2>
+
+<table>
+  <tr><th>이미지 항목</th><th>기존 데이터/로직</th><th>상태</th></tr>
+  <tr><td>기준가</td><td><code>StockAnalysis.currentPrice</code></td><td class="ok">바로 사용</td></tr>
+  <tr><td>시가총액</td><td><code>StockMaster.marcap</code> (+ 기존 <code>format-marcap.ts</code>)</td><td class="ok">바로 사용</td></tr>
+  <tr><td>PBR</td><td><code>StockAnalysis.pbr</code></td><td class="ok">바로 사용</td></tr>
+  <tr><td>예상 시가배당률</td><td><code>StockAnalysis.dividendYield</code> (네이버 스크래핑)</td><td class="ok">바로 사용</td></tr>
+  <tr><td>ROE</td><td>stocks explorer에 이미 존재: <code>manualRoe ?? (pbr/per)×100</code> (<code>StocksExplorerClient.tsx:599</code>, <code>StockOverride.manualRoe</code>)</td><td class="ok">기존 방식 재사용</td></tr>
+  <tr><td>YoY (EPS)</td><td><code>FinancialSnapshot.netIncomeYoyPct</code> — DART 분기보고서 기반 순이익 YoY. 주식수 변동이 없으면 EPS YoY와 동일</td><td class="partial">유사값 보유 (EPS 기준으로 할지 결정 필요)</td></tr>
+  <tr><td>52주 저가 대비 위치</td><td>저장된 데이터 없음. 단, <code>lib/stocks/price-history.ts</code>가 네이버 일별 시세 API(<code>siseJson</code>)를 이미 사용 중 — 1년 범위로 호출하면 52주 고저 계산 가능</td><td class="partial">수집 로직 추가 필요 (난이도 낮음)</td></tr>
+  <tr><td>국채시가배당률 / 국채배당 점수</td><td>국채금리 데이터 없음. 후보: ① 한국은행 ECOS API, ② 네이버 금융 채권 페이지 스크래핑, ③ 설정값 수동 입력</td><td class="missing">신규 데이터 소스 필요</td></tr>
+  <tr><td>RRR</td><td>공식 자체가 불명 (52주 고저 기반 (고가-현재가)/(현재가-저가)로 계산하면 예시 종목은 약 1.03 — 이미지의 14.78과 불일치)</td><td class="missing">공식 확인 필요</td></tr>
+  <tr><td>종합 평균점수 + 순위</td><td>점수 체계 없음. 지표별 점수화 공식 + 순위 산정 유니버스(47종목에 해당하는 기준) 정의 필요</td><td class="missing">정의 필요</td></tr>
+  <tr><td>상대순위 (+7)</td><td>의미 불명 — 이전 대비 순위 변동이라면 순위 이력 저장 필요</td><td class="missing">정의 필요</td></tr>
+</table>
+
+<h2>3. 의견 요약</h2>
+
+<h3>구현 가능성</h3>
+<ul>
+  <li><strong>12개 항목 중 5개는 기존 데이터로 즉시 표시 가능</strong> (기준가·시총·PBR·배당률·ROE), 2개는 근소한 추가 작업(YoY, 52주 위치)으로 가능.</li>
+  <li><strong>국채금리</strong>는 신규 소스가 필요하지만, 자주 변하지 않는 값이라 설정 화면에서 수동 입력하는 단순한 방식도 실용적임 (본인용 도구 특성상).</li>
+  <li><strong>RRR·종합점수·상대순위는 출처 시트의 공식을 알아야 함</strong> — 이미지 값으로 역산이 안 되므로 추측 구현은 위험. 공식 확보가 1순위 선결 과제.</li>
+</ul>
+
+<h3>배치 구조</h3>
+<blockquote>이미지는 "유니버스에서 종목을 골라 보는 독립 대시보드"인 반면, 요청 위치는 <strong>종목 상세 페이지</strong>. 상세 페이지 최상단(StockDetailHeader 아래)에 대시보드 섹션을 추가하고, 종목 선택 드롭다운은 생략(URL이 이미 종목을 결정)하는 적응이 자연스러움. 순위는 <code>StockAnalysis</code> 보유 전 종목 또는 태그/관심종목 유니버스 기준으로 계산.</blockquote>
+
+<h3>기술 스택 적합성</h3>
+<ul>
+  <li>게이지(반원형)는 이미 의존성에 있는 <strong>recharts</strong>의 <code>RadialBarChart</code>/<code>PieChart</code>로 구현 가능 — 추가 패키지 불필요.</li>
+  <li>순위 계산은 Server Action에서 전 종목 1회 조회로 충분 (SQLite 로컬이라 비용 미미).</li>
+  <li>다크 테마 디자인은 기존 company-map 테마 톤을 따르되, 이미지의 네온 글로우 스타일 차용 여부는 디자인 단계에서 결정.</li>
+</ul>
+
+<h3>선결 질문 (설계 전 확인 필요)</h3>
+<ol>
+  <li>RRR·종합 평균점수·국채배당 점수·상대순위의 <strong>정확한 공식/출처</strong> (Value Sheet 양식의 정의)</li>
+  <li>순위 산정 <strong>유니버스</strong>: 분석된 전 종목 vs 관심종목(태그) vs 별도 목록</li>
+  <li><strong>국채금리 입력 방식</strong>: 자동 수집(ECOS/스크래핑) vs 수동 설정</li>
+  <li>YoY를 <strong>EPS 기준</strong>으로 맞출지, 기존 보유한 순이익/영업이익 YoY로 대체할지</li>
+</ol>
+
+</body>
+</html>

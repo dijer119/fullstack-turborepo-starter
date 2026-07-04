@@ -34,6 +34,11 @@ export interface StocksExplorerView {
   maxMarcapEok: number | null;
   perMax: number | null;
   pbrMax: number | null;
+  netIncomeYoyMin: number | null;
+  opIncomeYoyMin: number | null;
+  dividendYieldMin: number | null;
+  seojunsikIndexMin: number | null;
+  excludeLoss: boolean;
   analyzedOnly: boolean;
   vipOnly: boolean;
   memoOnly: boolean;
@@ -59,6 +64,11 @@ function buildQuery(view: Partial<StocksExplorerView>): string {
   if (view.maxMarcapEok != null) qs.set("maxMarcap", String(view.maxMarcapEok));
   if (view.perMax != null) qs.set("perMax", String(view.perMax));
   if (view.pbrMax != null) qs.set("pbrMax", String(view.pbrMax));
+  if (view.netIncomeYoyMin != null) qs.set("netYoyMin", String(view.netIncomeYoyMin));
+  if (view.opIncomeYoyMin != null) qs.set("opYoyMin", String(view.opIncomeYoyMin));
+  if (view.dividendYieldMin != null) qs.set("divMin", String(view.dividendYieldMin));
+  if (view.seojunsikIndexMin != null) qs.set("seojunsikMin", String(view.seojunsikIndexMin));
+  if (view.excludeLoss) qs.set("excludeLoss", "1");
   if (view.analyzedOnly) qs.set("analyzed", "1");
   if (view.vipOnly) qs.set("vip", "1");
   if (view.memoOnly) qs.set("memo", "1");
@@ -171,6 +181,11 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
       view.maxMarcapEok != null ||
       view.perMax != null ||
       view.pbrMax != null ||
+      view.netIncomeYoyMin != null ||
+      view.opIncomeYoyMin != null ||
+      view.dividendYieldMin != null ||
+      view.seojunsikIndexMin != null ||
+      view.excludeLoss ||
       view.analyzedOnly ||
       view.vipOnly ||
       view.memoOnly ||
@@ -192,6 +207,19 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
   const [pbrMax, setPbrMax] = useState(
     view.pbrMax != null ? String(view.pbrMax) : "",
   );
+  const [netYoyMin, setNetYoyMin] = useState(
+    view.netIncomeYoyMin != null ? String(view.netIncomeYoyMin) : "",
+  );
+  const [opYoyMin, setOpYoyMin] = useState(
+    view.opIncomeYoyMin != null ? String(view.opIncomeYoyMin) : "",
+  );
+  const [dividendYieldMin, setDividendYieldMin] = useState(
+    view.dividendYieldMin != null ? String(view.dividendYieldMin) : "",
+  );
+  const [seojunsikMin, setSeojunsikMin] = useState(
+    view.seojunsikIndexMin != null ? String(view.seojunsikIndexMin) : "",
+  );
+  const [excludeLoss, setExcludeLoss] = useState(view.excludeLoss);
   const [analyzedOnly, setAnalyzedOnly] = useState(view.analyzedOnly);
   const [vipOnly, setVipOnly] = useState(view.vipOnly);
   const [memoOnly, setMemoOnly] = useState(view.memoOnly);
@@ -242,6 +270,12 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
       maxMarcapEok: maxMarcap ? Number(maxMarcap) : null,
       perMax: perMax ? Number(perMax) : null,
       pbrMax: pbrMax ? Number(pbrMax) : null,
+      // 0·음수도 유효(YoY 증감률)라 빈 문자열만 null 처리.
+      netIncomeYoyMin: netYoyMin !== "" ? Number(netYoyMin) : null,
+      opIncomeYoyMin: opYoyMin !== "" ? Number(opYoyMin) : null,
+      dividendYieldMin: dividendYieldMin !== "" ? Number(dividendYieldMin) : null,
+      seojunsikIndexMin: seojunsikMin !== "" ? Number(seojunsikMin) : null,
+      excludeLoss,
       analyzedOnly,
       vipOnly,
       memoOnly,
@@ -257,6 +291,11 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
     setMaxMarcap("");
     setPerMax("");
     setPbrMax("");
+    setNetYoyMin("");
+    setOpYoyMin("");
+    setDividendYieldMin("");
+    setSeojunsikMin("");
+    setExcludeLoss(false);
     setAnalyzedOnly(false);
     setVipOnly(false);
     setMemoOnly(false);
@@ -387,6 +426,66 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
               placeholder="상한"
               className="flex-1 rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
             />
+          </label>
+          <label className="flex items-center gap-2" title="순이익 전년 동기 대비 증감률(YoY %)">
+            <span className="w-20 text-gray-600 dark:text-gray-400">순이익YoY ≥</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="1"
+              value={netYoyMin}
+              onChange={(e) => setNetYoyMin(e.target.value)}
+              placeholder="% (예: 10)"
+              className="flex-1 rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+            />
+            <span className="text-xs text-gray-500">%</span>
+          </label>
+          <label className="flex items-center gap-2" title="영업이익 전년 동기 대비 증감률(YoY %)">
+            <span className="w-20 text-gray-600 dark:text-gray-400">영업익YoY ≥</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="1"
+              value={opYoyMin}
+              onChange={(e) => setOpYoyMin(e.target.value)}
+              placeholder="% (예: 10)"
+              className="flex-1 rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+            />
+            <span className="text-xs text-gray-500">%</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <span className="w-20 text-gray-600 dark:text-gray-400">배당% ≥</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.1"
+              value={dividendYieldMin}
+              onChange={(e) => setDividendYieldMin(e.target.value)}
+              placeholder="하한"
+              className="flex-1 rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+            />
+          </label>
+          <label className="flex items-center gap-2" title="서준식 지수 = 연복리 기대수익률(%). 12 이상이면 목표(12%) 달성">
+            <span className="w-20 text-gray-600 dark:text-gray-400">서준식 ≥</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              value={seojunsikMin}
+              onChange={(e) => setSeojunsikMin(e.target.value)}
+              placeholder="% (예: 12)"
+              className="flex-1 rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+            />
+            <span className="text-xs text-gray-500">%</span>
+          </label>
+          <label className="flex items-center gap-2" title="DART 최신 보고서 기준 영업이익·순이익이 모두 흑자(>0)인 종목만. 재무 미수집 종목도 제외됨">
+            <input
+              type="checkbox"
+              checked={excludeLoss}
+              onChange={(e) => setExcludeLoss(e.target.checked)}
+            />
+            <span>적자 제외 (영업·순이익 흑자)</span>
           </label>
           <label className="flex items-center gap-2">
             <input
@@ -552,7 +651,7 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                   <td className="sticky left-0 z-10 bg-white p-2 font-medium group-hover:bg-gray-50 dark:bg-gray-950 dark:group-hover:bg-gray-900/50">
                     <div className="flex items-center gap-1.5">
                       <RatingDot stockCode={r.code} initialGrade={r.grade} />
-                      <MemoButton stockCode={r.code} initialHasMemo={r.hasMemo} />
+                      <MemoButton stockCode={r.code} initialHasMemo={r.hasMemo} initialMemoText={r.memoText} />
                       <Link
                         href={`/stocks/${r.code}`}
                         className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
@@ -560,6 +659,14 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                       >
                         <FileText size={14} />
                       </Link>
+                      <a
+                        href={`https://finance.naver.com/item/main.naver?code=${r.code}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        {r.name}
+                      </a>
                       {r.hasLinks && (
                         <Link
                           href={`/stocks/${r.code}#links`}
@@ -581,14 +688,6 @@ export function StocksExplorerClient({ rows, total, view, allTags }: Props) {
                           {r.treasuryCancelCount}
                         </Link>
                       )}
-                      <a
-                        href={`https://finance.naver.com/item/main.naver?code=${r.code}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline dark:text-blue-400"
-                      >
-                        {r.name}
-                      </a>
                     </div>
                   </td>
                   <td className="p-2 font-mono text-gray-500">{r.code}</td>
@@ -952,17 +1051,23 @@ function RatingDot({
 function MemoButton({
   stockCode,
   initialHasMemo,
+  initialMemoText,
 }: {
   stockCode: string;
   initialHasMemo: boolean;
+  initialMemoText: string | null;
 }) {
   const [hasMemo, setHasMemo] = useState(initialHasMemo);
+  // 호버 미리보기용 메모 본문(저장 시 동기화). row 데이터에 실려와 추가 fetch 불필요.
+  const [memoText, setMemoText] = useState(initialMemoText ?? "");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
   // popover 위치(viewport 기준). 부모 overflow-x-auto에 갇히지 않게 fixed 사용.
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  // 호버 툴팁 위치(viewport 기준). null이면 미표시.
+  const [hoverPos, setHoverPos] = useState<{ top: number; left: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
   const POPOVER_W = 288; // w-72 = 18rem = 288px
 
@@ -994,6 +1099,7 @@ function MemoButton({
     try {
       const r = await setMemo(stockCode, text);
       setHasMemo(r.hasMemo);
+      setMemoText(r.hasMemo ? text.trim() : ""); // 호버 미리보기 동기화
       setOpen(false);
       setText("");
       setPos(null);
@@ -1002,12 +1108,27 @@ function MemoButton({
     }
   };
 
+  // 메모 있는 종목에 한해 호버 시 본문 미리보기 툴팁 표시.
+  const showHover = () => {
+    if (!hasMemo || !memoText || open) return;
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const left = Math.min(rect.left, window.innerWidth - POPOVER_W - 8);
+      setHoverPos({ top: rect.bottom + 4, left: Math.max(8, left) });
+    }
+  };
+  const hideHover = () => setHoverPos(null);
+
   return (
     <>
       <button
         ref={btnRef}
         type="button"
         onClick={openPopover}
+        onMouseEnter={showHover}
+        onMouseLeave={hideHover}
+        onFocus={showHover}
+        onBlur={hideHover}
         aria-label={hasMemo ? "메모 편집" : "메모 추가"}
         className={`inline-flex items-center justify-center rounded p-0.5 transition ${
           hasMemo
@@ -1017,6 +1138,20 @@ function MemoButton({
       >
         <FileText size={14} fill={hasMemo ? "currentColor" : "none"} />
       </button>
+      {/* 호버 미리보기 (읽기 전용). 편집 팝오버가 열리면 표시 안 함. */}
+      {hoverPos &&
+        !open &&
+        hasMemo &&
+        memoText &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-50 max-h-60 w-72 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-gray-200 bg-white p-2 text-xs leading-relaxed text-gray-700 shadow-lg dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+            style={{ top: hoverPos.top, left: hoverPos.left }}
+          >
+            {memoText}
+          </div>,
+          document.body,
+        )}
       {open &&
         pos &&
         createPortal(

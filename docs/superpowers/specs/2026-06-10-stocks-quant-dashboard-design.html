@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>종목 상세 퀀트 대시보드 — 설계 명세</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+</style>
+</head>
+<body>
+
+<h1>종목 상세 퀀트 대시보드 — 설계 명세</h1>
+<p>작성일: 2026-06-10 · 대상 앱: <code>apps/company-map</code> (Next.js 16 App Router · SQLite · Vitest) · 참고: <a href="./2026-06-10-stocks-quant-dashboard-analysis.html">이미지 분석 문서</a></p>
+
+<h2>1. 목표</h2>
+<p>종목 상세 페이지(<code>/stocks/[code]</code>) 최상단에 Value Sheet 스타일 퀀트 대시보드 섹션을 추가한다. 기존 보유 데이터를 최대한 재사용하고, 신규 외부 의존성은 한국은행 ECOS API(국채금리)와 네이버 일별 시세 1년 범위 조회(52주 고저) 두 가지로 한정한다.</p>
+
+<h2>2. 범위</h2>
+
+<h3>포함 (10개 표시 항목)</h3>
+<table>
+  <tr><th>그룹</th><th>항목</th><th>데이터 출처</th></tr>
+  <tr><td rowspan="2">상단 카드</td><td>기준가</td><td><code>StockAnalysis.currentPrice</code></td></tr>
+  <tr><td>시가총액</td><td><code>StockMaster.marcap</code> + 기존 <code>format-marcap.ts</code></td></tr>
+  <tr><td rowspan="3">반원 게이지</td><td>52주 저가 대비 현재가 위치 (0~100%)</td><td>신규 <code>Week52Price</code> + 현재가</td></tr>
+  <tr><td>ROE (스케일 −10~40%)</td><td><code>manualRoe ?? PBR/PER×100</code> (공통 함수로 추출)</td></tr>
+  <tr><td>PBR (스케일 0~3)</td><td><code>StockAnalysis.pbr</code></td></tr>
+  <tr><td rowspan="5">세부 지표</td><td>예상 시가배당률</td><td><code>StockAnalysis.dividendYield</code></td></tr>
+  <tr><td>국채시가배당률 (배)</td><td>배당률 ÷ 국채금리</td></tr>
+  <tr><td>순이익 YoY</td><td><code>FinancialSnapshot.netIncomeYoyPct</code> + 기준 보고서(<code>latestBsnsYear</code>·<code>latestReprtCode</code>) 표기</td></tr>
+  <tr><td>서준식 지수 (채권형 주식 기대수익률)</td><td>PBR·ROE로 계산 (아래 4절)</td></tr>
+  <tr><td>서준식 지수 보조: 국채금리 대비 배수</td><td>기대수익률 ÷ 국채금리, 2배 이상이면 강조색</td></tr>
+</table>
+
+<h3>제외 (사용자 결정)</h3>
+<ul>
+  <li>RRR, 종합 평균점수, 상대순위 — 공식 미확보로 제외</li>
+  <li>모든 순위 표기(N위/47) 및 유니버스 개념 — 제외</li>
+  <li>종목 선택 드롭다운 — URL이 종목을 결정하므로 불필요</li>
+</ul>
+
+<h2>3. 아키텍처 (A안: 서버 컴포넌트 통합)</h2>
+<pre><code>page.tsx (서버, force-dynamic 유지)
+  ├─ 기존: stockMaster + analysis + priceChange + override 조회
+  ├─ 신규: getWeek52Price(code)   ← 캐시 24h, 미스 시 네이버 시세 1년 조회
+  ├─ 신규: getTreasuryYield()     ← 캐시 24h, 미스 시 ECOS API
+  └─ &lt;QuantDashboard {...}/&gt;     ← StockDetailHeader 바로 아래
+        └─ &lt;GaugeChart/&gt; ×3      ← "use client", recharts 반원 게이지</code></pre>
+<p>두 신규 조회는 <code>Promise.all</code>로 기존 조회와 병렬 실행한다. Suspense 스트리밍(B안)은 채택하지 않으며, 필요 시 후속 개선으로 전환한다.</p>
+
+<h2>4. 지표 계산 — <code>src/lib/stocks/quant-metrics.ts</code> (순수 함수)</h2>
+<table>
+  <tr><th>함수</th><th>공식</th><th>엣지 케이스 → null 반환</th></tr>
+  <tr><td><code>resolveRoe(manualRoe, pbr, per)</code></td><td><code>manualRoe ?? (pbr/per)×100</code> — StocksExplorerClient.tsx:599의 기존 로직을 이 함수로 추출하고 탐색기도 이 함수를 사용하도록 교체</td><td>per≤0 또는 pbr≤0이고 manualRoe 없음</td></tr>
+  <tr><td><code>week52Position(current, low, high)</code></td><td><code>(current−low)/(high−low)×100</code>, 0~100으로 클램프</td><td>high≤low, 값 누락</td></tr>
+  <tr><td><code>bondDividendRatio(divYield, treasuryYield)</code></td><td><code>divYield ÷ treasuryYield</code></td><td>treasuryYield≤0, 값 누락</td></tr>
+  <tr><td><code>seoJunsikReturn(pbr, roePct)</code></td><td><code>((1+roe)^10 ÷ pbr)^(1/10) − 1</code> (roe=roePct/100, 결과는 연복리 %). 도출: BPS=현재가÷PBR, 10년 후 BPS=BPS×(1+ROE)^10, 기대수익률=(10년후BPS÷현재가)^(1/10)−1</td><td>pbr≤0, roe≤−100%</td></tr>
+</table>
+
+<h2>5. 데이터 계층</h2>
+
+<h3>5.1 신규 Prisma 모델 (마이그레이션 1회)</h3>
+<pre><code>model Week52Price {
+  code      String   @id
+  high      Float
+  low       Float
+  asOfDate  DateTime @map("as_of_date")   // 시세 마지막 일자
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+  master    StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+  @@map("week52_prices")
+}
+
+model MarketRate {
+  kind      String   @id              // 예: "treasury_10y"
+  ratePct   Float    @map("rate_pct")
+  fetchedAt DateTime @default(now()) @map("fetched_at")
+  @@map("market_rates")
+}</code></pre>
+<p><code>StockMaster</code>에 <code>week52Price Week52Price?</code> 역방향 관계를 추가한다. 기존 <code>RefreshState</code>는 작업 상태 추적용이라 재사용하지 않는다.</p>
+
+<h3>5.2 52주 고저 — <code>src/lib/stocks/week52.ts</code></h3>
+<ul>
+  <li><code>fetchWeek52Range(code)</code>: 기존 <code>price-history.ts</code>의 네이버 <code>siseJson</code> 호출 패턴을 재사용해 1년치 일봉을 조회, 고가 컬럼 최대값·저가 컬럼 최소값을 계산</li>
+  <li><code>getWeek52Price(code)</code>: DB 조회 → <code>fetchedAt</code>이 24시간 이내면 그대로 반환, 아니면 fetch 후 upsert. fetch 실패 시 stale 레코드 반환, 그것도 없으면 null</li>
+</ul>
+
+<h3>5.3 국채금리 — <code>src/lib/rates/ecos.ts</code></h3>
+<ul>
+  <li>ECOS 통계 API (<code>ecos.bok.or.kr/api/StatisticSearch</code>)에서 <strong>국고채 10년</strong> 최신 일별 수익률 조회. 기본값은 시장금리(일별) 통계표 <code>817Y002</code>의 국고채 10년 항목으로 하되, <strong>구현 단계에서 ECOS 문서로 항목코드를 실제 호출로 검증 후 확정</strong>한다. env(<code>ECOS_TREASURY_STAT_CODE</code>, <code>ECOS_TREASURY_ITEM_CODE</code>)로 재정의 가능</li>
+  <li>env <code>ECOS_API_KEY</code> 필수 — 미설정 시 fetch를 시도하지 않고 캐시(stale 포함)만 사용</li>
+  <li><code>getTreasuryYield()</code>: <code>MarketRate(kind="treasury_10y")</code> 24h TTL 캐시, 동작은 5.2와 동일한 stale 폴백</li>
+  <li>응답 파서는 별도 순수 함수 <code>parseEcosYield(json)</code>로 분리 (테스트 대상)</li>
+</ul>
+
+<h2>6. UI — <code>src/app/stocks/[code]/QuantDashboard.tsx</code></h2>
+<ul>
+  <li>위치: <code>StockDetailHeader</code> 바로 아래, 기존 섹션 흐름 위에 추가. <code>SectionNav</code>에 "대시보드" 항목 추가</li>
+  <li>레이아웃: 카드 2 (기준가·시총) → 게이지 3 (그리드, 모바일 1열) → 세부 지표 카드 4 (배당률, 국채시가배당률, 순이익 YoY, 서준식 지수)</li>
+  <li><code>GaugeChart.tsx</code>: <code>"use client"</code>, recharts <code>PieChart</code> 반원(startAngle 180 → endAngle 0). props: <code>value, min, max, label, color, formatter, ticks</code>. 중앙에 값, 양끝에 min/max 라벨</li>
+  <li>게이지 색: 52주 위치 = violet, ROE = emerald, PBR = amber. 값이 범위를 벗어나면 클램프해 그리되 실제 값을 표기</li>
+  <li>서준식 지수 카드: 연복리 기대수익률 % 크게, 아래에 "국채금리 대비 N.N배" 보조 줄. 2.0배 이상이면 emerald 강조</li>
+  <li>모든 항목은 null이면 "—" 표시. 다크 모드는 기존 <code>dark:</code> Tailwind 패턴 준수, 이미지의 하드코딩 네온 스타일은 차용하지 않음</li>
+</ul>
+
+<h2>7. 에러 처리</h2>
+<ul>
+  <li>네이버·ECOS 실패: stale 캐시 → 없으면 해당 카드 "—". 페이지 렌더는 어떤 경우에도 실패하지 않음 (외부 호출은 try/catch + null)</li>
+  <li>외부 fetch에는 <code>AbortSignal.timeout(10_000)</code> 적용 (blog-collection에서 학습한 패턴)</li>
+  <li>52주 데이터의 <code>asOfDate</code>를 게이지 옆에 작게 표기해 신선도를 드러냄</li>
+</ul>
+
+<h2>8. 테스트 (Vitest, 소스 옆 <code>*.test.ts</code>)</h2>
+<table>
+  <tr><th>파일</th><th>케이스</th></tr>
+  <tr><td><code>quant-metrics.test.ts</code></td><td>resolveRoe(수동값 우선, per≤0), week52Position(경계 0/100, high=low), bondDividendRatio(금리 0), seoJunsikReturn(PBR 1.0·ROE 10% → 10%, pbr≤0 → null, 이미지 유사값 검산)</td></tr>
+  <tr><td><code>week52.test.ts</code></td><td>siseJson 응답 fixture → 고저 추출, 빈 응답 → null</td></tr>
+  <tr><td><code>ecos.test.ts</code></td><td>정상 응답 fixture → 수익률, 에러 응답/형식 불일치 → null</td></tr>
+</table>
+<p>UI 게이지는 단위 테스트 제외(수동 확인). 캐시 TTL 로직은 DB 의존이라 통합 수준 — 순수 판정 함수(<code>isFresh(fetchedAt, now)</code>)만 분리해 단위 테스트한다.</p>
+
+<h2>9. 환경 변수</h2>
+<pre><code># apps/company-map/.env
+ECOS_API_KEY=&lt;한국은행 ECOS에서 발급&gt;        # 필수 (없으면 국채 관련 2개 항목만 "—")
+ECOS_TREASURY_STAT_CODE=&lt;선택, 기본값 내장&gt;
+ECOS_TREASURY_ITEM_CODE=&lt;선택, 기본값 내장&gt;</code></pre>
+
+<h2>10. 구현 순서</h2>
+<ol>
+  <li>Prisma 모델 추가 + <code>migrate dev</code> + generate</li>
+  <li><code>quant-metrics.ts</code> + 테스트 (TDD)</li>
+  <li><code>week52.ts</code> + <code>ecos.ts</code> + 테스트 (TDD)</li>
+  <li><code>GaugeChart.tsx</code> + <code>QuantDashboard.tsx</code></li>
+  <li><code>page.tsx</code> 연결 + <code>SectionNav</code> 항목 추가, 탐색기 ROE 로직을 공통 함수로 교체</li>
+  <li>검증: <code>yarn workspace company-map test</code> + lint + 383220 페이지 수동 확인</li>
+</ol>
+
+</body>
+</html>

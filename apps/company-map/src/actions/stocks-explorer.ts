@@ -4,6 +4,7 @@ import { Prisma } from "@prisma-clients/company-map";
 import type { TagView } from "./tags";
 import type { Grade } from "./ratings";
 import { db } from "@/lib/db";
+import { resolveRoe, seoJunsikReturn } from "@/lib/stocks/quant-metrics";
 
 export type MarketFilter = "ALL" | "KOSPI" | "KOSDAQ";
 export type StocksSort =
@@ -21,6 +22,16 @@ export interface StocksExplorerParams {
   maxMarcapEok?: number | null;
   perMax?: number | null;
   pbrMax?: number | null;
+  /** % 단위. 순이익 YoY 증감률 ≥ 값. */
+  netIncomeYoyMin?: number | null;
+  /** % 단위. 영업이익 YoY 증감률 ≥ 값. */
+  opIncomeYoyMin?: number | null;
+  /** % 단위. 배당수익률 ≥ 값. */
+  dividendYieldMin?: number | null;
+  /** % 단위. 서준식 지수(연복리 기대수익률) ≥ 값. 파생 계산값이라 메모리에서 필터. */
+  seojunsikIndexMin?: number | null;
+  /** 적자 제외: DART 최신 보고서 기준 영업이익·순이익이 모두 흑자(>0)인 종목만. */
+  excludeLoss?: boolean;
   analyzedOnly?: boolean;
   sort?: StocksSort;
   page?: number;
@@ -54,6 +65,7 @@ export interface StocksExplorerRow {
   tags: TagView[];
   pctChange3M: number | null;
   hasMemo: boolean;
+  memoText: string | null;
   hasLinks: boolean;
   manualRoe: number | null;
   grade: Grade | null;
@@ -83,6 +95,8 @@ export async function getStocksExplorer(
     params.analyzedOnly === true ||
     params.perMax != null ||
     params.pbrMax != null ||
+    params.dividendYieldMin != null ||
+    params.seojunsikIndexMin != null ||
     sort === "safetyMargin_desc" ||
     sort === "dividendYield_desc";
 
@@ -113,6 +127,8 @@ export async function getStocksExplorer(
     const analysisFilter: Prisma.StockAnalysisWhereInput = {};
     if (params.perMax != null) analysisFilter.per = { gt: 0, lte: params.perMax };
     if (params.pbrMax != null) analysisFilter.pbr = { gt: 0, lte: params.pbrMax };
+    if (params.dividendYieldMin != null)
+      analysisFilter.dividendYield = { gte: params.dividendYieldMin };
     where.analysis = { is: analysisFilter };
   }
 
@@ -134,8 +150,20 @@ export async function getStocksExplorer(
     }));
   }
 
-  if (needsFinancialSnapshot) {
-    where.financialSnapshot = { is: { opIncomeYoyPct: { not: null } } };
+  const financialFilter: Prisma.FinancialSnapshotWhereInput = {};
+  if (needsFinancialSnapshot) financialFilter.opIncomeYoyPct = { not: null };
+  if (params.netIncomeYoyMin != null)
+    financialFilter.netIncomeYoyPct = { gte: params.netIncomeYoyMin };
+  if (params.opIncomeYoyMin != null)
+    financialFilter.opIncomeYoyPct = { gte: params.opIncomeYoyMin };
+  // 적자 제외: DART 최신 보고서 기준 영업이익·순이익 모두 흑자. financialSnapshot이
+  // 없는(재무 미수집) 종목은 흑자 확인이 불가하므로 함께 제외된다.
+  if (params.excludeLoss) {
+    financialFilter.opIncome = { gt: 0 };
+    financialFilter.netIncome = { gt: 0 };
+  }
+  if (Object.keys(financialFilter).length > 0) {
+    where.financialSnapshot = { is: financialFilter };
   }
 
   // SQLite의 NULLS LAST 지원이 불안정해 분기 처리.
@@ -174,32 +202,25 @@ export async function getStocksExplorer(
       break;
   }
 
-  const [masters, total] = await Promise.all([
-    db.stockMaster.findMany({
-      where,
-      include: {
-        analysis: true,
-        vipHoldings: {
-          orderBy: { rceptDt: "desc" },
-          take: 1,
-          select: { rceptDt: true },
-        },
-        _count: { select: { vipHoldings: true, links: true } },
-        financialSnapshot: true,
-        tags: { include: { tag: true } },
-        priceChange: true,
-        memo: { select: { code: true } },
-        override: true,
-        rating: { select: { grade: true } },
-      },
-      orderBy,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-    db.stockMaster.count({ where }),
-  ]);
+  const include = {
+    analysis: true,
+    vipHoldings: {
+      orderBy: { rceptDt: "desc" },
+      take: 1,
+      select: { rceptDt: true },
+    },
+    _count: { select: { vipHoldings: true, links: true } },
+    financialSnapshot: true,
+    tags: { include: { tag: true } },
+    priceChange: true,
+    memo: { select: { text: true } },
+    override: true,
+    rating: { select: { grade: true } },
+  } satisfies Prisma.StockMasterInclude;
 
-  const rows: StocksExplorerRow[] = masters.map((m) => ({
+  type MasterRow = Prisma.StockMasterGetPayload<{ include: typeof include }>;
+
+  const mapRow = (m: MasterRow): StocksExplorerRow => ({
     code: m.code,
     name: m.name,
     market: m.market,
@@ -229,11 +250,40 @@ export async function getStocksExplorer(
     tags: m.tags.map((t) => ({ id: t.tag.id, name: t.tag.name })),
     pctChange3M: m.priceChange?.pctChange ?? null,
     hasMemo: m.memo != null,
+    memoText: m.memo?.text ?? null,
     hasLinks: m._count.links > 0,
     manualRoe: m.override?.manualRoe ?? null,
     grade: (m.rating?.grade as Grade | undefined) ?? null,
     treasuryCancelCount: m.treasuryCancelCount,
-  }));
+  });
 
-  return { rows, total };
+  // 서준식 지수는 PER/PBR/현재가/manualRoe에서 파생되는 계산값이라 SQL where로 못 거른다.
+  // 이 필터가 켜지면 후보(needsAnalysis로 분석된 종목만)를 전부 가져와 계산 후
+  // 메모리에서 필터·페이지네이션한다. (탐색기 표의 서준식 지수 표시값과 동일 공식)
+  if (params.seojunsikIndexMin != null) {
+    const min = params.seojunsikIndexMin;
+    const masters = await db.stockMaster.findMany({ where, include, orderBy });
+    const filtered = masters.map(mapRow).filter((r) => {
+      if (r.currentPrice == null || r.currentPrice <= 0 || r.pbr == null || r.pbr <= 0) {
+        return false;
+      }
+      const idx = seoJunsikReturn(r.pbr, resolveRoe(r.manualRoe, r.per, r.pbr));
+      return idx != null && idx >= min;
+    });
+    const start = (page - 1) * pageSize;
+    return { rows: filtered.slice(start, start + pageSize), total: filtered.length };
+  }
+
+  const [masters, total] = await Promise.all([
+    db.stockMaster.findMany({
+      where,
+      include,
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    db.stockMaster.count({ where }),
+  ]);
+
+  return { rows: masters.map(mapRow), total };
 }
