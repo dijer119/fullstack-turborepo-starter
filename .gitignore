@@ -38,3 +38,7 @@ secret.json
 
 # superpowers brainstorming
 .superpowers/
+
+# 로컬 AI 도구 산출물
+.codex/
+.playwright-mcp/
