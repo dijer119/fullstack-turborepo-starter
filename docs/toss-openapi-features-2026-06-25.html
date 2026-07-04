@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>토스증권 Open API 기능 정리</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; vertical-align: top; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .tag { display: inline-block; font-size: 0.78em; padding: 0.05rem 0.4rem; border-radius: 3px; font-weight: 600; }
+  .get { background: #c6f6d5; color: #22543d; }
+  .post { background: #feebc8; color: #7b341e; }
+  .done { background: #bee3f8; color: #2a4365; }
+  .muted { color: #718096; font-size: 0.9em; }
+  .method-col { white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<h1>토스증권 Open API 기능 정리</h1>
+<p class="muted">기준일 2026-06-25 · Base URL <code>https://openapi.tossinvest.com</code> · 본 문서는 company-map 연동 과정에서 실제 호출로 검증한 내용을 정리한 것입니다.</p>
+
+<blockquote>
+<strong>핵심 성격</strong> — 국내(KRX/NXT) + 미국 주식의 <strong>시세 · 종목정보 · 환율/장운영 · 계좌/보유 · 주문</strong>을 다루는 <strong>REST API</strong>입니다. WebSocket 미지원, 모든 응답 JSON, 금액·수량은 문자열, 타임존은 KST.
+</blockquote>
+
+<h2>1. 인증 (Auth)</h2>
+<ul>
+  <li><strong>OAuth2 Client Credentials</strong>: 토스증권 WTS &gt; Open API에서 <code>client_id</code>/<code>client_secret</code> 발급</li>
+  <li><code>POST /oauth2/token</code> (form-urlencoded, <code>grant_type=client_credentials</code>) → <code>access_token</code>(약 24시간), <code>token_type</code>, <code>expires_in</code></li>
+  <li>모든 요청 헤더: <code>Authorization: Bearer {access_token}</code></li>
+  <li>계좌·자산·주문 API는 <strong><code>X-Tossinvest-Account: {accountSeq}</code></strong> 헤더 추가 필수</li>
+</ul>
+<blockquote>⚠️ <strong>클라이언트당 활성 토큰 1개</strong>만 유지됩니다. 새 토큰을 발급하면 이전 토큰이 즉시 무효화되므로, 동시 다발 재발급은 서로를 무효화합니다(토큰 발급을 single-flight로 묶어야 안전).</blockquote>
+
+<h2>2. 제공 기능 (카테고리별 엔드포인트)</h2>
+
+<h3>시세 (Market Data) — 토큰만 필요</h3>
+<table>
+  <tr><th>기능</th><th class="method-col">메서드 · 경로</th><th>주요 파라미터 / 응답</th></tr>
+  <tr><td>현재가</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/prices</code></td><td><code>symbols=</code>(콤마, 최대 200) → <code>lastPrice, currency, timestamp</code></td></tr>
+  <tr><td>호가</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/orderbook</code></td><td><code>symbol=</code> → <code>asks[], bids[]</code> (각 10단계, <code>price/volume</code>)</td></tr>
+  <tr><td>최근 체결</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/trades</code></td><td><code>symbol=</code> → 체결 목록 <code>price, volume, timestamp, currency</code></td></tr>
+  <tr><td>상/하한가</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/price-limits</code></td><td>가격 제한</td></tr>
+  <tr><td>캔들</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/candles</code></td><td><code>symbol=, interval=1m|1d, count=1~200, before=, adjusted=</code> → <code>open/high/low/closePrice, volume</code> (최신순)</td></tr>
+</table>
+
+<h3>종목 정보 (Stock Info) — 토큰만 필요</h3>
+<table>
+  <tr><th>기능</th><th class="method-col">메서드 · 경로</th><th>주요 응답</th></tr>
+  <tr><td>종목 기본정보</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/stocks</code></td><td><code>symbols=</code> → <code>name, englishName, isinCode, market, securityType, currency, listDate, sharesOutstanding, koreanMarketDetail</code></td></tr>
+  <tr><td>매수 유의사항</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/stocks/{symbol}/warnings</code></td><td>투자유의/경고 정보</td></tr>
+</table>
+
+<h3>시장 정보 (Market Info) — 토큰만 필요</h3>
+<table>
+  <tr><th>기능</th><th class="method-col">메서드 · 경로</th><th>주요 응답</th></tr>
+  <tr><td>환율</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/exchange-rate</code></td><td><code>baseCurrency=&amp;quoteCurrency=</code> (예: USD→KRW) → <code>rate, midRate</code></td></tr>
+  <tr><td>국내 장 운영정보</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/market-calendar/KR</code></td><td>전·당·익영업일의 preMarket / regularMarket / afterMarket 시각</td></tr>
+  <tr><td>미국 장 운영정보</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/market-calendar/US</code></td><td>dayMarket / preMarket / regularMarket / afterMarket 시각</td></tr>
+</table>
+
+<h3>계좌 · 자산 (Account / Asset) — 계좌 헤더 필요</h3>
+<table>
+  <tr><th>기능</th><th class="method-col">메서드 · 경로</th><th>주요 응답</th></tr>
+  <tr><td>계좌 목록</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/accounts</code></td><td><code>accountNo, accountSeq, accountType</code> (BROKERAGE / OVERSEAS_DERIVATIVES / PENSION_SAVINGS / RESHORING_INVESTMENT)</td></tr>
+  <tr><td>보유 주식</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/holdings</code></td><td>요약(총매입·평가금액·평가손익·당일손익, 통화별) + 종목별 <code>quantity, lastPrice, averagePurchasePrice, marketValue, profitLoss, dailyProfitLoss, cost</code></td></tr>
+</table>
+
+<h3>주문 (Order / History / Info) — 계좌 헤더 필요</h3>
+<table>
+  <tr><th>기능</th><th class="method-col">메서드 · 경로</th><th>주요 파라미터 / 응답</th></tr>
+  <tr><td><strong>주문 생성</strong></td><td class="method-col"><span class="tag post">POST</span> <code>/api/v1/orders</code></td><td><code>symbol, side(BUY/SELL), orderType(LIMIT/MARKET), quantity|orderAmount, price(LIMIT시), timeInForce(DAY/CLS), clientOrderId</code> → <code>orderId</code></td></tr>
+  <tr><td>주문 정정</td><td class="method-col"><span class="tag post">POST</span> <code>/api/v1/orders/{orderId}/modify</code></td><td>미체결 주문의 가격·수량 정정</td></tr>
+  <tr><td>주문 취소</td><td class="method-col"><span class="tag post">POST</span> <code>/api/v1/orders/{orderId}/cancel</code></td><td>미체결 주문 취소</td></tr>
+  <tr><td>주문 목록</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/orders</code></td><td><code>status=OPEN|CLOSED</code></td></tr>
+  <tr><td>주문 상세</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/orders/{orderId}</code></td><td>개별 주문 상태</td></tr>
+  <tr><td>매수 가능 금액</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/buying-power</code></td><td><code>currency=KRW|USD</code> → <code>cashBuyingPower</code></td></tr>
+  <tr><td>매도 가능 수량</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/sellable-quantity</code></td><td><code>symbol=</code> → <code>sellableQuantity</code></td></tr>
+  <tr><td>매매 수수료</td><td class="method-col"><span class="tag get">GET</span> <code>/api/v1/commissions</code></td><td>시장별 <code>commissionRate</code> (현재 국내 0% · 미국 0.1%)</td></tr>
+</table>
+
+<h2>3. 속도 제한 (Rate Limit · 초당 요청 수)</h2>
+<table>
+  <tr><th>그룹</th><th>한도/초</th><th>피크(09:00~09:10)</th><th>그룹</th><th>한도/초</th></tr>
+  <tr><td>AUTH</td><td>5</td><td>—</td><td>MARKET_DATA</td><td>10</td></tr>
+  <tr><td>ACCOUNT</td><td>1</td><td>—</td><td>MARKET_DATA_CHART</td><td>5</td></tr>
+  <tr><td>ASSET</td><td>5</td><td>—</td><td>ORDER</td><td>6 → <strong>3</strong></td></tr>
+  <tr><td>STOCK</td><td>5</td><td>—</td><td>ORDER_HISTORY</td><td>5</td></tr>
+  <tr><td>MARKET_INFO</td><td>3</td><td>—</td><td>ORDER_INFO</td><td>6 → <strong>3</strong></td></tr>
+</table>
+<p class="muted">응답 헤더 <code>X-RateLimit-Limit / Remaining / Reset</code>, 초과 시 429 + <code>Retry-After</code>. ACCOUNT(초당 1회)이 가장 빡빡 → 계좌 목록은 캐싱 권장.</p>
+
+<h2>4. 주요 에러 코드</h2>
+<table>
+  <tr><th>HTTP · code</th><th>의미 / 대응</th></tr>
+  <tr><td>400 <code>invalid-request</code></td><td>파라미터/형식 오류</td></tr>
+  <tr><td>400 <code>confirm-high-value-required</code></td><td>1억원 이상 주문 → <code>confirmHighValueOrder: true</code> 추가</td></tr>
+  <tr><td>400 <code>account-header-required</code></td><td><code>X-Tossinvest-Account</code> 헤더 누락</td></tr>
+  <tr><td>401 <code>invalid-token</code> / <code>expired-token</code></td><td>토큰 재발급 (동시 재발급 주의)</td></tr>
+  <tr><td>422 <code>insufficient-buying-power</code></td><td>매수가능금액 부족</td></tr>
+  <tr><td>422 <code>order-hours-closed</code></td><td>주문 가능 시간 외</td></tr>
+  <tr><td>422 <code>price-out-of-range</code></td><td>상/하한가 초과</td></tr>
+  <tr><td>429 <code>rate-limit-exceeded</code></td><td><code>Retry-After</code> 대기 후 재시도</td></tr>
+  <tr><td>404 <code>stock-not-found</code> / <code>order-not-found</code>, 409 <code>already-filled</code>, 403 <code>forbidden</code>, 500 <code>internal-error</code></td><td>각 상황별 처리</td></tr>
+</table>
+<p class="muted">에러 형식: <code>{ error: { requestId, code, message, data } }</code> — CS 문의 시 <code>requestId</code> 첨부.</p>
+
+<h2>5. 한계 (없는 기능)</h2>
+<ul>
+  <li><strong>종목명 검색 없음</strong> — <code>/stocks</code>는 symbol(티커)로만 조회. 이름→심볼 변환은 외부(예: 네이버 자동완성)로 보완해야 함.</li>
+  <li><strong>실시간 스트리밍(WebSocket) 없음</strong> — 시세는 폴링.</li>
+  <li><strong>전일종가 전용 필드 없음</strong> — 현재가에 포함되지 않아 캔들/당일손익률로 산출해야 함.</li>
+  <li>시간외(프리/애프터마켓) <strong>별도 가격 필드 없음</strong> — 현재가가 최신 체결(시간외 포함)을 반영. "시장외 여부"는 장 운영정보로 판정.</li>
+</ul>
+
+<h2>6. company-map 적용 현황</h2>
+<p>이번 세션에서 <code>/stocks/toss-holdings</code> 화면(보유종목·관심종목 탭)에 아래를 연동했습니다.</p>
+<table>
+  <tr><th>기능</th><th>사용 API</th><th>상태</th></tr>
+  <tr><td>보유종목 + 원화환산 합계</td><td>accounts, holdings, exchange-rate</td><td><span class="tag done">적용</span></td></tr>
+  <tr><td>관심종목(이름검색·현재가)</td><td>stocks, prices (+ 네이버 검색)</td><td><span class="tag done">적용</span></td></tr>
+  <tr><td>구매가 입력 / 등락</td><td>(로컬 DB) + prices</td><td><span class="tag done">적용</span></td></tr>
+  <tr><td>전일종가 · 전일대비</td><td>candles (관심), 당일손익 역산(보유)</td><td><span class="tag done">적용</span></td></tr>
+  <tr><td>매수/매도 주문 (확인 다이얼로그)</td><td>orders(POST), buying-power, sellable-quantity</td><td><span class="tag done">적용</span></td></tr>
+  <tr><td>호가창 (클릭 시 지정가 입력)</td><td>orderbook</td><td><span class="tag done">적용</span></td></tr>
+  <tr><td>시장외/장 세션 상태 배지</td><td>market-calendar KR/US</td><td><span class="tag done">적용</span></td></tr>
+  <tr><td>주문 정정/취소, 주문 내역 조회</td><td>orders modify/cancel, order history</td><td>미적용 (확장 가능)</td></tr>
+  <tr><td>분봉 차트, 상/하한가, 매수 유의사항</td><td>candles(1m), price-limits, warnings</td><td>미적용 (확장 가능)</td></tr>
+</table>
+
+</body>
+</html>
