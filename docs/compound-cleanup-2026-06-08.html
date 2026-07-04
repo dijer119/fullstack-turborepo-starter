@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Compound Cleanup 진단 리포트 — 2026-06-08</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; vertical-align: top; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .tag { display: inline-block; padding: 0.05rem 0.45rem; border-radius: 3px; font-size: 0.8em; font-weight: 600; color: #fff; }
+  .a { background: #c53030; } .b { background: #2b6cb0; } .c { background: #b7791f; }
+  .summary-cards { display: flex; gap: 0.8rem; margin: 1rem 0; flex-wrap: wrap; }
+  .card { flex: 1; min-width: 120px; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.8rem; text-align: center; }
+  .card .n { font-size: 1.8rem; font-weight: 700; color: #2c5282; }
+  .card .l { font-size: 0.85em; color: #4a5568; }
+  .ok { color: #2f855a; }
+</style>
+</head>
+<body>
+
+<h1>Compound Cleanup 진단 리포트</h1>
+<p>생성일: <strong>2026-06-08</strong> · 대상 프로젝트: <code>fullstack-turborepo-starter</code><br>
+<em>읽기 전용 진단입니다 — 어떤 파일도 수정되지 않았습니다. 아래는 정리 후보일 뿐, 실제 정리 여부는 직접 판단하세요.</em></p>
+
+<h2>요약</h2>
+<div class="summary-cards">
+  <div class="card"><div class="n">2</div><div class="l">A · 끊어진 참조</div></div>
+  <div class="card"><div class="n">0</div><div class="l">B · 중복</div></div>
+  <div class="card"><div class="n">1</div><div class="l">C · 모순</div></div>
+</div>
+
+<p>검토한 저장소:</p>
+<ul>
+  <li><strong>① 글로벌 가이드</strong> — <code>~/.claude/CLAUDE.md</code> · 행동 지침 위주, 코드 경로·심볼 참조 없음 → 끊어진 참조 후보 없음</li>
+  <li><strong>② 프로젝트 가이드</strong> — <code>CLAUDE.md</code> · 명시 경로 22건 검증, 1건 누락</li>
+  <li><strong>③ 파일 기반 메모리</strong> — <code>memory/</code> 비어 있음 (<code>*.md</code> 0개, <code>MEMORY.md</code> 없음) → 검토 대상 없음</li>
+</ul>
+
+<h2>A. 끊어진 참조 <span class="tag a">A</span></h2>
+<p>②가 언급한 경로·심볼이 실제 코드에 존재하는지 <code>ls</code>/<code>grep</code>으로 핀포인트 확인한 결과. 근거는 모두 실제 명령 결과입니다.</p>
+
+<table>
+<thead>
+<tr><th>위치</th><th>내용 (원문)</th><th>근거</th><th>권장 조치</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td>② <code>CLAUDE.md</code><br>"중요 파일" 목록 (백엔드 아키텍처 섹션)</td>
+  <td><code>apps/api/src/persistence/persistence.service.ts</code> - Prisma 클라이언트</td>
+  <td><code>ls</code> 결과 해당 파일 없음. 실제 디렉토리에는 <code>persistence.module.ts</code> + <code>prisma/</code> 하위에 <code>prisma.service.ts</code>가 존재.</td>
+  <td><strong>갱신</strong> → 경로를 <code>apps/api/src/persistence/prisma/prisma.service.ts</code>로 수정</td>
+</tr>
+<tr>
+  <td>② <code>CLAUDE.md</code><br>"새 도메인 모듈 추가" 7번 단계 + "핵심 패턴" 전역 모듈 설명</td>
+  <td>"데이터베이스 액세스를 위해 <code>PersistenceService</code> 주입"</td>
+  <td><code>grep "PersistenceService"</code> 결과 0건 — 코드에 그런 심볼 없음. <code>PersistenceModule</code>이 실제로 provide·export하는 것은 <code>PrismaService</code> (<code>persistence.module.ts:5-6</code>). 도메인 서비스들도 <code>PrismaService</code>를 주입 중.</td>
+  <td><strong>갱신</strong> → <code>PersistenceService</code> → <code>PrismaService</code></td>
+</tr>
+</tbody>
+</table>
+
+<blockquote>
+이 두 건은 같은 리팩터링(전역 Prisma 서비스를 <code>PersistenceService</code> → <code>PrismaService</code>로 개명하고 <code>prisma/</code> 하위로 이동)에서 비롯된 것으로 보입니다. CLAUDE.md만 옛 이름으로 남아, 이를 참고하는 이후 작업이 존재하지 않는 심볼을 주입하려 할 위험이 있습니다.
+</blockquote>
+
+<h2>B. 중복 <span class="tag b">B</span></h2>
+<p class="ok">후보 없음. ③ 메모리가 비어 있어 ①②와 교차 중복이 발생하지 않았습니다. ② 내부의 라우터 서술 반복은 정상적인 문서 구조로 판단해 후보에서 제외했습니다.</p>
+
+<h2>C. 모순 <span class="tag c">C</span></h2>
+<table>
+<thead>
+<tr><th>위치</th><th>내용</th><th>충돌 지점</th><th>권장 조치</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td>② <code>CLAUDE.md:440</code> (최근 주요 업그레이드)</td>
+  <td>"Next.js 13 → 15 (App Router 지원 추가됨, 하지만 <strong>현재는 Pages Router 사용</strong>)"</td>
+  <td>전역 진술처럼 읽히지만, 앱 테이블(<code>CLAUDE.md:13-19</code>)과 <code>:56-63</code>은 <code>company-map</code>·<code>blog-collection</code>이 <strong>App Router</strong>를 쓴다고 명시. 두 앱이 추가되며 이 진술이 부분적으로 낡음.</td>
+  <td><strong>갱신</strong> → "현재는 <code>web</code>/<code>todo</code>가 Pages Router 사용" 처럼 범위를 한정</td>
+</tr>
+</tbody>
+</table>
+
+<h2>비고</h2>
+<ul>
+  <li>검증 깊이는 "명시된 경로·심볼 핀포인트"로 한정했습니다. 코드 전체 스캔은 하지 않았으므로, 본문에 적히지 않은 다른 stale 항목은 이 리포트 범위 밖입니다.</li>
+  <li>노후(D) 차원(이미 해결된 주의사항 등)은 오탐 과다로 이번 진단에서 제외했습니다.</li>
+</ul>
+
+</body>
+</html>
