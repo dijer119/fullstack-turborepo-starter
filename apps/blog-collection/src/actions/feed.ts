@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { refreshFeeds } from "@/lib/rss/refresh";
 import type { Feed } from "@/types/feed";
 
 export async function addFeed(
@@ -46,11 +47,7 @@ export async function addFeed(
     }
 
     // 3. 등록 직후 글 수집
-    await fetch(`${baseUrl}/api/rss/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ feedId: data.id }),
-    });
+    await refreshFeeds(data.id);
 
     revalidatePath("/");
     revalidatePath("/feeds");
