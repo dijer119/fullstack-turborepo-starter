@@ -6,8 +6,8 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import {
-  createCycle, updateCycle, deleteCycle, runCycleNow, getCycleOrders, getPriceHistory, getSellHistory, syncSellFills,
-  type CycleView, type OrderView,
+  createCycle, updateCycle, deleteCycle, runCycleNow, getCycleOrders, getPriceHistory, getSellHistory, syncSellFills, getRsiTable,
+  type CycleView, type OrderView, type RsiTable,
 } from "@/actions/infinite-buy";
 import type { DailyCandle } from "@/lib/toss/client";
 
@@ -21,9 +21,11 @@ function pct(v: number | null): string {
 export function InfiniteBuyManager({
   cycles,
   usdBuyingPower,
+  initialRsi,
 }: {
   cycles: CycleView[];
   usdBuyingPower: number | null;
+  initialRsi: RsiTable;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -35,6 +37,8 @@ export function InfiniteBuyManager({
   const [openOrders, setOpenOrders] = useState<Record<string, OrderView[]>>({});
   const [sells, setSells] = useState<Record<string, OrderView[]>>({});
   const [charts, setCharts] = useState<Record<string, DailyCandle[]>>({});
+  const [rsi, setRsi] = useState<RsiTable>(initialRsi);
+  const [rsiLoading, setRsiLoading] = useState(false);
 
   const onCreate = () =>
     start(async () => {
@@ -99,6 +103,17 @@ export function InfiniteBuyManager({
       setSells((p) => ({ ...p, [c.id]: data }));
     });
 
+  const refreshRsi = () => {
+    setRsiLoading(true);
+    start(async () => {
+      try {
+        setRsi(await getRsiTable(true)); // 15종목 순차 수집 (~20초)
+      } finally {
+        setRsiLoading(false);
+      }
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* USD 잔고 + 갱신 */}
@@ -117,6 +132,80 @@ export function InfiniteBuyManager({
         >
           {pending ? "갱신 중…" : "갱신"}
         </button>
+      </section>
+
+      {/* RSI 모니터 — 무한매수 유니버스(3배 ETF 15종) */}
+      <section className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">
+            RSI(14) — 3배 ETF 유니버스
+            <span className="ml-2 text-xs font-normal text-gray-400">≤30 과매도 · ≥60 과매수</span>
+          </h2>
+          <div className="flex items-center gap-2">
+            {rsi.fetchedAt && (
+              <span className="text-xs text-gray-400">
+                갱신 {new Date(rsi.fetchedAt).toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }).slice(5, 16)}
+              </span>
+            )}
+            <button
+              onClick={refreshRsi}
+              disabled={rsiLoading || pending}
+              className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800"
+            >
+              {rsiLoading ? "수집 중… (~20초)" : "RSI 갱신"}
+            </button>
+          </div>
+        </div>
+        {rsi.rows.length === 0 ? (
+          <p className="text-sm text-gray-500">아직 수집 전입니다. RSI 갱신을 눌러 토스에서 수집하세요.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-gray-500">
+                  <th className="p-1.5">심볼</th>
+                  <th className="p-1.5 text-right">RSI</th>
+                  <th className="p-1.5 text-right">종가</th>
+                  <th className="p-1.5">기준일</th>
+                  <th className="p-1.5">판정</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rsi.rows.map((r) => {
+                  const hasCycle = cycles.some((c) => c.symbol === r.symbol && c.status === "active");
+                  return (
+                    <tr key={r.symbol} className="border-b border-gray-100 dark:border-gray-800">
+                      <td className="p-1.5 font-mono">
+                        {r.symbol}
+                        {hasCycle && (
+                          <span className="ml-1.5 rounded bg-blue-50 px-1 py-0.5 text-[10px] text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">사이클</span>
+                        )}
+                      </td>
+                      <td className={`p-1.5 text-right font-semibold tabular-nums ${
+                        r.rsi == null ? "text-gray-400"
+                          : r.rsi <= 30 ? "text-green-600 dark:text-green-400"
+                          : r.rsi >= 60 ? "text-red-600 dark:text-red-400" : ""
+                      }`}>
+                        {r.rsi == null ? "—" : r.rsi.toFixed(1)}
+                      </td>
+                      <td className="p-1.5 text-right tabular-nums">{r.close == null ? "—" : usd(r.close)}</td>
+                      <td className="p-1.5 text-gray-500">{r.date ?? "—"}</td>
+                      <td className="p-1.5 text-xs">
+                        {r.error ? (
+                          <span className="text-amber-600 dark:text-amber-400" title={r.error}>조회 실패</span>
+                        ) : r.rsi == null ? "" : r.rsi <= 30 ? (
+                          <span className="text-green-600 dark:text-green-400">과매도</span>
+                        ) : r.rsi >= 60 ? (
+                          <span className="text-red-600 dark:text-red-400">과매수</span>
+                        ) : ""}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {/* 등록 폼 */}

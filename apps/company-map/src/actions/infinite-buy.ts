@@ -8,6 +8,7 @@ import {
 } from "@/lib/toss/client";
 import { runCycle, type CycleConfig } from "@/lib/infinite-buy/run";
 import { tossRunDeps, prismaPersistence, isKilled } from "@/lib/infinite-buy/toss-adapter";
+import { rsi14, RSI_UNIVERSE } from "@/lib/infinite-buy/rsi";
 
 export interface CycleView {
   id: string;
@@ -83,6 +84,49 @@ export async function getUsdBuyingPower(): Promise<number | null> {
   } catch {
     return null;
   }
+}
+
+export interface RsiRow {
+  symbol: string;
+  rsi: number | null;
+  close: number | null;
+  date: string | null; // 마지막 캔들 기준일
+  error: string | null;
+}
+
+export interface RsiTable {
+  rows: RsiRow[];
+  fetchedAt: string | null; // ISO. null이면 아직 수집 전
+}
+
+// 모듈 캐시(프로세스 생명주기). RSI는 참고 지표라 영속 저장까진 불필요.
+let rsiCache: RsiTable = { rows: [], fetchedAt: null };
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// 무한매수 유니버스(3배 ETF 15종) RSI(14) 테이블.
+// force=false: 캐시만 반환(네트워크 0). force=true: 토스 일봉 200개 × 15종 순차 수집(~20초).
+export async function getRsiTable(force = false): Promise<RsiTable> {
+  if (!force || !isTossConfigured()) return rsiCache;
+  const rows: RsiRow[] = [];
+  for (const symbol of RSI_UNIVERSE) {
+    try {
+      const candles = await retryRead(() => getDailyCandles(symbol, 200), 2, 800);
+      const closes = candles.map((c) => c.close);
+      rows.push({
+        symbol,
+        rsi: rsi14(closes),
+        close: closes[closes.length - 1] ?? null,
+        date: candles[candles.length - 1]?.date ?? null,
+        error: null,
+      });
+    } catch (e) {
+      rows.push({ symbol, rsi: null, close: null, date: null, error: e instanceof Error ? e.message : String(e) });
+    }
+    await sleep(800); // MARKET_DATA 요청한도 완화
+  }
+  rows.sort((a, b) => (a.rsi ?? 999) - (b.rsi ?? 999));
+  rsiCache = { rows, fetchedAt: new Date().toISOString() };
+  return rsiCache;
 }
 
 export async function listCycles(): Promise<CycleView[]> {
