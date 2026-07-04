@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>VIP 펀드 추적 기능 설계</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+</style>
+</head>
+<body>
+<h1>VIP 펀드 추적 기능 설계</h1>
+<p><strong>날짜</strong>: 2026-06-28 · <strong>앱</strong>: company-map · <strong>대상</strong>: VIP한국형가치투자증권자투자신탁[주식]A-e클래스 (운용사: 브이아이피자산운용, KB <code>amak_stnd_cd=K553W5E17302</code>)</p>
+
+<h2>1. 목표</h2>
+<p>KB증권 펀드 상세 페이지의 데이터를 ETF 추적 기능과 유사하게 주기적으로 스냅샷·추적한다. 단일 펀드(하드코딩)이며, 추적 대상은 <strong>종목별 보유 TOP10</strong>과 <strong>기준가(NAV) 추이</strong> 두 가지다.</p>
+<p>성공 기준:</p>
+<ul>
+  <li>종목별 TOP10 보유종목이 바뀔 때마다 새 스냅샷이 쌓이고, 신규/이탈/비중변동 diff를 화면에서 확인할 수 있다.</li>
+  <li>NAV 주간 시계열이 차트로 표시된다.</li>
+  <li><code>/stocks/funds</code> 별도 화면 + 사이드바 메뉴로 접근 가능하다.</li>
+</ul>
+
+<h2>2. 데이터 소스 (검증 완료)</h2>
+<p>브라우저 불필요. 서버사이드 Node <code>fetch</code> + EUC-KR 디코드로 전부 수집 가능함을 확인했다.</p>
+<table>
+  <tr><th>데이터</th><th>요청</th><th>형식</th></tr>
+  <tr><td>펀드명·운용사·종목별 비중 TOP10</td><td><code>GET go.able?linkcd=s010100030000&amak_stnd_cd=K553W5E17302</code></td><td>EUC-KR HTML</td></tr>
+  <tr><td>기준가(NAV) 주간 시계열</td><td><code>GET chart/data/MOBI_02_0039_JSON.jsp?dd=1&amak_stnd_cd=...</code></td><td>JSON <code>{data:[{date,fnd}]}</code></td></tr>
+</table>
+<p>HTML 내 "주식종목별비중TOP10" caption 표에서 <code>&lt;td &gt;종목명&lt;/td&gt;&lt;td &gt;비중&lt;/td&gt;</code> 행을 파싱한다(종목별 표는 셀이 <code>&lt;td &gt;</code> 공백 포함이라 정규식 주의). NAV의 <code>fnd</code>는 기준가(원), <code>date</code>는 YYYYMMDD(KST).</p>
+<blockquote>업종별·국가별·자산유형별 비중은 이번 범위에서 제외(요청 범위: 종목별 + NAV).</blockquote>
+
+<h2>3. 스냅샷 dedup 전략 (ETF와 다른 핵심 결정)</h2>
+<p>ETF는 KRX가 매일 명확한 기준일 PDF를 제공해 <code>trdDd</code>로 dedup하지만, 펀드 보유종목은 운용보고서 기준이라 드물게(월 단위) 변하고 페이지에 일별 기준일이 없다. 따라서 <strong>내용 기반 dedup</strong>을 쓴다.</p>
+<ul>
+  <li>새로 가져온 TOP10(종목명+비중 집합)을 최신 스냅샷과 비교.</li>
+  <li>동일하면 skip(새 행 생성 안 함). 달라졌을 때만 <strong>그날 날짜(KST YYYYMMDD)</strong>로 새 스냅샷 생성.</li>
+  <li><code>@@unique([fundCode, trdDd])</code>로 같은 날 재실행 시 중복 방지.</li>
+</ul>
+<p>결과적으로 보유 이력은 실제 구성 변동이 있을 때만 늘어난다.</p>
+
+<h2>4. 데이터 모델 (company-map SQLite, 별도 테이블)</h2>
+<p>ETF 테이블 재사용 대신 별도 모델을 둔다(코드 형식·NAV 차이, ETF 목록 UI 오염 방지). 단일 펀드라 등록 테이블은 없고 펀드 코드/이름은 상수로 둔다.</p>
+<pre><code>model FundSnapshot {
+  id        String        @id @default(uuid())
+  fundCode  String        @map("fund_code")   // amak_stnd_cd
+  trdDd     String        @map("trd_dd")       // YYYYMMDD (생성일)
+  nav       Float?                             // 스냅샷 시점 최신 기준가(참고)
+  fetchedAt DateTime      @default(now()) @map("fetched_at")
+  holdings  FundHolding[]
+  @@unique([fundCode, trdDd])
+  @@map("fund_snapshot")
+}
+
+model FundHolding {
+  id         String       @id @default(uuid())
+  snapshotId String       @map("snapshot_id")
+  name       String
+  weight     Float?
+  rank       Int
+  snapshot   FundSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  @@map("fund_holding")
+}
+
+model FundNav {
+  id       String @id @default(uuid())
+  fundCode String @map("fund_code")
+  date     String                            // YYYYMMDD
+  nav      Float
+  @@unique([fundCode, date])
+  @@map("fund_nav")
+}</code></pre>
+
+<h2>5. 컴포넌트 & 파일</h2>
+<table>
+  <tr><th>파일</th><th>역할</th></tr>
+  <tr><td><code>src/lib/funds/kb-fund.ts</code></td><td>KB 펀드 fetch+parse 격리: 펀드 상수, <code>fetchFundHoldings()</code>(HTML→{name,weight,rank}[]), <code>fetchFundNav()</code>(JSON→{date,nav}[]). 순수 파싱 함수는 테스트 대상.</td></tr>
+  <tr><td><code>src/lib/funds/kb-fund.test.ts</code></td><td>고정 HTML/JSON 픽스처로 파서 단위 테스트 (Vitest).</td></tr>
+  <tr><td><code>worker/fund-snapshot.ts</code></td><td><code>snapshotFund()</code>: 내용 dedup 스냅샷 + NAV upsert. 반환 <code>"saved"|"skipped"|"failed"</code>.</td></tr>
+  <tr><td><code>worker/etf-pdf-loop.ts</code></td><td>기존 일일 루프(19:00)에서 <code>snapshotAllEtfs()</code> 직후 <code>snapshotFund()</code> 추가 호출.</td></tr>
+  <tr><td><code>src/actions/funds.ts</code></td><td><code>getFundDetail()</code>(최신·직전 diff, <code>src/lib/etf/diff.ts</code> 재사용), <code>getFundShareHistory()</code>(비중 이력 매트릭스), <code>getFundNavHistory()</code>, <code>refreshFund()</code>(인라인 실행).</td></tr>
+  <tr><td><code>src/app/stocks/funds/page.tsx</code></td><td>서버 컴포넌트. detail+history+nav 병렬 로드 → FundView.</td></tr>
+  <tr><td><code>src/app/stocks/funds/FundView.tsx</code></td><td>클라이언트. 헤더(펀드명·운용사), 보유 TOP10 diff 표, 비중 이력(테이블/차트 토글), NAV 추이 차트(Recharts), 새로고침 버튼.</td></tr>
+  <tr><td><code>src/components/layout/AppMenu.tsx</code></td><td>사이드바 "VIP 펀드" 메뉴(아이콘) 추가.</td></tr>
+  <tr><td><code>src/app/stocks/page.tsx</code></td><td><code>/stocks/funds</code> 링크 추가.</td></tr>
+</table>
+
+<h2>6. diff 재사용</h2>
+<p>ETF <code>src/lib/etf/diff.ts</code>의 <code>diffHoldings(latest, prev)</code>는 식별자로 <code>constituentCode || constituentName</code>을 쓰므로 name 기반 펀드 보유에도 그대로 동작한다. 펀드 보유를 <code>{constituentCode:"", constituentName:name, weight, shares:null, amount:null}</code> 형태로 매핑해 재사용한다. (펀드엔 주식수가 없으므로 sharesDelta 컬럼은 UI에서 숨김.)</p>
+
+<h2>7. 수동 새로고침</h2>
+<p>ETF의 무거운 spawn-script + refresh_state 머신을 쓰지 않고, 서버액션 <code>refreshFund()</code>에서 인라인으로 fetch→<code>snapshotFund()</code>→<code>revalidatePath</code>. 단일 빠른 fetch라 충분.</p>
+
+<h2>8. 합산 보기 (선택적, stretch)</h2>
+<p><code>/stocks/etf/combined</code>에 <code>?fund=1</code>이 있으면 펀드 최신 보유 TOP10을 <strong>별도 컬럼으로 병기</strong>한다. ETF↔펀드는 성격이 달라 비중 단순 합산은 하지 않고 컬럼만 추가한다. 본 기능들이 끝난 뒤 진행.</p>
+
+<h2>9. 검증 계획</h2>
+<ul>
+  <li>파서: Vitest 픽스처 테스트 — 종목 10건 파싱, NAV 시계열 파싱, 빈/형식이상 입력 처리.</li>
+  <li>수집: <code>snapshotFund()</code> 1회 실행 후 SQLite에서 FundSnapshot/FundHolding/FundNav 행 확인. 재실행 시 skip 확인(dedup).</li>
+  <li>UI: 가동 중 dev 서버(3004)에 HMR 반영 → <code>/stocks/funds</code>에서 헤더/보유 표/NAV 차트 렌더 확인. (스키마 변경 후엔 dev 서버 재시작 필수.)</li>
+  <li>lint: 변경 파일만 <code>npx eslint &lt;files&gt;</code>로 스코프 검증(워크스페이스 lint는 기존 에러로 게이트 불가).</li>
+</ul>
+
+<h2>10. 범위 밖 / 주의</h2>
+<ul>
+  <li>일반 펀드 추가/관리 기능 아님 — 단일 펀드 하드코딩.</li>
+  <li>업종별·국가별·자산유형별 비중 추적 제외.</li>
+  <li>Prisma 스키마 변경 후 dev 서버 재시작 필수(globalThis PrismaClient 캐시).</li>
+  <li>company-map dev를 백그라운드로 띄우지 말 것(turbo가 3004 관리).</li>
+</ul>
+</body>
+</html>

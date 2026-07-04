@@ -1,4 +1,5 @@
 import { snapshotAllEtfs } from "./etf-snapshot";
+import { snapshotFund } from "./fund-snapshot";
 
 const CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30분 폴
 const SCHEDULE_HOUR_KST = 19;             // 18시 PDF 확정 후
@@ -17,6 +18,7 @@ export async function etfPdfLoop(): Promise<void> {
       if (now.getHours() >= SCHEDULE_HOUR_KST && lastRunDay !== todayKey(now)) {
         console.log("[etf-pdf-loop] running at", now.toISOString());
         await snapshotAllEtfs();
+        console.log("[etf-pdf-loop] fund snapshot:", await snapshotFund());
         lastRunDay = todayKey(now);
       }
     } catch (e) {
