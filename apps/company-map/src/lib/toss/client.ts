@@ -6,6 +6,23 @@
 // 계좌·보유 API는 X-Tossinvest-Account: {accountSeq} 헤더가 추가로 필요.
 // 문서: https://developers.tossinvest.com/docs
 
+import { setDefaultResultOrder } from "node:dns";
+import dns from "node:dns";
+import { fetch as undiciFetch, Agent } from "undici";
+
+// 토스 IP 허용목록은 IPv4 기준. macOS/Node가 IPv6로 연결하면 허용목록에 없는
+// (그리고 주기적으로 바뀌는) IPv6 주소로 나가 403/"허용되지 않은 IP"가 난다.
+// 실측: 연결마다 v4/v6가 오락가락(토큰은 v4 통과, 직후 API 호출은 v6 거부).
+// 내장 fetch는 npm undici의 setGlobalDispatcher가 안 먹힐 수 있어(버전 심볼 불일치),
+// 이 클라이언트의 모든 토스 호출은 npm undici fetch + IPv4 고정 Agent를 직접 사용한다.
+setDefaultResultOrder("ipv4first");
+const ipv4Agent = new Agent({
+  connect: {
+    // family만 4로 고정 (all 등 나머지 옵션은 호출자 유지 — autoSelectFamily가 배열을 기대함)
+    lookup: (host, opts, cb) => dns.lookup(host, { ...opts, family: 4 }, cb),
+  },
+});
+
 const BASE_URL = "https://openapi.tossinvest.com";
 
 export class TossNotConfiguredError extends Error {
@@ -25,6 +42,20 @@ let cachedToken: { value: string; expiresAt: number } | null = null;
 // (토스는 클라이언트당 활성 토큰 1개라, 동시 다발 재발급 시 서로를 무효화함)
 let tokenPromise: Promise<string> | null = null;
 
+// IP 거부 진단용: 같은 Agent로 실제 egress IP를 조회해 에러 메시지에 포함.
+// (checkip.amazonaws.com은 토스와 같은 AWS 계열이라 라우팅 경로가 유사)
+async function currentEgressIp(): Promise<string> {
+  try {
+    const r = await undiciFetch("https://checkip.amazonaws.com", {
+      signal: AbortSignal.timeout(5_000),
+      dispatcher: ipv4Agent,
+    });
+    return (await r.text()).trim();
+  } catch {
+    return "조회실패";
+  }
+}
+
 async function fetchNewToken(): Promise<string> {
   const clientId = process.env.TOSS_API_KEY;
   const clientSecret = process.env.TOSS_API_SECRET;
@@ -35,15 +66,18 @@ async function fetchNewToken(): Promise<string> {
     client_id: clientId,
     client_secret: clientSecret,
   });
-  const resp = await fetch(`${BASE_URL}/oauth2/token`, {
+  const resp = await undiciFetch(`${BASE_URL}/oauth2/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
     signal: AbortSignal.timeout(10_000),
-    cache: "no-store",
+    dispatcher: ipv4Agent,
   });
   if (!resp.ok) {
-    throw new Error(`토스 토큰 발급 실패 (${resp.status}): ${await resp.text()}`);
+    const text = await resp.text();
+    // IP 거부면 실패 순간의 egress IP를 함께 기록 (허용목록 대조용).
+    const egress = text.includes("IP") ? ` [egress=${await currentEgressIp()}]` : "";
+    throw new Error(`토스 토큰 발급 실패 (${resp.status}): ${text}${egress}`);
   }
   const json = (await resp.json()) as {
     access_token: string;
@@ -75,11 +109,7 @@ interface CallOpts {
   body?: unknown;
 }
 
-async function callOnce(
-  path: string,
-  token: string,
-  opts?: CallOpts,
-): Promise<Response> {
+async function callOnce(path: string, token: string, opts?: CallOpts) {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
   };
@@ -88,12 +118,12 @@ async function callOnce(
   }
   const method = opts?.method ?? "GET";
   if (method === "POST") headers["Content-Type"] = "application/json";
-  return fetch(`${BASE_URL}${path}`, {
+  return undiciFetch(`${BASE_URL}${path}`, {
     method,
     headers,
     body: opts?.body != null ? JSON.stringify(opts.body) : undefined,
     signal: AbortSignal.timeout(10_000),
-    cache: "no-store",
+    dispatcher: ipv4Agent,
   });
 }
 
@@ -105,7 +135,12 @@ async function tossFetch<T>(path: string, opts?: CallOpts): Promise<T> {
   }
   if (!resp.ok) {
     // 에러 본문(JSON)을 그대로 던져 호출측에서 코드 분기 가능하게 함.
-    throw new TossApiError(resp.status, await resp.text());
+    const text = await resp.text();
+    // IP 거부면 실패 순간의 egress IP를 함께 기록 (허용목록 대조용).
+    if (resp.status === 403 && text.includes("IP")) {
+      throw new TossApiError(resp.status, `${text} [egress=${await currentEgressIp()}]`);
+    }
+    throw new TossApiError(resp.status, text);
   }
   return (await resp.json()) as T;
 }
