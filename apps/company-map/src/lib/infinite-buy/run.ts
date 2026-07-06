@@ -1,5 +1,5 @@
 import { computeDailyOrders, type CycleState, type IntendedOrder } from "./strategy";
-import { computeDailyOrdersV21 } from "./strategy-v21";
+import { computeDailyOrdersV22 } from "./strategy-v22";
 
 export interface CycleConfig {
   id: string;
@@ -12,7 +12,7 @@ export interface CycleConfig {
   lossCut: number;
   round: number;
   dryRun: boolean;
-  version: "v1" | "v2.1";
+  version: "v1" | "v2.2";
 }
 
 export interface HoldingSnapshot {
@@ -84,8 +84,8 @@ export async function runCycle(
   };
 
   const rawPlan =
-    cycle.version === "v2.1" ? computeDailyOrdersV21(state) : computeDailyOrders(state);
-  // v1(IntendedOrder)/v2.1(V21Order)은 kind 유니온만 다름. 실행부는 kind를 string으로만 읽고
+    cycle.version === "v2.2" ? computeDailyOrdersV22(state) : computeDailyOrders(state);
+  // v1(IntendedOrder)/v2.2(V22Order)은 kind 유니온만 다름. 실행부는 kind를 string으로만 읽고
   // submitOrder는 kind를 사용하지 않으므로, 공통 구조로 정규화해 분기 결과를 통일한다.
   const plan: {
     orders: Array<{
@@ -135,7 +135,7 @@ export async function runCycle(
     }
 
     try {
-      // submitOrder는 kind를 읽지 않음. v1/v2.1 공통 구조라 IntendedOrder로 좁혀 전달.
+      // submitOrder는 kind를 읽지 않음. v1/v2.2 공통 구조라 IntendedOrder로 좁혀 전달.
       const { tossOrderId } = await deps.submitOrder(accountSeq, o as IntendedOrder, cycle.symbol);
       await persist.logOrder({ ...base, status: "submitted", tossOrderId });
       result.placed++;

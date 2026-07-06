@@ -41,7 +41,7 @@ export async function infiniteBuyLoop(): Promise<void> {
           const config: CycleConfig = {
             id: c.id, symbol: c.symbol, accountSeq: c.accountSeq,
             principalUsd: c.principal, splits: c.splits, profitTarget: c.profitTarget,
-            bigBuyPremium: c.bigBuyPremium, lossCut: c.lossCut, round: c.round, dryRun: c.dryRun, version: c.version as "v1" | "v2.1",
+            bigBuyPremium: c.bigBuyPremium, lossCut: c.lossCut, round: c.round, dryRun: c.dryRun, version: c.version as "v1" | "v2.2",
           };
           try {
             const r = await runCycle(persist, deps, config, tradeDate, isKilled());

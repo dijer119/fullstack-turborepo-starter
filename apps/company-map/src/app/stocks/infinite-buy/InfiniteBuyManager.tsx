@@ -18,6 +18,17 @@ function pct(v: number | null): string {
   return v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
 }
 
+// 매도 주문 kind → 한글 라벨 (v1/v2.2 공통)
+function sellKindLabel(kind: string): string {
+  switch (kind) {
+    case "reset_sell": return "손절";
+    case "target_sell": return "익절(+10%)";       // v1
+    case "sell_lim_10": return "지정가(+10%)";      // v2.2 3/4
+    case "sell_loc_var": return "LOC(변동)";        // v2.2 1/4 @ (10−T/2)%
+    default: return kind;
+  }
+}
+
 export function InfiniteBuyManager({
   cycles,
   usdBuyingPower,
@@ -32,7 +43,7 @@ export function InfiniteBuyManager({
   const [symbol, setSymbol] = useState("");
   const [name, setName] = useState("");
   const [principal, setPrincipal] = useState("");
-  const [version, setVersion] = useState<"v1" | "v2.1">("v1");
+  const [version, setVersion] = useState<"v1" | "v2.2">("v1");
   const [msg, setMsg] = useState<string | null>(null);
   const [openOrders, setOpenOrders] = useState<Record<string, OrderView[]>>({});
   const [sells, setSells] = useState<Record<string, OrderView[]>>({});
@@ -229,10 +240,10 @@ export function InfiniteBuyManager({
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-xs text-gray-500">전략</span>
-            <select value={version} onChange={(e) => setVersion(e.target.value as "v1" | "v2.1")}
+            <select value={version} onChange={(e) => setVersion(e.target.value as "v1" | "v2.2")}
               className="w-28 rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900">
               <option value="v1">v1</option>
-              <option value="v2.1">v2.1</option>
+              <option value="v2.2">v2.2</option>
             </select>
           </label>
           <button onClick={onCreate} disabled={pending}
@@ -328,7 +339,7 @@ export function InfiniteBuyManager({
                         <tr key={o.id} className="border-t border-gray-100 dark:border-gray-800">
                           <td className="p-1">{o.filledAt ? o.filledAt.slice(0, 10) : o.tradeDate}</td>
                           <td className="p-1">{o.round}</td>
-                          <td className="p-1">{o.kind === "reset_sell" ? "손절" : o.kind === "target_sell" ? "익절" : o.kind}</td>
+                          <td className="p-1">{sellKindLabel(o.kind)}</td>
                           <td className="p-1 text-right">{usd(o.avgCost)}</td>
                           <td className="p-1 text-right">{usd(o.filledPrice ?? o.price)}</td>
                           <td className="p-1 text-right">{o.filledQty ?? o.quantity}</td>

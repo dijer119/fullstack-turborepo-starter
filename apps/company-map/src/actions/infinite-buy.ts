@@ -147,7 +147,7 @@ export async function listCycles(): Promise<CycleView[]> {
 export async function createCycle(input: {
   symbol: string; name: string; principal: number;
   splits?: number; profitTarget?: number; bigBuyPremium?: number; lossCut?: number;
-  version?: "v1" | "v2.1";
+  version?: "v1" | "v2.2";
 }): Promise<{ ok: boolean; reason?: string }> {
   const symbol = input.symbol.trim().toUpperCase();
   if (!symbol) return { ok: false, reason: "심볼 필요" };
@@ -159,7 +159,7 @@ export async function createCycle(input: {
       symbol, name: input.name.trim() || symbol, principal: input.principal,
       splits: input.splits ?? 40, profitTarget: input.profitTarget ?? 10,
       bigBuyPremium: input.bigBuyPremium ?? 12, lossCut: input.lossCut ?? 10,
-      version: input.version === "v2.1" ? "v2.1" : "v1",
+      version: input.version === "v2.2" ? "v2.2" : "v1",
       dryRun: true, // 항상 dryRun으로 시작
     },
   });
@@ -278,7 +278,7 @@ export async function runCycleNow(id: string): Promise<{ ok: boolean; reason?: s
   const config: CycleConfig = {
     id: c.id, symbol: c.symbol, accountSeq: c.accountSeq, principalUsd: c.principal,
     splits: c.splits, profitTarget: c.profitTarget, bigBuyPremium: c.bigBuyPremium,
-    lossCut: c.lossCut, round: c.round, dryRun: c.dryRun, version: c.version as "v1" | "v2.1",
+    lossCut: c.lossCut, round: c.round, dryRun: c.dryRun, version: c.version as "v1" | "v2.2",
   };
   const tradeDate = new Date().toISOString().slice(0, 10);
   await runCycle(prismaPersistence(db), tossRunDeps(), config, tradeDate, isKilled());

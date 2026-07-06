@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>무한매수법 V2.2 규칙 정리 (학습 노트)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .warn { border-left: 3px solid #c53030; background: #fff5f5; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .ok { border-left: 3px solid #38a169; background: #f0fff4; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+</style>
+</head>
+<body>
+<h1>무한매수법 V2.2 규칙 정리 (학습 노트)</h1>
+<p><strong>출처</strong>: 라오어 카페 계보 정리 + 나무위키/브런치 등(사용자 제공 분석). <strong>2023년부터 V2.2가 오피셜.</strong> 본 문서는 구현 전 학습·확인용이며, 실제 구현은 별도 spec/plan으로 진행. 수치는 3배 레버리지 고위험 전략이라 LIVE 전 원문 재검증 권장.</p>
+
+<h2>0. 버전 계보 (핵심 한 줄)</h2>
+<table>
+  <tr><th>버전</th><th>매수</th><th>매도</th></tr>
+  <tr><td>v1</td><td>0.5회 평단 + 0.5회 시중가+15%(무제한 큰수)</td><td>전량 평단+10% 1건</td></tr>
+  <tr><td>v2.0</td><td>큰수에 <b>평단+5% 고정 상한</b> 도입 + 후반전(진행률50%↑ 평단이하만) + 쿼터손절</td><td>전량 평단+10% 1건</td></tr>
+  <tr><td>v2.1</td><td>v2.0과 동일</td><td>LOC 세분화 — 전반 2단 / 후반 3단</td></tr>
+  <tr><td><b>v2.2 (오피셜)</b></td><td>큰수 = 평단+<b>(10−T/2)%</b> 변동식</td><td>전/후반 구분 폐지 → <b>2단 통일</b> (1/4 LOC + 3/4 지정가)</td></tr>
+</table>
+<p><strong>v2.2의 정체성</strong>: v2.0/v2.1의 "고정 티어 + T=20 계단(cliff)"을 <strong>매수·매도 모두 <code>(10−T/2)%</code>라는 하나의 변동식(경사, ramp)으로 통일</strong>. → <strong>매수·매도 둘 다 변경</strong>됨(매도 변화가 더 큼).</p>
+
+<h2>1. T(회차)와 변동식</h2>
+<ul>
+  <li>원금 40분할, 1회 매수액 = 원금 ÷ 40. 종목 TQQQ 등 3배 레버리지.</li>
+  <li><code>T = 누적 매수액 ÷ 1회 매수액</code> (진행률 = T/40).</li>
+  <li>변동식 값 = <code>(10 − T/2)%</code> (평단 대비). 검증점: T=0 → +10%, T=10 → +5%(= v2.0 큰수와 일치), T=20 → 0%(평단), T=30 → −5%, T=40 → −10%.</li>
+  <li>전반전 = T &lt; 20, 후반전 = T ≥ 20 (변동식이 0% 이하로 내려가는 지점).</li>
+</ul>
+
+<h2>2. 매수 (전부 LOC = LIMIT+CLS)</h2>
+<p>LOC 매수는 종가 ≤ 지정가일 때 종가로 체결(항상 지정가 이하로 유리).</p>
+<table>
+  <tr><th>구간</th><th>주문</th></tr>
+  <tr><td><b>전반전 (T&lt;20)</b></td><td>매일 2건: 0.5회분 @ 평단(LOC) + 0.5회분 @ 평단+(10−T/2)%(LOC)</td></tr>
+  <tr><td><b>후반전 (T≥20)</b></td><td>매일 1건: 1회분 전액 @ 평단+(10−T/2)%(LOC). T≥20이라 이 값 ≤ 0% = 평단 이하</td></tr>
+</table>
+<p><strong>큰수 최종 지정가 = min( 평단+(10−T/2)%, 현재가+15% )</strong> — 급등일에 현재가+15%가 상한으로 작동.</p>
+<blockquote>우리 v2.1 구현과의 매수 차이: v2.1 전반 큰수 = <b>평단×1.05 고정</b>, 후반 = 전액 <b>평단(0%)</b>. v2.2는 둘 다 <b>(10−T/2)%</b> 변동(전반은 +5%가 아니라 T에 따라 +10%~+0.5%, 후반은 0%가 아니라 T에 따라 0%~−10%).</blockquote>
+
+<h2>3. 매도 (전/후반 구분 폐지 → 2단 통일)</h2>
+<p>매일 2건:</p>
+<table>
+  <tr><th>비중(누적 보유수량)</th><th>가격</th><th>유형</th></tr>
+  <tr><td>1/4 (25%)</td><td>평단+(10−T/2)%</td><td>LOC 매도 (종가 ≥ 지정가면 종가로 체결)</td></tr>
+  <tr><td>3/4 (75%)</td><td>평단+10% (고정)</td><td>지정가 매도 (장중 도달 시)</td></tr>
+</table>
+<p>LOC 매도 티어(1/4)가 T에 따라 내려오는 것이 핵심: T=0 → +10%(3/4와 동일), T=10 → +5%, T=20 → 0%(평단), T=30 → −5%. <strong>자금을 많이 쓸수록(T↑) 더 낮은 수익률에서도 1/4을 털어 디리스킹</strong>. LOC 종가체결이라 지정가보다 높은 초과수익도 가능(백테스트상 수익률은 v2.0과 비슷하다는 주장).</p>
+<blockquote>우리 v2.1 구현과의 매도 차이: v2.1은 전반 2단(25%@+5% LOC / 75%@+10%) · 후반 3단(25%@평단 LOC / 25%@+5% / 50%@+10%). v2.2는 <b>전/후반 무관 2단 통일</b>(1/4 @ (10−T/2)% LOC / 3/4 @ +10%).</blockquote>
+
+<h2>4. 쿼터모드 / 쿼터손절 (검증 필요)</h2>
+<ul>
+  <li><strong>쿼터 매도 모드</strong>: T가 <b>19~20 사이</b>일 때 1/4을 <b>MOC 매도</b>. 그리고 "<b>쿼터 매도한 날엔 매수하지 않는다</b>"는 예외 규칙(v2.1엔 없음).</li>
+  <li><strong>쿼터손절 모드</strong>: T <b>39.1~40.0</b> 구간(40회 소진 부근). 전량손절 대신 보유의 1/4을 매도해 시드 재확보 후 계속 진행.</li>
+</ul>
+<p class="warn">쿼터모드의 정확한 트리거·수량·MOC 처리·"매도한 날 매수 스킵"은 출처가 2차 자료(나무위키/유튜브)라 <strong>LIVE 구현 전 원문 재검증 필수</strong>. 우리 v2.1은 사용자 결정으로 쿼터손절을 제외했었음.</p>
+
+<h2>5. 수치 예시 (평단 $60)</h2>
+<table>
+  <tr><th>T</th><th>(10−T/2)%</th><th>매수 큰수 지정가</th><th>매도 1/4 LOC 지정가</th><th>매도 3/4 지정가(고정)</th></tr>
+  <tr><td>0</td><td>+10%</td><td>$66.0 (또는 현재가+15% 중 작은값)</td><td>$66.0</td><td>$66.0</td></tr>
+  <tr><td>4</td><td>+8%</td><td>$64.8</td><td>$64.8</td><td>$66.0</td></tr>
+  <tr><td>10</td><td>+5%</td><td>$63.0</td><td>$63.0</td><td>$66.0</td></tr>
+  <tr><td>12</td><td>+4%</td><td>$62.4</td><td>$62.4</td><td>$66.0</td></tr>
+  <tr><td>20</td><td>0%</td><td>$60.0(평단, 후반전 진입)</td><td>$60.0(평단)</td><td>$66.0</td></tr>
+  <tr><td>30</td><td>−5%</td><td>$57.0</td><td>$57.0</td><td>$66.0</td></tr>
+  <tr><td>40</td><td>−10%</td><td>$54.0</td><td>$54.0</td><td>$66.0</td></tr>
+</table>
+<p>전반전(T&lt;20) 매수는 위 큰수 지정가 + 별도로 0.5회분 @ 평단($60). 후반전(T≥20)은 큰수 지정가에 1회분 전액.</p>
+
+<h2>6. Toss 매핑 (구현 관점)</h2>
+<ul>
+  <li>LOC(매수/매도) → <code>LIMIT + timeInForce:"CLS"</code>. 지정가 매도 → <code>LIMIT + timeInForce:"DAY"</code>. (v2.1에서 검증된 매핑 재사용)</li>
+  <li>MOC(쿼터 매도) → 토스 지원 여부 확인 필요(없으면 종가 근사/시장가 대체 검토).</li>
+  <li>매도 3/4 지정가 + 1/4 LOC = 동시 2건(v2.1 후반 3건보다 단순). 동시 다중 매도 수용은 여전히 실거래 검증 대상.</li>
+</ul>
+
+<h2>7. 우리 코드에 도입 시 변경 범위 (요약)</h2>
+<ul>
+  <li>신규 코어 <code>computeDailyOrdersV22</code> 추가(기존 <code>strategy.ts</code> v1 · <code>strategy-v21.ts</code>는 유지). <code>cycle.version</code>에 <code>"v2.2"</code> 추가, 실행기 분기.</li>
+  <li>핵심은 <code>(10−T/2)%</code> 변동식 하나로 매수 큰수·매도 1/4 LOC를 계산. 큰수는 <code>min(…, 현재가+15%)</code> 캡. 정수 반올림(합=보유수량) 규칙은 v2.1과 동일.</li>
+  <li>쿼터모드는 별도 결정 필요(포함/제외).</li>
+</ul>
+
+<h2>8. 미확인 / 검증 필요</h2>
+<ol>
+  <li>쿼터모드(T 19~20 MOC 매도 + "매도일 매수 스킵")·쿼터손절(T 39.1~40) 정확 규칙.</li>
+  <li>매도 1/4·3/4의 정수 반올림 정확 방식(누적 수량 기준).</li>
+  <li>매수 전반전 0.5/0.5 분할이 v2.2에서도 유지되는지(2차 자료 기준 유지로 보이나 원문 확인).</li>
+  <li>종목별 목표 차등(SOXL 등)·현재가+15% 캡의 정확 적용.</li>
+  <li>(참고) v3.0은 별개: TQQQ 매도점 +10%→+15%, 40→20분할. v2.2 범위 아님.</li>
+</ol>
+</body>
+</html>
