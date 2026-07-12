@@ -137,6 +137,15 @@ export async function runV4(
     }
     if (plan.blocked) return block(plan.blocked);
 
+    // 같은 거래일 중복 제출 방지: 이미 오늘 이 사이클에 생성한 주문이 있으면 재제출하지 않는다.
+    // worker는 lastRunDate로 막지만 runCycleNow(수동 "지금 실행")는 우회하므로 여기서 방어 —
+    // 재실행 시 위의 sync/apply(멱등)만 갱신되고 주문은 중복 생성되지 않는다.
+    const alreadyToday = await db.infiniteBuyOrder.count({ where: { cycleId, tradeDate } });
+    if (alreadyToday > 0) {
+      await db.infiniteBuyCycle.update({ where: { id: cycleId }, data: { lastRunDate: tradeDate, note: null } });
+      return result;
+    }
+
     // ⑤ submit / 기록 (run.ts와 동일한 관행)
     const simulate = c0.dryRun || killed;
     let buyingPower = 0;
