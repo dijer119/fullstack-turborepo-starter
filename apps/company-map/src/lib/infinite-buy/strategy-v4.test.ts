@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { computeDailyOrdersV4, starPct, px, type V4State } from "./strategy-v4";
+import { computeDailyOrdersV4, starPct, px, type V4State, type V4Order } from "./strategy-v4";
 
 // 부록 A 앵커: $10,000 · 40분할 · TQQQ(base 15) · 평단 $50
 const base: V4State = {
   t: 0, splits: 40, cash: 10000, starBase: 15, bigBuyPremium: 12,
   avgPrice: null, currentPrice: 50, holdingQty: 0,
 };
-const buys = (p: { orders: { side: string }[] }) => p.orders.filter((o) => o.side === "BUY");
-const sells = (p: { orders: { side: string }[] }) => p.orders.filter((o) => o.side === "SELL");
+const buys = (p: { orders: V4Order[] }) => p.orders.filter((o) => o.side === "BUY");
+const sells = (p: { orders: V4Order[] }) => p.orders.filter((o) => o.side === "SELL");
 
 describe("starPct / px", () => {
   it("별% = base×(1−2T/분할): 검증점 T=1→14.25, T=20→0, T=39→−14.25", () => {
