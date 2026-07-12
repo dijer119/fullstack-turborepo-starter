@@ -129,12 +129,31 @@ export function InfiniteBuyManager({
     <div className="space-y-6">
       {/* USD 잔고 + 갱신 */}
       <section className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-900/40">
-        <div className="text-sm">
-          <span className="text-gray-500">USD 매수가능금액</span>{" "}
-          <span className="font-semibold tabular-nums">{usd(usdBuyingPower)}</span>
-          {usdBuyingPower == null && (
-            <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">(토스 조회 실패/미설정)</span>
-          )}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+          <div>
+            <span className="text-gray-500">USD 매수가능금액</span>{" "}
+            <span className="font-semibold tabular-nums">{usd(usdBuyingPower)}</span>
+            {usdBuyingPower == null && (
+              <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">(토스 조회 실패/미설정)</span>
+            )}
+          </div>
+          {(() => {
+            // 전체 사이클 누적 실현수익 합계 (체결 확인된 매도 기준). 항상 표시.
+            const hasFills = cycles.some((c) => c.realizedPnl != null);
+            const total = cycles.reduce((a, c) => a + (c.realizedPnl ?? 0), 0);
+            return (
+              <div title="모든 사이클의 체결 확인된 매도(익절/손절) 실현수익 합계. '토스 체결 동기화'로 갱신됨">
+                <span className="text-gray-500">전체 누적수익</span>{" "}
+                <span className={`font-semibold tabular-nums ${
+                  !hasFills ? "text-gray-400"
+                    : total >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                }`}>
+                  {total >= 0 ? "+" : ""}${total.toFixed(2)}
+                </span>
+                {!hasFills && <span className="ml-1.5 text-xs text-gray-400">(체결된 매도 없음)</span>}
+              </div>
+            );
+          })()}
         </div>
         <button
           onClick={() => start(() => router.refresh())}
@@ -297,6 +316,12 @@ export function InfiniteBuyManager({
                 <div><span className="text-gray-500">보유</span> {c.holdingQty ?? "—"}</div>
                 <div><span className="text-gray-500">수익률</span> <span className={c.pnlPct == null ? "" : c.pnlPct >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>{pct(c.pnlPct)}</span></div>
                 <div><span className="text-gray-500">목표매도</span> {usd(c.targetSellPrice)}</div>
+                <div>
+                  <span className="text-gray-500">누적수익</span>{" "}
+                  <span className={c.realizedPnl == null ? "" : c.realizedPnl >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"} title="체결 확인된 매도(익절/손절) 실현수익 합계. '토스 체결 동기화'로 갱신됨">
+                    {c.realizedPnl == null ? "—" : `${c.realizedPnl >= 0 ? "+" : ""}$${c.realizedPnl.toFixed(2)}`}
+                  </span>
+                </div>
                 <div><span className="text-gray-500">마지막실행</span> {c.lastRunDate ?? "—"}</div>
               </div>
 

@@ -29,6 +29,7 @@ export interface CycleView {
   holdingQty: number | null;
   pnlPct: number | null;
   targetSellPrice: number | null;
+  realizedPnl: number | null; // 누적 실현수익(USD). 체결 확인된 매도 합산, 없으면 null
 }
 
 // 토스 읽기 호출 재시도. worker와 토큰/요청한도 경합으로 간헐 실패 시 대시보드가
@@ -132,6 +133,21 @@ export async function getRsiTable(force = false): Promise<RsiTable> {
 export async function listCycles(): Promise<CycleView[]> {
   const rows = await db.infiniteBuyCycle.findMany({ orderBy: { createdAt: "asc" } });
   const live = await liveHoldingMap();
+
+  // 사이클별 누적 실현수익 = 체결 확인된(SELL·filled) 매도의 (체결가 − 평단) × 체결수량 합.
+  // 체결 확인은 "토스 체결 동기화"(syncSellFills)가 filled로 마킹한 것만 — dryRun/미체결 제외.
+  const fills = await db.infiniteBuyOrder.findMany({
+    where: { side: "SELL", status: "filled" },
+    select: { cycleId: true, filledQty: true, filledPrice: true, quantity: true, price: true, avgCost: true },
+  });
+  const pnlByCycle = new Map<string, number>();
+  for (const f of fills) {
+    const sellPrice = f.filledPrice ?? f.price;
+    const sellQty = f.filledQty ?? f.quantity;
+    if (sellPrice == null || f.avgCost == null) continue;
+    pnlByCycle.set(f.cycleId, (pnlByCycle.get(f.cycleId) ?? 0) + (sellPrice - f.avgCost) * sellQty);
+  }
+
   return rows.map((c) => {
     const h = live.get(c.symbol) ?? null;
     return {
@@ -140,6 +156,7 @@ export async function listCycles(): Promise<CycleView[]> {
       bigBuyPremium: c.bigBuyPremium, lossCut: c.lossCut, lastRunDate: c.lastRunDate,
       avgPrice: h?.avg ?? null, holdingQty: h?.qty ?? null, pnlPct: h?.pnl ?? null,
       targetSellPrice: h && h.avg > 0 ? Math.round(h.avg * (1 + c.profitTarget / 100) * 100) / 100 : null,
+      realizedPnl: pnlByCycle.get(c.id) ?? null,
     };
   });
 }
