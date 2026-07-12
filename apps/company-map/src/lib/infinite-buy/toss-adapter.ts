@@ -1,8 +1,9 @@
 import {
-  getDefaultAccountSeq, getHoldings, getPrices, getBuyingPower, createOrder,
+  getDefaultAccountSeq, getHoldings, getPrices, getBuyingPower, createOrder, getOrders, getDailyCandles,
 } from "@/lib/toss/client";
 import type { PrismaClient } from "@prisma-clients/company-map";
 import type { RunDeps, RunPersistence, HoldingSnapshot, OrderLog } from "./run";
+import type { V4RunDeps } from "./run-v4";
 import type { IntendedOrder } from "./strategy";
 
 // 실주문 직전 방어 가드: 비정상 주문(수량/가격)이 실제 브로커로 가지 않도록 throw.
@@ -68,6 +69,21 @@ export function prismaPersistence(db: PrismaClient): RunPersistence {
     },
     async updateCycle(id, data) {
       await db.infiniteBuyCycle.update({ where: { id }, data });
+    },
+  };
+}
+
+// 토스 클라이언트 → V4RunDeps. 기존 RunDeps에 체결 조회·일봉 1건 조회를 얹는다.
+export function tossV4Deps(): V4RunDeps {
+  return {
+    ...tossRunDeps(),
+    getClosedOrders(accountSeq, symbol, from) {
+      return getOrders(accountSeq, { status: "CLOSED", symbol, from });
+    },
+    async getDailyCandle(symbol, date) {
+      const candles = await getDailyCandles(symbol, 30);
+      const c = candles.find((x) => x.date === date);
+      return c ? { close: c.close, high: c.high } : null;
     },
   };
 }
