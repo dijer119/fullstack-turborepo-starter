@@ -7,8 +7,11 @@ import {
   isTossConfigured, type DailyCandle,
 } from "@/lib/toss/client";
 import { runCycle, type CycleConfig } from "@/lib/infinite-buy/run";
-import { tossRunDeps, prismaPersistence, isKilled } from "@/lib/infinite-buy/toss-adapter";
+import { tossRunDeps, prismaPersistence, isKilled, tossV4Deps } from "@/lib/infinite-buy/toss-adapter";
 import { rsi14, RSI_UNIVERSE } from "@/lib/infinite-buy/rsi";
+import { starPct, px } from "@/lib/infinite-buy/strategy-v4";
+import { syncFillsFromToss, loadFillEvents, derivePositionFromFills } from "@/lib/infinite-buy/sync";
+import { runV4 } from "@/lib/infinite-buy/run-v4";
 
 export interface CycleView {
   id: string;
@@ -30,6 +33,13 @@ export interface CycleView {
   pnlPct: number | null;
   targetSellPrice: number | null;
   realizedPnl: number | null; // 누적 실현수익(USD). 체결 확인된 매도 합산, 없으면 null
+  // v4.0 전용 (그 외 버전은 null)
+  tValue: number | null;
+  cashRemaining: number | null;
+  starBase: number | null;
+  note: string | null;
+  starPrice: number | null;     // 오늘의 별지점 (평단 있을 때)
+  perBuyAmount: number | null;  // 1회매수금 = 잔금/(분할−T)
 }
 
 // 토스 읽기 호출 재시도. worker와 토큰/요청한도 경합으로 간헐 실패 시 대시보드가
@@ -148,36 +158,76 @@ export async function listCycles(): Promise<CycleView[]> {
     pnlByCycle.set(f.cycleId, (pnlByCycle.get(f.cycleId) ?? 0) + (sellPrice - f.avgCost) * sellQty);
   }
 
-  return rows.map((c) => {
+  const views: CycleView[] = [];
+  for (const c of rows) {
     const h = live.get(c.symbol) ?? null;
-    return {
+    const isV4 = c.version === "v4.0";
+    // v4 dryRun은 라이브 보유가 없으므로 가상 체결 이력에서 포지션 파생
+    let avgPrice = h?.avg ?? null;
+    let holdingQty: number | null = h?.qty ?? null;
+    if (isV4 && c.dryRun) {
+      const pos = derivePositionFromFills(await loadFillEvents(db, c.id));
+      avgPrice = pos.avgPrice;
+      holdingQty = pos.holdingQty;
+    }
+    const t = c.tValue;
+    const v4Star =
+      isV4 && t != null && c.starBase != null && avgPrice != null && avgPrice > 0
+        ? px(avgPrice * (1 + starPct(t, c.splits, c.starBase) / 100))
+        : null;
+    const v4PerBuy =
+      isV4 && t != null && c.cashRemaining != null && t <= c.splits - 1
+        ? px(c.cashRemaining / (c.splits - t))
+        : null;
+    views.push({
       id: c.id, symbol: c.symbol, name: c.name, status: c.status, dryRun: c.dryRun, version: c.version,
       principal: c.principal, splits: c.splits, round: c.round, profitTarget: c.profitTarget,
       bigBuyPremium: c.bigBuyPremium, lossCut: c.lossCut, lastRunDate: c.lastRunDate,
-      avgPrice: h?.avg ?? null, holdingQty: h?.qty ?? null, pnlPct: h?.pnl ?? null,
-      targetSellPrice: h && h.avg > 0 ? Math.round(h.avg * (1 + c.profitTarget / 100) * 100) / 100 : null,
+      avgPrice, holdingQty, pnlPct: h?.pnl ?? null,
+      targetSellPrice:
+        isV4 && c.starBase != null && avgPrice != null && avgPrice > 0
+          ? px(avgPrice * (1 + c.starBase / 100))
+          : h && h.avg > 0 ? Math.round(h.avg * (1 + c.profitTarget / 100) * 100) / 100 : null,
       realizedPnl: pnlByCycle.get(c.id) ?? null,
-    };
-  });
+      tValue: c.tValue, cashRemaining: c.cashRemaining, starBase: c.starBase, note: c.note,
+      starPrice: v4Star, perBuyAmount: v4PerBuy,
+    });
+  }
+  return views;
 }
+
+const V4_STAR_BASE: Record<string, number> = { TQQQ: 15, SOXL: 20 };
 
 export async function createCycle(input: {
   symbol: string; name: string; principal: number;
   splits?: number; profitTarget?: number; bigBuyPremium?: number; lossCut?: number;
-  version?: "v1" | "v2.2";
+  version?: "v1" | "v2.2" | "v4.0";
+  starBase?: number; // v4.0 전용 — TQQQ/SOXL은 자동, 그 외 필수
 }): Promise<{ ok: boolean; reason?: string }> {
   const symbol = input.symbol.trim().toUpperCase();
   if (!symbol) return { ok: false, reason: "심볼 필요" };
   if (!(input.principal > 0)) return { ok: false, reason: "원금은 0보다 커야 함" };
   const exists = await db.infiniteBuyCycle.findFirst({ where: { symbol, status: "active" } });
   if (exists) return { ok: false, reason: "이미 active 사이클이 있는 종목" };
+
+  const version = input.version === "v2.2" ? "v2.2" : input.version === "v4.0" ? "v4.0" : "v1";
+  let v4Fields: { starBase: number; tValue: number; cashRemaining: number } | undefined;
+  if (version === "v4.0") {
+    const starBase = input.starBase ?? V4_STAR_BASE[symbol];
+    if (!starBase || starBase <= 0) {
+      return { ok: false, reason: "v4.0은 starBase 필요 (TQQQ 15/SOXL 20 자동, 그 외 직접 입력)" };
+    }
+    v4Fields = { starBase, tValue: 0, cashRemaining: input.principal };
+  }
+
   await db.infiniteBuyCycle.create({
     data: {
       symbol, name: input.name.trim() || symbol, principal: input.principal,
       splits: input.splits ?? 40, profitTarget: input.profitTarget ?? 10,
       bigBuyPremium: input.bigBuyPremium ?? 12, lossCut: input.lossCut ?? 10,
-      version: input.version === "v2.2" ? "v2.2" : "v1",
+      version,
       dryRun: true, // 항상 dryRun으로 시작
+      ...(v4Fields ?? {}),
     },
   });
   revalidatePath("/stocks/infinite-buy");
@@ -248,37 +298,16 @@ export async function getSellHistory(id: string, limit = 200): Promise<OrderView
   return rows.map(toOrderView);
 }
 
-// 토스 주문내역과 대조해, 우리가 낸 매도 주문의 실제 체결을 확인·저장(status=filled).
+// 토스 주문내역과 대조해, 우리가 낸 매수·매도 주문의 실제 체결을 확인·저장(status=filled).
 // dryRun/미체결/취소는 filled로 바뀌지 않아 매도 이력에서 자연히 제외된다.
 export async function syncSellFills(id: string): Promise<{ ok: boolean; updated: number; reason?: string }> {
   if (!isTossConfigured()) return { ok: false, updated: 0, reason: "토스 미설정" };
-  const cycle = await db.infiniteBuyCycle.findUnique({ where: { id } });
-  if (!cycle) return { ok: false, updated: 0, reason: "사이클 없음" };
   try {
-    const accountSeq = cycle.accountSeq ?? (await getDefaultAccountSeq());
-    const from = cycle.createdAt.toISOString().slice(0, 10);
-    const orders = await retryRead(() =>
-      getOrders(accountSeq, { status: "CLOSED", symbol: cycle.symbol, from }),
-    );
-    let updated = 0;
-    for (const to of orders) {
-      if (to.side !== "SELL" || to.filledQuantity <= 0) continue; // 체결된 매도만
-      const our = await db.infiniteBuyOrder.findFirst({
-        where: { cycleId: id, tossOrderId: to.orderId },
-      });
-      if (!our) continue;
-      if (our.status === "filled" && our.filledQty === to.filledQuantity) continue; // 이미 반영
-      await db.infiniteBuyOrder.update({
-        where: { id: our.id },
-        data: {
-          status: "filled",
-          filledQty: to.filledQuantity,
-          filledPrice: to.averageFilledPrice,
-          filledAt: to.filledAt,
-        },
-      });
-      updated++;
-    }
+    const { updated } = await syncFillsFromToss(db, id, {
+      getDefaultAccountSeq,
+      getClosedOrders: (accountSeq, symbol, from) =>
+        retryRead(() => getOrders(accountSeq, { status: "CLOSED", symbol, from })),
+    });
     revalidatePath("/stocks/infinite-buy");
     return { ok: true, updated };
   } catch (e) {
@@ -292,6 +321,12 @@ export async function runCycleNow(id: string): Promise<{ ok: boolean; reason?: s
   const c = await db.infiniteBuyCycle.findUnique({ where: { id } });
   if (!c) return { ok: false, reason: "사이클 없음" };
   if (c.status !== "active") return { ok: false, reason: "active 사이클만 실행 가능 (재개 후 시도)" };
+  if (c.version === "v4.0") {
+    const tradeDate = new Date().toISOString().slice(0, 10);
+    const r = await runV4(db, tossV4Deps(), c.id, tradeDate, isKilled());
+    revalidatePath("/stocks/infinite-buy");
+    return r.blocked ? { ok: false, reason: r.blocked } : { ok: true };
+  }
   const config: CycleConfig = {
     id: c.id, symbol: c.symbol, accountSeq: c.accountSeq, principalUsd: c.principal,
     splits: c.splits, profitTarget: c.profitTarget, bigBuyPremium: c.bigBuyPremium,
