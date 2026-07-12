@@ -3,6 +3,9 @@
 //   매수: ΔT = 가중(전반 leg 0.5 / 후반·첫매수 1) × 체결비율. 잔금 −= 체결대금.
 //   쿼터매도: T×0.75 / 지정가매도: T×0.25 (부분체결이어도 전량 기준 — 스펙 확정). 잔금 += 체결대금.
 // 같은 거래일 적용 순서: 지정가매도(장중) → 쿼터매도(종가) → 매수(종가).
+import type { PrismaClient } from "@prisma-clients/company-map";
+import type { TossOrder } from "@/lib/toss/client";
+
 export interface FillEvent {
   side: "BUY" | "SELL";
   kind: string;
@@ -79,4 +82,93 @@ export function crossCheckHolding(fills: FillEvent[], actualQty: number): { ok: 
     expected += fe.side === "BUY" ? fe.filledQty : -fe.filledQty;
   }
   return { ok: Math.abs(expected - actualQty) < 1e-6, expected };
+}
+
+// ───────────────────────── IO 파트 ─────────────────────────
+
+export interface SyncTossDeps {
+  getDefaultAccountSeq(): Promise<number>;
+  getClosedOrders(accountSeq: number, symbol: string, from: string): Promise<TossOrder[]>;
+}
+
+// 토스 CLOSED 주문 ↔ 우리 주문(tossOrderId) 대조, BUY·SELL 모두 체결 기록. 멱등.
+// (기존 syncSellFills의 확장판 — SELL 필터 제거. 서버 액션은 이 함수의 래퍼가 된다.)
+export async function syncFillsFromToss(
+  db: PrismaClient,
+  cycleId: string,
+  deps: SyncTossDeps,
+): Promise<{ updated: number }> {
+  const cycle = await db.infiniteBuyCycle.findUnique({ where: { id: cycleId } });
+  if (!cycle) return { updated: 0 };
+  const accountSeq = cycle.accountSeq ?? (await deps.getDefaultAccountSeq());
+  const from = cycle.createdAt.toISOString().slice(0, 10);
+  const tossOrders = await deps.getClosedOrders(accountSeq, cycle.symbol, from);
+  let updated = 0;
+  for (const to of tossOrders) {
+    if (to.filledQuantity <= 0) continue;
+    const our = await db.infiniteBuyOrder.findFirst({ where: { cycleId, tossOrderId: to.orderId } });
+    if (!our) continue;
+    if (our.status === "filled" && our.filledQty === to.filledQuantity) continue; // 이미 반영
+    await db.infiniteBuyOrder.update({
+      where: { id: our.id },
+      data: {
+        status: "filled",
+        filledQty: to.filledQuantity,
+        filledPrice: to.averageFilledPrice,
+        filledAt: to.filledAt,
+      },
+    });
+    updated++;
+  }
+  return { updated };
+}
+
+const FILLED_STATUSES = ["filled", "simulated_filled"];
+
+function toFillEvent(o: {
+  side: string; kind: string; quantity: number;
+  filledQty: number | null; filledPrice: number | null; tradeDate: string;
+}): FillEvent {
+  return {
+    side: o.side as "BUY" | "SELL",
+    kind: o.kind,
+    quantity: o.quantity,
+    filledQty: o.filledQty ?? 0,
+    filledPrice: o.filledPrice ?? 0,
+    tradeDate: o.tradeDate,
+  };
+}
+
+// 체결된 전체 이벤트 (포지션 파생·크로스체크용)
+export async function loadFillEvents(db: PrismaClient, cycleId: string): Promise<FillEvent[]> {
+  const rows = await db.infiniteBuyOrder.findMany({
+    where: { cycleId, status: { in: FILLED_STATUSES } },
+    orderBy: { tradeDate: "asc" },
+  });
+  return rows.map(toFillEvent);
+}
+
+// 미반영 체결(stateApplied ≠ true)을 T/잔금에 반영하고 마킹. 트랜잭션으로 원자성 보장.
+export async function applyPendingFillsV4(
+  db: PrismaClient,
+  cycleId: string,
+): Promise<{ t: number; cash: number; applied: number }> {
+  return db.$transaction(async (tx) => {
+    const cycle = await tx.infiniteBuyCycle.findUniqueOrThrow({ where: { id: cycleId } });
+    const pending = await tx.infiniteBuyOrder.findMany({
+      where: { cycleId, status: { in: FILLED_STATUSES }, OR: [{ stateApplied: null }, { stateApplied: false }] },
+      orderBy: { tradeDate: "asc" },
+    });
+    let t = cycle.tValue ?? 0;
+    let cash = cycle.cashRemaining ?? cycle.principal;
+    if (pending.length > 0) {
+      ({ t, cash } = applyFills({ t, cash }, pending.map(toFillEvent)));
+      await tx.infiniteBuyCycle.update({ where: { id: cycleId }, data: { tValue: t, cashRemaining: cash } });
+      await tx.infiniteBuyOrder.updateMany({
+        where: { id: { in: pending.map((p) => p.id) } },
+        data: { stateApplied: true },
+      });
+    }
+    return { t, cash, applied: pending.length };
+  });
 }
