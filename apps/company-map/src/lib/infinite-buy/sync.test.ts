@@ -53,6 +53,13 @@ describe("applyFills — 매도 배수 (부분체결이어도 전량 기준, 스
     const r = applyFills({ t: 5, cash: 1000 }, [f({ filledQty: 0 })]);
     expect(r).toEqual({ t: 5, cash: 1000 });
   });
+  it("쿼터매도 부분체결이어도 T×0.75 (체결비율 무관)", () => {
+    const r = applyFills({ t: 10, cash: 5000 }, [
+      f({ side: "SELL", kind: "sell_loc_star", quantity: 25, filledQty: 10, filledPrice: 54.2 }),
+    ]);
+    expect(r.t).toBeCloseTo(7.5, 10);
+    expect(r.cash).toBeCloseTo(5000 + 10 * 54.2, 10);
+  });
 });
 
 describe("sortFills — 거래일 → 종류 우선순위(지정가매도→쿼터→매수)", () => {
@@ -89,5 +96,12 @@ describe("crossCheckHolding", () => {
     ];
     expect(crossCheckHolding(fills, 3)).toEqual({ ok: true, expected: 3 });
     expect(crossCheckHolding(fills, 5).ok).toBe(false);
+  });
+  it("filledPrice 0 이벤트는 무시", () => {
+    const fills = [
+      f({ quantity: 4, filledQty: 4, filledPrice: 50 }),
+      f({ side: "SELL", kind: "sell_loc_star", quantity: 2, filledQty: 2, filledPrice: 0 }),
+    ];
+    expect(crossCheckHolding(fills, 4)).toEqual({ ok: true, expected: 4 });
   });
 });

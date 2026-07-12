@@ -75,7 +75,7 @@ export function derivePositionFromFills(fills: FillEvent[]): { avgPrice: number 
 export function crossCheckHolding(fills: FillEvent[], actualQty: number): { ok: boolean; expected: number } {
   let expected = 0;
   for (const fe of fills) {
-    if (!(fe.filledQty > 0)) continue;
+    if (!(fe.filledQty > 0) || !(fe.filledPrice > 0)) continue;
     expected += fe.side === "BUY" ? fe.filledQty : -fe.filledQty;
   }
   return { ok: Math.abs(expected - actualQty) < 1e-6, expected };
