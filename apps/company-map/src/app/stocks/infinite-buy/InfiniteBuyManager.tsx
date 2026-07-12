@@ -18,13 +18,15 @@ function pct(v: number | null): string {
   return v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
 }
 
-// 매도 주문 kind → 한글 라벨 (v1/v2.2 공통)
+// 매도 주문 kind → 한글 라벨 (v1/v2.2/v4 공통)
 function sellKindLabel(kind: string): string {
   switch (kind) {
     case "reset_sell": return "손절";
     case "target_sell": return "익절(+10%)";       // v1
     case "sell_lim_10": return "지정가(+10%)";      // v2.2 3/4
     case "sell_loc_var": return "LOC(변동)";        // v2.2 1/4 @ (10−T/2)%
+    case "sell_loc_star": return "쿼터(LOC@별지점)"; // v4 ¼
+    case "sell_lim_target": return "지정가(+base%)";  // v4 ¾
     default: return kind;
   }
 }
@@ -43,7 +45,8 @@ export function InfiniteBuyManager({
   const [symbol, setSymbol] = useState("");
   const [name, setName] = useState("");
   const [principal, setPrincipal] = useState("");
-  const [version, setVersion] = useState<"v1" | "v2.2">("v1");
+  const [version, setVersion] = useState<"v1" | "v2.2" | "v4.0">("v1");
+  const [starBase, setStarBase] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [openOrders, setOpenOrders] = useState<Record<string, OrderView[]>>({});
   const [sells, setSells] = useState<Record<string, OrderView[]>>({});
@@ -54,9 +57,12 @@ export function InfiniteBuyManager({
   const onCreate = () =>
     start(async () => {
       setMsg(null);
-      const r = await createCycle({ symbol, name, principal: Number(principal), version });
+      const r = await createCycle({
+        symbol, name, principal: Number(principal), version,
+        starBase: starBase ? Number(starBase) : undefined,
+      });
       if (!r.ok) { setMsg(r.reason ?? "실패"); return; }
-      setSymbol(""); setName(""); setPrincipal(""); setVersion("v1");
+      setSymbol(""); setName(""); setPrincipal(""); setVersion("v1"); setStarBase("");
       router.refresh();
     });
 
@@ -259,12 +265,21 @@ export function InfiniteBuyManager({
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-xs text-gray-500">전략</span>
-            <select value={version} onChange={(e) => setVersion(e.target.value as "v1" | "v2.2")}
+            <select value={version} onChange={(e) => setVersion(e.target.value as "v1" | "v2.2" | "v4.0")}
               className="w-28 rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900">
               <option value="v1">v1</option>
               <option value="v2.2">v2.2</option>
+              <option value="v4.0">v4.0</option>
             </select>
           </label>
+          {version === "v4.0" && (
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-gray-500">별% base</span>
+              <input type="number" value={starBase} onChange={(e) => setStarBase(e.target.value)}
+                placeholder="TQQQ 15 / SOXL 20 자동"
+                className="w-40 rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900" />
+            </label>
+          )}
           <button onClick={onCreate} disabled={pending}
             className="rounded bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700 disabled:opacity-50">
             추가 (dryRun)
@@ -296,6 +311,11 @@ export function InfiniteBuyManager({
                   <span className="rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
                     {c.version}
                   </span>
+                  {c.note && (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title={c.note}>
+                      ⚠ {c.note.length > 30 ? `${c.note.slice(0, 30)}…` : c.note}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 text-xs">
                   <button onClick={() => toggleDryRun(c)} disabled={pending} className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
@@ -310,7 +330,12 @@ export function InfiniteBuyManager({
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
-                <div><span className="text-gray-500">진행</span> {c.round}/{c.splits}</div>
+                <div>
+                  <span className="text-gray-500">진행</span>{" "}
+                  {c.version === "v4.0"
+                    ? `T ${c.tValue == null ? "—" : c.tValue.toFixed(2)}/${c.splits}`
+                    : `${c.round}/${c.splits}`}
+                </div>
                 <div><span className="text-gray-500">원금</span> {usd(c.principal)}</div>
                 <div><span className="text-gray-500">평단</span> {usd(c.avgPrice)}</div>
                 <div><span className="text-gray-500">보유</span> {c.holdingQty ?? "—"}</div>
@@ -322,6 +347,13 @@ export function InfiniteBuyManager({
                     {c.realizedPnl == null ? "—" : `${c.realizedPnl >= 0 ? "+" : ""}$${c.realizedPnl.toFixed(2)}`}
                   </span>
                 </div>
+                {c.version === "v4.0" && (
+                  <>
+                    <div><span className="text-gray-500">잔금</span> {usd(c.cashRemaining)}</div>
+                    <div><span className="text-gray-500">별지점</span> {usd(c.starPrice)}</div>
+                    <div><span className="text-gray-500">1회매수금</span> {usd(c.perBuyAmount)}</div>
+                  </>
+                )}
                 <div><span className="text-gray-500">마지막실행</span> {c.lastRunDate ?? "—"}</div>
               </div>
 
