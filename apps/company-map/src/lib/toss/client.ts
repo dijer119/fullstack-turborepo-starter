@@ -322,11 +322,13 @@ export async function getMarketCalendarUS(): Promise<MarketCalendar<USCalDay>> {
 interface RawCandle {
   timestamp: string;
   closePrice: string;
+  highPrice?: string;
 }
 
 export interface DailyCandle {
   date: string; // YYYY-MM-DD (KST)
   close: number;
+  high: number; // 고가. 응답에 없으면 close로 대체(보수적 판정)
 }
 
 // 일봉 종가 시계열(오름차순). 차트용. 토스 candles는 최신순이라 정렬해서 반환.
@@ -338,7 +340,11 @@ export async function getDailyCandles(
     `/api/v1/candles?symbol=${encodeURIComponent(symbol)}&interval=1d&count=${count}`,
   );
   return (json.result.candles ?? [])
-    .map((c) => ({ date: c.timestamp.slice(0, 10), close: Number(c.closePrice) }))
+    .map((c) => {
+      const close = Number(c.closePrice);
+      const high = Number(c.highPrice);
+      return { date: c.timestamp.slice(0, 10), close, high: Number.isFinite(high) && high > 0 ? high : close };
+    })
     .filter((c) => Number.isFinite(c.close))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
