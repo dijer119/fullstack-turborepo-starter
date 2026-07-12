@@ -83,103 +83,106 @@ export async function runV4(
     if (c0.dryRun) {
       await simulateDryFills(db, deps, c0, tradeDate);
     } else {
-      const accountSeq = c0.accountSeq ?? (await deps.getDefaultAccountSeq());
-      void accountSeq; // syncFillsFromToss가 내부에서 재조회
-      await syncFillsFromToss(db, cycleId, deps);
+      await syncFillsFromToss(db, cycleId, deps); // 내부에서 accountSeq 재조회
     }
   } catch (e) {
     return block(`체결 동기화 실패: ${e instanceof Error ? e.message : String(e)}`);
   }
 
-  // ② apply — T·잔금 갱신
-  const { t, cash } = await applyPendingFillsV4(db, cycleId);
+  // ②~⑤ 상태 갱신·계산·제출. 실패 시 해당 사이클 주문 보류(block) → 다음 폴 재시도.
+  try {
+    // ② apply — T·잔금 갱신
+    const { t, cash } = await applyPendingFillsV4(db, cycleId);
 
-  // ③ 포지션 + 크로스체크
-  const fills = await loadFillEvents(db, cycleId);
-  let avgPrice: number | null;
-  let holdingQty: number;
-  let currentPrice: number;
-  if (c0.dryRun) {
-    ({ avgPrice, holdingQty } = derivePositionFromFills(fills));
-    currentPrice = await deps.getCurrentPrice(c0.symbol);
-  } else {
-    const accountSeq = c0.accountSeq ?? (await deps.getDefaultAccountSeq());
-    const h = await deps.getHoldingForSymbol(accountSeq, c0.symbol);
-    avgPrice = h?.avgPrice ?? null;
-    holdingQty = h?.quantity ?? 0;
-    currentPrice = h?.currentPrice ?? (await deps.getCurrentPrice(c0.symbol));
-    const check = crossCheckHolding(fills, holdingQty);
-    if (!check.ok) {
-      return block(`정합성 불일치: 체결합 ${check.expected} ≠ 실보유 ${holdingQty} — 수동 확인 필요`);
+    // ③ 포지션 + 크로스체크
+    const fills = await loadFillEvents(db, cycleId);
+    let avgPrice: number | null;
+    let holdingQty: number;
+    let currentPrice: number;
+    if (c0.dryRun) {
+      ({ avgPrice, holdingQty } = derivePositionFromFills(fills));
+      currentPrice = await deps.getCurrentPrice(c0.symbol);
+    } else {
+      const accountSeq = c0.accountSeq ?? (await deps.getDefaultAccountSeq());
+      const h = await deps.getHoldingForSymbol(accountSeq, c0.symbol);
+      avgPrice = h?.avgPrice ?? null;
+      holdingQty = h?.quantity ?? 0;
+      currentPrice = h?.currentPrice ?? (await deps.getCurrentPrice(c0.symbol));
+      const check = crossCheckHolding(fills, holdingQty);
+      if (!check.ok) {
+        return block(`정합성 불일치: 체결합 ${check.expected} ≠ 실보유 ${holdingQty} — 수동 확인 필요`);
+      }
     }
-  }
 
-  // 사이클 완료: 전량 매도됨
-  if (t > 0 && holdingQty <= 0) {
-    await db.infiniteBuyCycle.update({
-      where: { id: cycleId },
-      data: { status: "completed", lastRunDate: tradeDate, note: "보유 0 — 사이클 종료(재시작은 새 사이클 생성)" },
+    // 사이클 완료: 전량 매도됨
+    if (t > 0 && holdingQty <= 0) {
+      await db.infiniteBuyCycle.update({
+        where: { id: cycleId },
+        data: { status: "completed", lastRunDate: tradeDate, note: "보유 0 — 사이클 종료(재시작은 새 사이클 생성)" },
+      });
+      return { ...result, completed: true };
+    }
+
+    // ④ compute
+    const plan = computeDailyOrdersV4({
+      t, splits: c0.splits, cash, starBase: c0.starBase, bigBuyPremium: c0.bigBuyPremium,
+      avgPrice, currentPrice, holdingQty,
     });
-    return { ...result, completed: true };
-  }
+    if (plan.exhausted) {
+      await db.infiniteBuyCycle.update({
+        where: { id: cycleId },
+        data: { status: "exhausted", lastRunDate: tradeDate, note: `소진 도달(T=${t.toFixed(2)}) — 소진모드 미구현, 수동 판단 필요` },
+      });
+      return { ...result, exhausted: true };
+    }
+    if (plan.blocked) return block(plan.blocked);
 
-  // ④ compute
-  const plan = computeDailyOrdersV4({
-    t, splits: c0.splits, cash, starBase: c0.starBase, bigBuyPremium: c0.bigBuyPremium,
-    avgPrice, currentPrice, holdingQty,
-  });
-  if (plan.exhausted) {
-    await db.infiniteBuyCycle.update({
-      where: { id: cycleId },
-      data: { status: "exhausted", lastRunDate: tradeDate, note: `소진 도달(T=${t.toFixed(2)}) — 소진모드 미구현, 수동 판단 필요` },
-    });
-    return { ...result, exhausted: true };
-  }
-  if (plan.blocked) return block(plan.blocked);
-
-  // ⑤ submit / 기록 (run.ts와 동일한 관행)
-  const simulate = c0.dryRun || killed;
-  let buyingPower = 0;
-  if (!simulate && plan.orders.some((o) => o.side === "BUY")) {
-    const accountSeq = c0.accountSeq ?? (await deps.getDefaultAccountSeq());
-    buyingPower = await deps.getBuyingPowerUsd(accountSeq);
-  }
-  for (const o of plan.orders) {
-    const base = {
-      cycleId, tradeDate, round: Math.floor(t), side: o.side, kind: o.kind,
-      orderType: o.orderType, tif: o.tif, price: o.price, quantity: o.quantity,
-      avgCost: o.side === "SELL" ? avgPrice : null,
-      tossOrderId: null as string | null, dryRun: c0.dryRun,
-    };
-    if (o.side === "BUY" && !simulate) {
-      const est = o.price * o.quantity;
-      if (est > buyingPower) {
-        await db.infiniteBuyOrder.create({ data: { ...base, status: "skipped", error: "insufficient buying power" } });
+    // ⑤ submit / 기록 (run.ts와 동일한 관행)
+    const simulate = c0.dryRun || killed;
+    let buyingPower = 0;
+    if (!simulate && plan.orders.some((o) => o.side === "BUY")) {
+      const accountSeq = c0.accountSeq ?? (await deps.getDefaultAccountSeq());
+      buyingPower = await deps.getBuyingPowerUsd(accountSeq);
+    }
+    for (const o of plan.orders) {
+      const base = {
+        cycleId, tradeDate, round: Math.floor(t), side: o.side, kind: o.kind,
+        orderType: o.orderType, tif: o.tif, price: o.price, quantity: o.quantity,
+        avgCost: o.side === "SELL" ? avgPrice : null,
+        tossOrderId: null as string | null, dryRun: c0.dryRun,
+      };
+      if (o.side === "BUY" && !simulate) {
+        const est = o.price * o.quantity;
+        if (est > buyingPower) {
+          await db.infiniteBuyOrder.create({ data: { ...base, status: "skipped", error: "insufficient buying power" } });
+          continue;
+        }
+        buyingPower -= est;
+      }
+      if (simulate) {
+        await db.infiniteBuyOrder.create({ data: { ...base, status: "simulated", error: null } });
+        result.simulated++;
         continue;
       }
-      buyingPower -= est;
+      try {
+        const intended: IntendedOrder = {
+          side: o.side, kind: "loc_avg", orderType: o.orderType, tif: o.tif, price: o.price, quantity: o.quantity,
+        };
+        assertSubmittable(intended);
+        const accountSeq = c0.accountSeq ?? (await deps.getDefaultAccountSeq());
+        const { tossOrderId } = await deps.submitOrder(accountSeq, intended, c0.symbol);
+        await db.infiniteBuyOrder.create({ data: { ...base, tossOrderId, status: "submitted", error: null } });
+        result.placed++;
+      } catch (e) {
+        await db.infiniteBuyOrder.create({
+          data: { ...base, status: "failed", error: e instanceof Error ? e.message : String(e) },
+        });
+      }
     }
-    if (simulate) {
-      await db.infiniteBuyOrder.create({ data: { ...base, status: "simulated", error: null } });
-      result.simulated++;
-      continue;
-    }
-    try {
-      const intended: IntendedOrder = {
-        side: o.side, kind: "loc_avg", orderType: o.orderType, tif: o.tif, price: o.price, quantity: o.quantity,
-      };
-      assertSubmittable(intended);
-      const accountSeq = c0.accountSeq ?? (await deps.getDefaultAccountSeq());
-      const { tossOrderId } = await deps.submitOrder(accountSeq, intended, c0.symbol);
-      await db.infiniteBuyOrder.create({ data: { ...base, tossOrderId, status: "submitted", error: null } });
-      result.placed++;
-    } catch (e) {
-      await db.infiniteBuyOrder.create({
-        data: { ...base, status: "failed", error: e instanceof Error ? e.message : String(e) },
-      });
-    }
-  }
 
-  await db.infiniteBuyCycle.update({ where: { id: cycleId }, data: { lastRunDate: tradeDate, note: null } });
-  return result;
+    await db.infiniteBuyCycle.update({ where: { id: cycleId }, data: { lastRunDate: tradeDate, note: null } });
+    return result;
+  } catch (e) {
+    return block(`실행 실패: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
