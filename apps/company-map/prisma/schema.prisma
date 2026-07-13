@@ -422,6 +422,11 @@ model InfiniteBuyCycle {
   dryRun        Boolean  @default(true) @map("dry_run")
   version       String   @default("v1")          // "v1" | "v2.2" 전략 버전
   round         Int      @default(0)
+  // ── v4.0 전용 상태 (v1/v2.2에선 null) ──
+  tValue        Float?   @map("t_value")         // 연속 T (체결 반영으로만 갱신)
+  cashRemaining Float?   @map("cash_remaining")  // 잔금(USD). 생성 시 principal
+  starBase      Float?   @map("star_base")       // 별% base = 지정가매도 % (TQQQ 15 / SOXL 20)
+  note          String?                          // 마지막 경고/보류 사유 (대시보드 배지)
   lastRunDate   String?  @map("last_run_date")  // 마지막 실행 US 거래일
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
@@ -447,6 +452,7 @@ model InfiniteBuyOrder {
   filledPrice Float?   @map("filled_price")      // 평균 체결가(토스 동기화)
   filledAt    String?  @map("filled_at")         // 체결 시각(토스, ISO KST)
   tossOrderId String?  @map("toss_order_id")
+  stateApplied Boolean? @map("state_applied")    // v4: 이 체결이 T/잔금에 반영됐는지(멱등 마커)
   dryRun      Boolean  @map("dry_run")
   status      String                            // submitted | filled | failed | simulated | skipped
   error       String?

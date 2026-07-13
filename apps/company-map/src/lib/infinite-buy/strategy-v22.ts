@@ -36,7 +36,10 @@ export function computeDailyOrdersV22(s: CycleState): V22Plan {
   let nextRound = s.round;
   let resetAfter = false;
 
-  if (s.round < s.splits) {
+  if (s.round >= 1 && s.round < s.splits && s.holdingQty <= 0) {
+    // 사이클 중간 전량 매도(익절 체결 등)로 보유 0 → 리셋해 다음 세션에 1회차부터 재시작.
+    resetAfter = true;
+  } else if (s.round < s.splits) {
     // ── 매수 (전부 LOC) ──
     if (s.round === 0) {
       const qty = Math.floor(daily / s.currentPrice);

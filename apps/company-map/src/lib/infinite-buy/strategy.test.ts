@@ -45,6 +45,13 @@ describe("computeDailyOrders", () => {
     expect(p.resetAfter).toBe(true);
   });
 
+  it("사이클 중간 보유 0(익절 체결): 주문 없이 리셋해 재시작 준비", () => {
+    // 실사례: FNGU r6에서 target_sell 전량 체결 → 보유 0인데 리셋이 없으면 round 40까지 공회전
+    const p = computeDailyOrders({ ...base, round: 6, holdingQty: 0, avgPrice: null });
+    expect(p.orders).toEqual([]);
+    expect(p.resetAfter).toBe(true);
+  });
+
   it("소진 후 -10% 이하: MARKET 전량 손절 + 리셋", () => {
     const p = computeDailyOrders({
       ...base, round: 40, avgPrice: 50, currentPrice: 44, holdingQty: 80, pnlPct: -12,

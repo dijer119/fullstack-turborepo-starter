@@ -106,4 +106,10 @@ describe("computeDailyOrdersV22 소진 후 (v1과 동일)", () => {
     expect(p.orders).toEqual([]);
     expect(p.resetAfter).toBe(true);
   });
+
+  it("사이클 중간 보유 0(익절 체결): 주문 없이 리셋해 재시작 준비", () => {
+    const p = computeDailyOrdersV22({ ...base, round: 6, holdingQty: 0, avgPrice: null });
+    expect(p.orders).toEqual([]);
+    expect(p.resetAfter).toBe(true);
+  });
 });
