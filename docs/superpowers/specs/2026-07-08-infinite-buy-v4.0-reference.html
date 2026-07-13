@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>무한매수법 V4.0 일반모드 규칙 정리 (학습 노트)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .warn { border-left: 3px solid #c53030; background: #fff5f5; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .ok { border-left: 3px solid #38a169; background: #f0fff4; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .muted { color: #718096; font-size: 0.9em; }
+  /* flow diagram */
+  .flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 1.2rem 0; }
+  .node { border: 1.5px solid #2c5282; border-radius: 6px; padding: 0.5rem 0.85rem; background: #fff; max-width: 660px; text-align: center; font-size: 0.9em; }
+  .node b { color: #2c5282; }
+  .node.calc { background: #ebf8ff; }
+  .node.buy { background: #eef6ff; border-color: #2b6cb0; }
+  .node.sell { background: #fff5f5; border-color: #c53030; }
+  .node.sell b { color: #c53030; }
+  .node.end { background: #f0fff4; border-color: #38a169; }
+  .node.end b { color: #276749; }
+  .arrow { width: 2px; height: 22px; background: #94a3b8; position: relative; }
+  .arrow::after { content: "▼"; position: absolute; bottom: -5px; left: -5px; color: #94a3b8; font-size: 12px; line-height: 1; }
+  .arrow.lbl-arrow { height: 34px; }
+  .arrow .albl { position: absolute; left: 8px; top: 4px; white-space: nowrap; font-size: 0.78em; color: #718096; }
+  .branch { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; max-width: 820px; }
+  .branch .node { flex: 1 1 175px; font-size: 0.82em; }
+  .caption { font-size: 0.82em; color: #718096; margin-top: 0.3rem; text-align: center; }
+</style>
+</head>
+<body>
+<h1>무한매수법 V4.0 일반모드 규칙 정리 (학습 노트)</h1>
+<p class="muted">출처: 라오어 카페 "무한매수법 V4.0 방법론 _ (일반모드)". 본 문서는 <strong>학습·확인용</strong>이며 구현 전 원문 재검증 권장. 3배 레버리지 고위험 전략(투자 권유 아님).</p>
+
+<h2>0. 버전 위치 / 모드 개념</h2>
+<ul>
+  <li><strong>V4.0 = 일반모드 + 소진모드</strong>. 이 문서는 <strong>일반모드</strong>만 다룸(소진모드=리버스 무한매수법은 별도 글, 미확보).</li>
+  <li><strong>일반모드</strong>: 소진되기 전, 쿼터매도를 포함한 일련의 과정.</li>
+  <li><strong>소진모드</strong>: T값이 <strong>1회분 미만</strong> 남은 시점부터 시작 → 특정 조건 만족 시 일반모드로 복귀. (내용 미확보)</li>
+  <li><strong>오피셜 종목: TQQQ, SOXL만.</strong> 초심자는 TQQQ 권장, 익숙해지면 SOXL 겸행. (수익은 대개 SOXL이 높으나 변동성이 커 중도포기 위험)</li>
+</ul>
+
+<h2>요약 흐름도 (일별 사이클)</h2>
+<p class="muted">일반모드의 하루 루프 — 매일 같은 5단계. 공식·세부는 각 절 참조(T §2 · 별지점 §3 · 매수금 §4 · 매수 §5 · 매도 §6).</p>
+<div class="flow">
+  <div class="node calc"><b>① T 갱신</b> — 전날 체결 반영 (§2)</div>
+  <div class="arrow"></div>
+  <div class="node calc"><b>② 계산</b> — 오늘의 별지점(§3) · 1회매수금(§4)</div>
+  <div class="arrow"></div>
+  <div class="node buy"><b>③ 주문 걸기</b> — 매수는 T 국면별(아래 표) · 매도는 ¼ 쿼터 LOC@별지점 + ¾ 지정가(§6)</div>
+  <div class="arrow lbl-arrow"><span class="albl">장 마감 — 종가 vs 별지점, 한쪽만 체결</span></div>
+  <div class="branch">
+    <div class="node buy"><b>④a 종가 &lt; 별지점</b><br>매수 체결(하락 담기) → T ↑</div>
+    <div class="node sell"><b>④b 종가 ≥ 별지점</b><br>쿼터매도 체결 → T ×0.75</div>
+  </div>
+  <div class="arrow"></div>
+  <div class="branch">
+    <div class="node end"><b>⑤ 보유 0 → 사이클 종료</b><br>T=0으로 재시작(§7)</div>
+    <div class="node"><b>보유 &gt; 0</b> → 내일 ①</div>
+  </div>
+</div>
+<p class="caption">별도 경로: 장중 지정가매도선(TQQQ 평단+15% / SOXL 평단+20%) 도달 시 ¾이 체결(T ×0.25). ④에서 매수·매도가 같은 날 겹치지 않는 이유는 매수점 = 별지점−0.01 (§3 예시 ②).</p>
+
+<h3>③의 매수 형태 — T 국면별 (전부 LOC, 아래 사다리 동반)</h3>
+<table>
+  <tr><th>국면</th><th>T 범위</th><th>매수 주문</th></tr>
+  <tr><td>첫매수</td><td>T = 0</td><td>종가+10~15% 큰수</td></tr>
+  <tr><td>전반전</td><td>0 &lt; T &lt; 분할/2</td><td>½ 별지점 + ½ 평단</td></tr>
+  <tr><td>후반전</td><td>분할/2 ≤ T ≤ 분할−1</td><td>전액 별지점 (평단 아래)</td></tr>
+  <tr><td>소진</td><td>T &gt; 분할−1</td><td>소진모드(리버스) 전환 — 별도 글</td></tr>
+</table>
+
+<h3>별지점 기준: 종가 위치별 판정</h3>
+<svg viewBox="0 0 700 130" width="100%" style="max-width:700px" role="img" aria-label="별지점 기준 종가 위치별 매수/매도 판정 축">
+  <!-- axis -->
+  <line x1="40" y1="70" x2="660" y2="70" stroke="#94a3b8" stroke-width="2"/>
+  <!-- star point marker -->
+  <line x1="350" y1="45" x2="350" y2="95" stroke="#d69e2e" stroke-width="2.5"/>
+  <text x="350" y="38" text-anchor="middle" font-size="13" fill="#b7791f" font-family="sans-serif">★ 별지점 = 평단×(1+별%)</text>
+  <!-- left region: buy -->
+  <rect x="40" y="56" width="308" height="28" fill="#eef6ff"/>
+  <text x="194" y="74" text-anchor="middle" font-size="13" fill="#2b6cb0" font-family="sans-serif">종가 &lt; 별지점 → LOC 매수 체결</text>
+  <!-- right region: sell -->
+  <rect x="352" y="56" width="308" height="28" fill="#fff5f5"/>
+  <text x="506" y="74" text-anchor="middle" font-size="13" fill="#c53030" font-family="sans-serif">종가 ≥ 별지점 → 쿼터매도(LOC) 체결</text>
+  <!-- bottom labels -->
+  <text x="44" y="112" font-size="11" fill="#718096" font-family="sans-serif">하락 (평단↓, 물타기)</text>
+  <text x="656" y="112" text-anchor="end" font-size="11" fill="#718096" font-family="sans-serif">상승 (수익 실현/디리스킹)</text>
+  <text x="350" y="112" text-anchor="middle" font-size="11" fill="#718096" font-family="sans-serif">매수점 = 별지점 − 0.01</text>
+</svg>
+<p class="caption">전반전(T&lt;분할/2)엔 별지점 &gt; 평단, 후반전(T≥분할/2)엔 별% 음수라 별지점 &lt; 평단(평단보다 손절 시도). 3/4 지정가매도(TQQQ+15%/SOXL+20%)는 이 축과 별개로 장중 도달 시 체결.</p>
+
+<h2>1. 원금 · 분할 설정 (예전과 동일)</h2>
+<ul>
+  <li>원금 확정 후, 매수 잔금이 남아도 다른 투자에 쓰지 않음.</li>
+  <li>분할: <strong>20 / 30 / 40분할 권장</strong>. 분할↓ = 공격적·위험, 분할↑ = 방어적·안정.</li>
+  <li>TQQQ·SOXL 동시 진행 시 원금 독립 설정(한 계좌 OK). 같은 종목 다른 분할이면 계좌 분리 권장.</li>
+</ul>
+<p class="muted">예: 2만달러 20분할 → 1회매수금 시작 $1,000 / 40분할 → $500.</p>
+
+<h2>2. T값 정의 (이전 버전과 다름 — 핵심 변화)</h2>
+<p>T = <strong>Turn(진행회차)</strong>. 1.0T = 1회분 진행. 소수점 무제한 연속값(예: 5.165479525).</p>
+<table>
+  <tr><th>사건</th><th>T 변화</th></tr>
+  <tr><td>1회치 매수 완료</td><td><code>+1</code></td></tr>
+  <tr><td>절반치 매수</td><td><code>+0.5</code></td></tr>
+  <tr><td>쿼터매도 발생</td><td><strong>직전T × 0.75</strong> (곱셈)</td></tr>
+  <tr><td>지정가매도 후 LOC 매수(동시)</td><td><code>(직전T × 0.25) + 1</code> 또는 <code>(직전T × 0.25) + 0.5</code></td></tr>
+</table>
+<p class="muted">예: T=7 → 1회 매수 시 T=8 / 절반 매수 시 T=7.5 / 쿼터매도 시 T=7×0.75=5.25.</p>
+<blockquote><strong>구조적 함의</strong>: T는 정수 회차가 아니라 <strong>실제 체결에 따라 변하는 연속값</strong>. 쿼터매도(3/4 잔존)면 ×0.75, 지정가매도(1/4 잔존)면 ×0.25. 매일 <strong>실제 매수·매도 체결량</strong>을 알아야 T를 갱신할 수 있음.</blockquote>
+
+<h2>3. 별지점 (V2.2부터 도입, V4.0 핵심 기준)</h2>
+<p>매수·매도의 기준선. <strong>별지점 = 평단 × (1 + 별%)</strong>, 매일 계산.</p>
+<h3>별% 공식 (종목 × 분할별)</h3>
+<table>
+  <tr><th>종목·분할</th><th>별%</th></tr>
+  <tr><td>20분할 TQQQ</td><td>(15 − 1.5·T) %</td></tr>
+  <tr><td>40분할 TQQQ</td><td>(15 − 0.75·T) %</td></tr>
+  <tr><td>20분할 SOXL</td><td>(20 − 2·T) %</td></tr>
+  <tr><td>40분할 SOXL</td><td>(20 − 1·T) %</td></tr>
+</table>
+<p>일반화: <code>별% = base × (1 − 2T/분할)</code>, <strong>base = TQQQ 15 / SOXL 20</strong>. → T = 분할/2(후반전 시작)에서 별% = 0%, 이후 <strong>마이너스(평단 아래)</strong>.</p>
+<ul>
+  <li><strong>매수점 = 별지점 − 0.01</strong> (매수·매도 겹침 방지), <strong>매도점 = 별지점</strong>.</li>
+  <li>후반전(T ≥ 분할/2)엔 별지점이 평단 아래 → "평단보다 손절을 시도"하는 성격.</li>
+</ul>
+<p class="muted">예: 20분할 SOXL, 평단 $38.30, T=8.6 → 별% = (20−2×8.6)=2.8% → 별지점 = 38.30×1.028 ≈ <strong>$39.37</strong>. 이 값이 매수/매도를 가름.</p>
+
+<h3>별이란 무엇인가 — 직관</h3>
+<p><strong>"별"은 별지점(★)을 가리키는 말</strong>로, 그날 하루의 매수·매도를 가르는 <strong>기준선 가격</strong>이다. 종가가 별 아래면 담고(LOC 매수 체결), 별 이상이면 보유의 1/4을 던진다(쿼터매도 체결). 핵심 성질은 두 가지:</p>
+<ul>
+  <li><strong>별은 평단에 붙어 다닌다</strong> — 별지점 = 평단×(1+별%)이므로, 물타기로 평단이 내려오면 별도 함께 내려온다.</li>
+  <li><strong>별은 T가 커질수록 내려온다</strong> — 별% = base×(1−2T/분할)는 T에 대한 감소 1차 함수. 사이클 초반엔 평단 위 높은 곳(익절 요구치가 높음), 반환점(T=분할/2)에서 평단과 일치, 후반엔 평단 아래(부분 손절도 감수)로 내려간다.</li>
+</ul>
+<blockquote><strong>별의 역할</strong>: 오늘 시장이 어느 쪽으로 마감하든 자동으로 "옳은 행동"(하락 → 매집, 상승 → 부분 익절)이 나가도록 미리 걸어두는 <strong>스위치 가격</strong>. 참고로 첫 매수 직후(T=1, 40분할 TQQQ)의 별%는 14.25%로, 지정가매도선(평단+15%) 바로 아래에서 출발해 매일 조금씩 내려온다.</blockquote>
+
+<h3>예시 ① 별의 일생 — T에 따른 하강 (40분할 TQQQ, 평단 $50 고정 가정)</h3>
+<table>
+  <tr><th>T</th><th>별% = 15 − 0.75T</th><th>별지점 = 50×(1+별%)</th><th>국면 · 의미</th></tr>
+  <tr><td>1</td><td>14.25%</td><td>$57.13</td><td>전반전 시작 — 익절 요구치 최고</td></tr>
+  <tr><td>4</td><td>12%</td><td>$56.00</td><td rowspan="3">전반전: 별이 평단 위 → 쿼터매도는 전부 이익 실현</td></tr>
+  <tr><td>10</td><td>7.5%</td><td>$53.75</td></tr>
+  <tr><td>16</td><td>3%</td><td>$51.50</td></tr>
+  <tr><td>20</td><td>0%</td><td>$50.00</td><td><strong>반환점 — 별 = 평단</strong></td></tr>
+  <tr><td>28</td><td>−6%</td><td>$47.00</td><td rowspan="2">후반전: 별이 평단 아래 → 쿼터매도가 부분 손절 성격</td></tr>
+  <tr><td>36</td><td>−12%</td><td>$44.00</td></tr>
+  <tr><td>39</td><td>−14.25%</td><td>$42.88</td><td>소진 직전 (T&gt;39 → 소진모드)</td></tr>
+</table>
+<p class="caption">실전에선 평단도 매일 변하므로, 별지점은 <strong>평단의 이동 × T의 변화</strong> 두 힘의 합성으로 움직인다 (아래 예시 ③).</p>
+
+<h3>예시 ② 왜 매수점은 별지점 − 0.01인가</h3>
+<p>매수 LOC 리밋(매수점)과 매도 LOC 리밋(별지점)을 1센트 벌려 두면, 어떤 종가든 <strong>정확히 한쪽만</strong> 발동한다. 별지점 $53.75(매수점 $53.74)일 때:</p>
+<table>
+  <tr><th>종가</th><th>쿼터매도 LOC @53.75</th><th>매수 LOC @53.74</th><th>결과</th></tr>
+  <tr><td>$53.75 이상</td><td>체결 (종가 ≥ 리밋)</td><td>미체결 (종가 &gt; 리밋)</td><td>매도만</td></tr>
+  <tr><td>$53.74 이하</td><td>미체결 (종가 &lt; 리밋)</td><td>체결 (종가 ≤ 리밋)</td><td>매수만</td></tr>
+</table>
+<p class="muted">미국 주식 호가는 1센트 단위라 두 리밋 사이에 낄 종가가 없다 → 같은 날 매수·매도가 같은 가격에서 겹치는 일이 구조적으로 차단됨.</p>
+
+<h3>예시 ③ 하루 체결이 별을 움직이는 방향 (40분할 TQQQ)</h3>
+<p>오늘 상태: <strong>평단 $50.00 · T=10 · 보유 100주</strong>. 별% = 7.5% → 별지점 <strong>$53.75</strong>(매수점 $53.74), 지정가매도선 $57.50(평단+15%). 1회매수금 ≈ $500 가정 → 주문: 매수 ½($250) LOC @53.74 = 4주 + ½ LOC @50.00 = 5주 (+아래 사다리), 매도 쿼터 25주 LOC @53.75 + 75주 지정가 @57.50.</p>
+<table>
+  <tr><th>오늘 종가</th><th>체결</th><th>내일 T</th><th>내일 별지점</th><th>해설</th></tr>
+  <tr><td><strong>A. $49.00</strong> (하락)</td><td>매수 LOC 9주 전부 종가 체결 (사다리 미체결 가정)</td><td>10+1 = <strong>11</strong></td><td>평단 $49.92 × 1.0675 ≈ <strong>$53.29</strong></td><td>별이 <strong>내려온다</strong> — 평단↓과 T↑ 둘 다 하강 방향</td></tr>
+  <tr><td><strong>B. $54.20</strong> (별 위 마감)</td><td>쿼터매도 25주 @54.20 체결 (실현익 +$105), 매수는 전부 미체결</td><td>10×0.75 = <strong>7.5</strong></td><td>평단 $50.00 × 1.09375 ≈ <strong>$54.69</strong></td><td>별이 <strong>올라간다</strong> — 매도는 평단을 안 바꾸고 T만 줄이므로, 다음 쿼터매도는 더 높은 종가를 요구</td></tr>
+  <tr><td><strong>C. 장중 $57.50 터치</strong></td><td>지정가매도 75주 체결. 종가도 별 위면 쿼터까지 체결 → <strong>보유 0, 사이클 종료</strong></td><td colspan="2">종가가 매수점 아래로 급락 마감하면 LOC 매수 체결 → 계속: T = 10×0.25+1 = <strong>3.5</strong></td><td>§11-4의 "지정가매도 후 LOC매수 동시" 케이스</td></tr>
+</table>
+<blockquote><strong>비대칭성 요점</strong>: 매수 체결은 별을 끌어내리고, 매도 체결은 별을 밀어올린다. 별은 "방금 익절했으면 다음 익절 눈높이를 올리고, 물렸으면 눈높이를 낮추는" <strong>자기조정 기준선</strong>이다.</blockquote>
+
+<h3>예시 ④ 후반전의 별 — 평단 아래 부분 손절</h3>
+<p>평단 $50.00 · T=28 (40분할 TQQQ): 별% = 15 − 0.75×28 = <strong>−6%</strong> → 별지점 <strong>$47.00</strong>. 후반전 규칙대로 매수는 전액 LOC @46.99, 쿼터매도는 LOC @47.00 — <strong>평단보다 $3 아래에 매도를 건다</strong>.</p>
+<ul>
+  <li>종가 $47.50 마감 → 쿼터매도 체결(주당 −$2.50 손실 실현) → T = 28×0.75 = <strong>21</strong> → 별% = −0.75% → 별지점 <strong>$49.63</strong>. 손실을 잘라 T를 되돌리면 별이 평단 근처로 복귀한다.</li>
+  <li>즉 후반전 쿼터매도는 단순 손절이 아니라 <strong>회차(T)를 되사서 소진(T&gt;39)을 늦추는 디리스킹 비용</strong>으로 이해하는 게 정확하다.</li>
+</ul>
+
+<h2>4. 매수금 (이전 버전과 다름 — 매일 변동)</h2>
+<p><strong>1회매수금 = 잔금 ÷ (분할 − T)</strong>. (20분할: 잔금/(20−T), 40분할: 잔금/(40−T))</p>
+<p class="muted">예: 원금 $20,000·40분할. 1회차 시도 $500 중 실제 $478 사용 → 잔금 $19,522, T=1 → 2회차 시도액 = 19,522 / (40−1) = <strong>$500.56</strong>. T가 +1/+0.5/×0.75 무엇이든 매일 재계산되어 미세 변동.</p>
+
+<h2>5. 매수 방법 (매일 걸어둠, 전부 LOC)</h2>
+<h3>(1) 첫 매수 (보유 0, T=0)</h3>
+<ul>
+  <li>무조건 1회 매수 시도 → 전날보다 적당히 큰 값(<strong>종가 +10~15%</strong>)으로 LOC 매수(큰수) + <strong>아래로 LOC 사다리</strong>.</li>
+</ul>
+<p class="muted">예(1회 $617.89, TQQQ 종가 $45.93): 큰수 $51.44(≈+12%)에 12개 LOC + $47.53에 1개 + $44.13에 1개 … 종가 $44 마감이면 14개 체결.</p>
+<h3>(2) 전반전 매수 (T = 1 ~ 분할/2 미만)</h3>
+<ul>
+  <li>40분할이면 T=0~19.999…가 전반전.</li>
+  <li>1회매수금의 <strong>절반 = 별지점 LOC</strong>, 나머지 <strong>절반 = 평단 LOC</strong> + 큰 하락 대비 <strong>아래 LOC 사다리 추가</strong>. 전부 LOC.</li>
+</ul>
+<p class="muted">예(별지점 78.12, 평단 69.75): LOC 78.11에 3개 + 69.75에 4개 + 67.40에 1개 + 59.91에 1개 …</p>
+<h3>(3) 후반전 매수 (T = 분할/2 ~ 분할−1)</h3>
+<ul>
+  <li>40분할이면 T=20~39가 후반전. <strong>T &gt; 39 초과 시 소진모드로 진입</strong>(별도 글).</li>
+  <li>별지점이 평단 아래. <strong>1회매수금 전체 = 별지점 LOC</strong> + 아래 LOC 사다리. 전부 LOC.</li>
+</ul>
+<p class="muted">예(별지점 59.55): LOC 59.54에 9개 + 56.85에 1개 + 51.68에 1개 + 47.37에 1개 …</p>
+
+<h3>LOC 사다리란 무엇인가 — 직관 <span class="muted">(2026-07-12 추가)</span></h3>
+<p><strong>사다리 = 그날의 메인 매수(별지점/평단 LOC) 아래에 더 낮은 가격대로 여러 단 걸어두는 소량 LOC 매수.</strong> 매일 새로 걸고, 미체결 단은 그날로 소멸한다. 급락일수록 아래 단까지 연쇄 발동해 "더 싸게, 더 많이" 담는 장치다.</p>
+<ul>
+  <li><strong>체결 원리</strong>: LOC 매수는 <strong>종가 ≤ 리밋이면 리밋가가 아니라 종가로</strong> 체결된다. 계단식으로 걸어두면 — 보합·소폭 하락 마감엔 맨 위 단(별지점·평단)만, 급락 마감엔 종가보다 리밋이 높은 단이 <strong>전부</strong> 발동하고 모두 그날 종가(가장 싼 가격)에 체결된다.</li>
+  <li><strong>귀결</strong>: 하락 깊이에 비례해 매수량이 자동으로 늘어난다. 규칙의 개념적 기준은 별지점이지만 실제 주문장에 나가는 것은 매일 사다리 포함 <strong>다건 주문</strong> — V2.2 대비 "급락장 매집력"(§9 장단점 표)이 바로 이 축이다. 세 국면(첫매수·전반·후반) 모두 "메인 + 사다리"가 한 세트.</li>
+</ul>
+<p><strong>예시 — 첫 매수 사다리의 체결 (1회분 $617.89, TQQQ 종가 $45.93)</strong></p>
+<table>
+  <tr><th>주문</th><th>리밋가</th><th>수량</th><th>다음날 종가 $44 마감 시</th></tr>
+  <tr><td>큰수 LOC (종가+12%)</td><td>$51.44</td><td>12개</td><td>체결 @ $44</td></tr>
+  <tr><td>사다리 1단</td><td>$47.53</td><td>1개</td><td>체결 @ $44</td></tr>
+  <tr><td>사다리 2단</td><td>$44.13</td><td>1개</td><td>체결 @ $44</td></tr>
+</table>
+<p class="muted">14개 × $44 = $616 ≤ 1회분 $617.89. 기본 수량(12개)을 리밋가($51.44) 기준으로 계산해 두면 실제 체결은 그보다 싼 종가로 이뤄져 예산이 남고, 사다리 단들이 그 잉여를 흡수한다. 단, 이는 원문 예시의 숫자가 맞아떨어지는 <strong>역산 해석</strong>이며 단 간격·단 수·수량 배분의 공식 규칙은 미확보(§11-3).</p>
+<div class="warn"><strong>구현 주의</strong>: ① 배분 공식 미확보(§11-3) — 원문 예시 모사 수준에서 시작해야 함. ② 아래 단일수록 현재가 대비 괴리가 커져 <strong>매매거부(±20%)</strong> 한도와 충돌 가능(§8 큰수매수와 같은 계열 문제). ③ 하루 다건 동시 주문 + 부분체결 처리 필요(§10).</div>
+
+<h2>6. 매도 방법 (매일 걸어둠, 전·후반 공통)</h2>
+<ul>
+  <li><strong>쿼터매도</strong>: 보유수량의 <strong>1/4</strong>을 <strong>별지점에 LOC 매도</strong>.</li>
+  <li><strong>최종매도</strong>: 나머지(3/4)를 <strong>지정가매도</strong> — <strong>TQQQ 평단+15% / SOXL 평단+20%</strong>.</li>
+  <li>매수와 달리 별지점은 LOC 매도, 최종은 지정가매도.</li>
+  <li>지정가매도는 프리장(서머 17시/비서머 18시)에 걸어 <strong>프리~본장~애프터</strong> 전체 활용. 주간장 미사용. LOC는 예약/본장 아무 때나.</li>
+</ul>
+<p class="muted">예(별지점 59.55): LOC 매도 59.55에 35개 + 지정가매도 75.76에 106개.</p>
+
+<h2>7. 종료 시점</h2>
+<ul>
+  <li>보유수량 <strong>0</strong>이면 종료.</li>
+  <li>지정가매도 후 급락해 LOC 매수가 발생하면 종료 아님 → 계속 진행.</li>
+  <li>종료 후 처음 매수로 복귀. 수익금 재투입(복리) vs 원금 유지(단리)는 선택. (저자는 1년 복리 후 원금 재설정)</li>
+</ul>
+
+<h2>8. 큰수매수 (방법론 무관, 매매거부 회피용)</h2>
+<p>증권사는 현재가 대비 약 20% 벗어난 주문을 매매실수 방지로 거부함. 3배 레버리지 하락장에서 이를 극복하려 <strong>큰수 매수</strong> 개념으로 주문을 성립시킴. (세부는 별도 카페글 — 미확보)</p>
+
+<h2>9. V2.2(현재 구현) → V4.0 차이 요약</h2>
+<table>
+  <tr><th>항목</th><th>V2.2 (현재 코드)</th><th>V4.0 (본 문서)</th></tr>
+  <tr><td>기준식</td><td>(10 − T/2)% 범용 고정</td><td>별% = base×(1−2T/분할), <b>base 15(TQQQ)/20(SOXL)</b> — 종목·분할 의존</td></tr>
+  <tr><td>T</td><td>정수 회차(round++)</td><td><b>연속값</b>: 매수 +1/+0.5, <b>쿼터매도 ×0.75</b>, 지정가매도 ×0.25</td></tr>
+  <tr><td>1회매수금</td><td>원금/분할 고정</td><td><b>잔금/(분할−T) 매일 변동</b></td></tr>
+  <tr><td>매수 주문</td><td>1~2건</td><td>별지점/평단 + <b>아래 LOC 사다리 다수</b></td></tr>
+  <tr><td>매도</td><td>1/4 LOC@(10−T/2)% + 3/4 @+10%</td><td>1/4 LOC@별지점 + 3/4 지정가 <b>TQQQ+15%/SOXL+20%</b></td></tr>
+  <tr><td>소진 처리</td><td>−10% 시장가 손절→리셋(v1식)</td><td><b>소진모드(리버스)</b> 별도</td></tr>
+  <tr><td>종목/분할</td><td>파라미터 있으나 공식엔 미반영</td><td><b>공식에 직접 반영</b>(종목·분할 필수 입력)</td></tr>
+</table>
+
+<h3>장단점 비교 — 어느 쪽이 무엇에 유리한가</h3>
+<table>
+  <tr><th>측면</th><th>V2.2 (현재 코드)</th><th>V4.0</th></tr>
+  <tr><td>구현·검증 난도</td><td><strong>✓ 유리</strong> — 상태가 round 정수 하나. 순수함수 코어 + 테스트로 이미 검증·LIVE 가동 중</td><td>불리 — T 연속값·잔금·체결 추적 등 영속 상태 3종. 버그 표면적과 테스트 복잡도 급증(§10)</td></tr>
+  <tr><td>체결 데이터 의존성</td><td><strong>✓ 낮음</strong> — 체결을 몰라도 회차 진행 가능(매일 주문만 내면 됨)</td><td>높음 — 매일 실제 체결량(+1/+0.5)과 매도 종류(×0.75/×0.25)를 알아야 T 갱신. 동기화가 하루라도 누락되면 상태가 오염됨</td></tr>
+  <tr><td>사이클 수명 (소진 저항)</td><td>불리 — 쿼터매도로 보유가 줄어도 round는 계속 증가 → 익절이 소진을 늦추지 못함</td><td><strong>✓ 유리</strong> — 쿼터매도 ×0.75가 회차를 "되돌림" → 횡보·완만한 상승 구간에서 사이클이 훨씬 오래 버팀 (V4.0의 핵심 개선)</td></tr>
+  <tr><td>자금 효율</td><td>불리 — 1회매수금 = 원금/분할 고정. 사이클 중 잔금 변화 미반영</td><td><strong>✓ 유리</strong> — 잔금/(분할−T)로 매일 재계산 → 쿼터매도 회수 자금이 자동으로 매수금에 재투입</td></tr>
+  <tr><td>종목 적합성</td><td>불리 — (10−T/2)% 범용 고정, TQQQ/SOXL 변동성 차이 무시</td><td><strong>✓ 유리</strong> — base(15/20)와 분할이 공식에 직접 반영되어 종목별 변동성 프로파일에 맞음</td></tr>
+  <tr><td>급락장 매집력</td><td>제한적 — 주문 1~2건, 급락일에도 1회분만 체결</td><td><strong>✓ 유리</strong> — LOC 사다리로 급락일수록 더 싸게 더 많이 담아 평단 개선 가속. 단 자금 소진 속도도 그만큼 빨라질 수 있음</td></tr>
+  <tr><td>디리스킹 방식</td><td>거침 — 소진 시 −10% 일괄 시장가 손절 → 리셋 (한 방에 확정)</td><td><strong>✓ 점진적</strong> — 후반전 별지점이 평단 아래로 내려가 1/4씩 부분 손절(§3 예시 ④). 단 최종 단계인 소진모드 규칙이 미확보 상태</td></tr>
+  <tr><td>주문 운영 복잡도</td><td><strong>✓ 단순</strong> — 하루 1~2건, 매매거부·부분체결 걱정 적음</td><td>복잡 — 사다리 다건 + 쿼터 LOC + 지정가. 매매거부(±20%)·부분체결·API 호출량 처리 필요</td></tr>
+  <tr><td>규칙 완결성</td><td><strong>✓ 완결</strong> — 모든 경로가 현재 코드로 정의됨</td><td>미완 — 소진모드·큰수매수·사다리 배분·반올림 규칙 미확정(§11). 원문 추가 확보 전엔 반쪽 구현</td></tr>
+</table>
+<div class="ok"><strong>전략 자체는 V4.0이 구조적으로 우수</strong>: 사이클 수명·자금 효율·종목 적합성·점진적 디리스킹 모두 개선이며, 특히 "쿼터매도가 T를 되돌리는" 메커니즘은 V2.2에 없는 생존성 개선이다. V2.2의 우위는 전략이 아니라 <strong>단순성과 운영 안정성</strong>에 있다.</div>
+<div class="warn"><strong>전환 판단</strong>: V4.0의 우수성은 <strong>체결 기반 상태 관리가 정확할 때만</strong> 실현된다. 체결 동기화가 수동인 현 운영 상태에서는 T가 틀어질 위험이 크고, §11 미확정 규칙(특히 소진모드) 확보 전 구현은 공백이 남는다. 안전한 순서: ① V2.2 LIVE 유지 → ② 체결 동기화 자동화 구축(§10 선행 과제 상세) → ③ 소진모드 원문 확보 → ④ V4.0 전환 검토.</div>
+
+<h2>10. 구현 시 아키텍처 함의 (도입 결정 시 참고)</h2>
+<div class="warn">
+V4.0은 코어 함수 교체 수준이 아니라 <strong>영속적 fill-aware 상태</strong>가 필요:
+<ul>
+  <li><strong>T 영속화 + 체결 기반 갱신</strong>: 매수 체결량(+1/+0.5)·매도 종류(쿼터 ×0.75/지정가 ×0.25)를 매일 반영. 현재 코드는 매수 체결을 추적하지 않고 round만 증가시킴 → 신규 필요.</li>
+  <li><strong>잔금(cash) 영속화</strong>: 1회매수금 = 잔금/(분할−T). 사이클별 잔금 회계(원금−투입+회수) 필요. 현재는 원금 고정 + 계좌 매수가능금액 확인만.</li>
+  <li><strong>종목·분할을 전략 공식 입력으로</strong>: base(TQQQ 15/SOXL 20), 분할값이 별%·매수금에 직접 사용.</li>
+  <li><strong>LOC 사다리</strong>: 하루 다건 매수(별지점/평단 + 아래 여러 단). 동시 다건 주문·매매거부(20%) 처리.</li>
+  <li><strong>소진모드(리버스)</strong> 별도 구현 필요(자료 확보 후).</li>
+</ul>
+</div>
+
+<h3>선행 과제 상세 — 체결 동기화 자동화 (V4.0의 전제조건)</h3>
+<p>V4.0의 모든 상태 갱신은 <strong>실제 체결 이벤트</strong>로만 정의된다 — 매수 체결 +1/+0.5, 쿼터매도 ×0.75, 지정가매도 ×0.25 (§2). 체결을 자동·신뢰 가능하게 반영하지 못하면 T가 실제 포지션과 어긋나고, 어긋난 T는 별지점·매수금·매도수량 <strong>전부</strong>를 오염시킨다. 즉 체결 동기화는 V4.0의 부가 기능이 아니라 <strong>성립 조건</strong>이다. V2.2 운영에서도 누적 실현수익 표시와 사이클 종료(보유 0) 판정이 이 동기화에 의존한다.</p>
+
+<p><strong>현재 상태 (as-is)</strong> — <code>syncSellFills</code> (<code>src/actions/infinite-buy.ts</code>):</p>
+<table>
+  <tr><th>항목</th><th>현재 구현</th></tr>
+  <tr><td>트리거</td><td>대시보드 <strong>"토스 체결 동기화" 버튼</strong>(사이클별 수동) 또는 일회성 스크립트. <strong>자동 실행 경로 없음</strong></td></tr>
+  <tr><td>범위</td><td><strong>SELL 주문만</strong>. 매수 체결은 미추적(round 증가로 갈음)</td></tr>
+  <tr><td>방식</td><td>토스 CLOSED 주문 조회(사이클 생성일 이후·심볼 필터) → <code>tossOrderId</code> 매칭 → <code>status=filled</code> + 체결량·평균체결가·체결시각 저장</td></tr>
+  <tr><td>멱등성</td><td>이미 filled이고 수량 동일하면 skip → <strong>반복 실행 안전</strong> (자동화 시 그대로 재사용 가능한 성질)</td></tr>
+  <tr><td>한계</td><td>익절이 나도 버튼 누르기 전까지 누적수익·매도이력 미반영. 매수 체결 미추적이라 V4.0의 T 갱신(+1/+0.5)·잔금 회계 입력이 없음</td></tr>
+</table>
+
+<p><strong>자동화 설계 (to-be)</strong>:</p>
+<table>
+  <tr><th>항목</th><th>설계</th></tr>
+  <tr><td>실행 시점</td><td>worker 루프에 편입: ① <strong>각 runCycle 직전</strong>에 전일 체결 동기화 → 그 결과로 T/round·평단 갱신 → 주문 계산 (불변식: <strong>"상태 갱신은 항상 최신 체결 반영 후"</strong>) ② 장 마감 직후 1회 추가 실행(대시보드 최신화용)</td></tr>
+  <tr><td>범위 확장</td><td><strong>BUY 체결 포함</strong> — V4.0의 +1/+0.5 판정과 잔금 회계의 입력. V2.2에서도 평단·보유수량 검증에 즉시 유용</td></tr>
+  <tr><td>코드 배치</td><td>동기화 로직을 서버 액션에서 <code>src/lib/infinite-buy/sync.ts</code>로 추출해 <strong>worker와 서버 액션이 공유</strong>(액션은 얇은 래퍼로). worker가 서버 액션을 직접 부르거나 HTTP self-호출하는 구조는 금지</td></tr>
+  <tr><td>부분체결</td><td><code>filledQty &lt; quantity</code>를 일급 케이스로 — V4.0 "1회분/절반" 판정의 직접 입력. 절반 판정 기준(수량 vs 금액, 경계값)은 §11 미확정 규칙과 함께 정밀화 필요</td></tr>
+  <tr><td>실패 정책</td><td>동기화 실패 시: <strong>V4.0은 해당 사이클 주문 보류</strong>(어긋난 T로 주문 내는 것보다 하루 쉬는 게 안전), V2.2는 경고 로그 후 진행 허용(회차가 체결 비의존이므로). 다음 15분 폴에서 자동 재시도</td></tr>
+  <tr><td>정합성 검증</td><td>동기화 후 <strong>Σ매수체결 − Σ매도체결 = 토스 실제 보유수량</strong> 크로스체크. 불일치 시 알람 + 해당 사이클 자동 진행 중단 — 상태 오염을 다음 주문 전에 잡는 마지막 방어선</td></tr>
+  <tr><td>API 부하</td><td>토스 주문 조회는 실계좌 API — 15분 폴마다 호출하지 말고 <strong>runCycle 직전 + 장 마감 후로 제한</strong>. 계좌목록 60초 캐시·ACCOUNT 초당 1회 제한과 공존해야 함</td></tr>
+</table>
+
+<div class="ok"><strong>V2.2에서의 즉시 효용</strong>: 이 자동화는 V4.0 도입과 무관하게 지금 가치가 있다 — ① 누적 실현수익이 버튼 없이 자동 갱신, ② 중간 익절로 보유 0이 되면 다음 폴에서 즉시 감지(FNGU가 round 6 익절 후 방치될 뻔한 유형의 갭을 운영 차원에서도 차단), ③ V4.0 전환 시 필요한 체결 데이터가 미리 쌓임. <strong>V4.0 선행 과제 중 가장 먼저, 독립적으로 착수 가능한 항목.</strong></div>
+<ol>
+  <li><strong>소진모드(리버스 무한매수법)</strong> 전체 규칙 — T &lt; 1회분 시점 처리, 일반모드 복귀 조건.</li>
+  <li><strong>큰수매수</strong> 세부(카페글 53077).</li>
+  <li>LOC 사다리의 <strong>단 간격·개수·수량 배분</strong> 규칙(예시만 있고 공식 불명확).</li>
+  <li>지정가매도 후 LOC매수 동시일 때 T=(×0.25 + 1/0.5) 트리거 조건 정밀화.</li>
+  <li>매도 쿼터 1/4·지정가 3/4의 정수 반올림·별지점 반올림 규칙.</li>
+</ol>
+
+<h2>부록 A. $10,000 · 40분할 · TQQQ — 전 회차(T=0~40) 주문 가격표 <span class="muted">(2026-07-12 추가)</span></h2>
+<p><strong>전제</strong>: 원금 $10,000 · 40분할 → 1회매수금 <strong>$250</strong> (매 회차 정확히 소진하면 잔금/(40−T) = 250으로 전 구간 고정, §4). 별% = 15 − 0.75T. <strong>평단 $50 고정 가정</strong>(§3 예시 ①과 같은 앵커) — 실제로는 매수 체결마다 평단이 내려가므로, 달러 값은 <code>표값 × (실제 평단 ÷ 50)</code>으로 재계산한다(모든 가격이 평단에 선형비례; 수량은 원금에 비례). 매도 지정가(¾)는 전 구간 공통 <strong>평단+15% = $57.50</strong>.</p>
+<table>
+  <tr><th>T</th><th>별%</th><th>매수점($, LOC 리밋)</th><th>쿼터매도가($) = 별지점</th><th>잔금($, 주문 전)</th></tr>
+  <tr><th colspan="5">첫매수 (T=0) — 1회분 $250 큰수 LOC ≈ 4주 (종가 $50 가정) · 매도 없음(보유 0)</th></tr>
+  <tr><td>0</td><td>—</td><td colspan="2">큰수 LOC = 종가+10~15% (종가 $50 가정 시 55.00~57.50)</td><td>10,000</td></tr>
+  <tr><th colspan="5">전반전 (T=1~19) — 매수: ½회분($125) @매수점 = 2주 + ½회분($125) @평단 50.00 = 2주 · 매도: ¼ @쿼터매도가 LOC + ¾ @57.50 지정가</th></tr>
+  <tr><td>1</td><td>+14.25%</td><td>57.12</td><td>57.13</td><td>9,750</td></tr>
+  <tr><td>2</td><td>+13.50%</td><td>56.74</td><td>56.75</td><td>9,500</td></tr>
+  <tr><td>3</td><td>+12.75%</td><td>56.37</td><td>56.38</td><td>9,250</td></tr>
+  <tr><td>4</td><td>+12.00%</td><td>55.99</td><td>56.00</td><td>9,000</td></tr>
+  <tr><td>5</td><td>+11.25%</td><td>55.62</td><td>55.63</td><td>8,750</td></tr>
+  <tr><td>6</td><td>+10.50%</td><td>55.24</td><td>55.25</td><td>8,500</td></tr>
+  <tr><td>7</td><td>+9.75%</td><td>54.87</td><td>54.88</td><td>8,250</td></tr>
+  <tr><td>8</td><td>+9.00%</td><td>54.49</td><td>54.50</td><td>8,000</td></tr>
+  <tr><td>9</td><td>+8.25%</td><td>54.12</td><td>54.13</td><td>7,750</td></tr>
+  <tr><td>10</td><td>+7.50%</td><td>53.74</td><td>53.75</td><td>7,500</td></tr>
+  <tr><td>11</td><td>+6.75%</td><td>53.37</td><td>53.38</td><td>7,250</td></tr>
+  <tr><td>12</td><td>+6.00%</td><td>52.99</td><td>53.00</td><td>7,000</td></tr>
+  <tr><td>13</td><td>+5.25%</td><td>52.62</td><td>52.63</td><td>6,750</td></tr>
+  <tr><td>14</td><td>+4.50%</td><td>52.24</td><td>52.25</td><td>6,500</td></tr>
+  <tr><td>15</td><td>+3.75%</td><td>51.87</td><td>51.88</td><td>6,250</td></tr>
+  <tr><td>16</td><td>+3.00%</td><td>51.49</td><td>51.50</td><td>6,000</td></tr>
+  <tr><td>17</td><td>+2.25%</td><td>51.12</td><td>51.13</td><td>5,750</td></tr>
+  <tr><td>18</td><td>+1.50%</td><td>50.74</td><td>50.75</td><td>5,500</td></tr>
+  <tr><td>19</td><td>+0.75%</td><td>50.37</td><td>50.38</td><td>5,250</td></tr>
+  <tr><th colspan="5">후반전 (T=20~39) — 매수: 1회분($250) 전액 @매수점 (평단 이하) = 5주 · 매도 동일: ¼ @쿼터매도가 LOC + ¾ @57.50 지정가</th></tr>
+  <tr><td>20</td><td>0.00%</td><td>49.99</td><td>50.00</td><td>5,000</td></tr>
+  <tr><td>21</td><td>−0.75%</td><td>49.62</td><td>49.63</td><td>4,750</td></tr>
+  <tr><td>22</td><td>−1.50%</td><td>49.24</td><td>49.25</td><td>4,500</td></tr>
+  <tr><td>23</td><td>−2.25%</td><td>48.87</td><td>48.88</td><td>4,250</td></tr>
+  <tr><td>24</td><td>−3.00%</td><td>48.49</td><td>48.50</td><td>4,000</td></tr>
+  <tr><td>25</td><td>−3.75%</td><td>48.12</td><td>48.13</td><td>3,750</td></tr>
+  <tr><td>26</td><td>−4.50%</td><td>47.74</td><td>47.75</td><td>3,500</td></tr>
+  <tr><td>27</td><td>−5.25%</td><td>47.37</td><td>47.38</td><td>3,250</td></tr>
+  <tr><td>28</td><td>−6.00%</td><td>46.99</td><td>47.00</td><td>3,000</td></tr>
+  <tr><td>29</td><td>−6.75%</td><td>46.62</td><td>46.63</td><td>2,750</td></tr>
+  <tr><td>30</td><td>−7.50%</td><td>46.24</td><td>46.25</td><td>2,500</td></tr>
+  <tr><td>31</td><td>−8.25%</td><td>45.87</td><td>45.88</td><td>2,250</td></tr>
+  <tr><td>32</td><td>−9.00%</td><td>45.49</td><td>45.50</td><td>2,000</td></tr>
+  <tr><td>33</td><td>−9.75%</td><td>45.12</td><td>45.13</td><td>1,750</td></tr>
+  <tr><td>34</td><td>−10.50%</td><td>44.74</td><td>44.75</td><td>1,500</td></tr>
+  <tr><td>35</td><td>−11.25%</td><td>44.37</td><td>44.38</td><td>1,250</td></tr>
+  <tr><td>36</td><td>−12.00%</td><td>43.99</td><td>44.00</td><td>1,000</td></tr>
+  <tr><td>37</td><td>−12.75%</td><td>43.62</td><td>43.63</td><td>750</td></tr>
+  <tr><td>38</td><td>−13.50%</td><td>43.24</td><td>43.25</td><td>500</td></tr>
+  <tr><td>39</td><td>−14.25%</td><td>42.87</td><td>42.88</td><td>250</td></tr>
+  <tr><th colspan="5">소진 (T &gt; 39)</th></tr>
+  <tr><td>40</td><td>−15.00%</td><td colspan="2">일반모드 주문 없음 → 소진모드(리버스, §11-1 미확보) · 참고 극한 별지점 42.50</td><td>0</td></tr>
+</table>
+<p class="caption">잔금 열은 매도 없이 매 회차 $250씩 소진하는 직선 물타기 경로 기준. 쿼터매도가 체결되면 T ×0.75로 위쪽 행으로 점프하고 잔금에 회수금이 더해져 이 열과 달라진다. 실제 T는 연속값이므로 정수 행 사이 값은 공식(별% = 15−0.75T)으로 계산. LOC 사다리(§5)는 이 표에 포함되지 않은 별도 추가분. 수량(2주/5주 등)은 평단 $50 앵커 기준 — 평단이 다르면 <code>floor(금액÷가격)</code>으로 재계산.</p>
+<div class="ok"><strong>실행 가능성 — $10,000이면 정수 주식으로 전 구간 작동한다.</strong> 평단 $50 앵커 기준 전반전 각 주문 2주(합 4주/일), 후반전 5주/일, 첫매수 4주. 각 주문 최소 1주 보장 조건은 ½회분($125) ≥ 최고 매수점(평단×1.1425), 즉 <strong>평단 ≤ 약 $109</strong>까지 유효(= 원금 ≥ 91.4×평단과 동일). 단 수량은 평단이 높을수록 줄어든다 — 예: 평단 $70.96(실전 TQQQ 사이클 수준)이면 전반 1주+1주, 후반 3~4주. 소수점 매수 없이도 성립하므로 토스 LOC 정수 주문으로 충분.</div>
+</body>
+</html>

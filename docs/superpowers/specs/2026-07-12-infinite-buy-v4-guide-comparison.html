@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>무한매수법 V4.0 문서 비교 — Downloads 가이드 vs 레포 레퍼런스</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .ok { border-left: 3px solid #38a169; background: #f0fff4; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .warn { border-left: 3px solid #c53030; background: #fff5f5; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .muted { color: #718096; font-size: 0.9em; }
+  .match { color: #276749; font-weight: 600; }
+  .only { color: #975a16; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>무한매수법 V4.0 문서 비교</h1>
+<p class="muted">작성일 2026-07-12 · 비교 대상:<br>
+<strong>A</strong> = <code>~/Downloads/laoer-infinite-buying-v4-guide.html</code> (신규 입수)<br>
+<strong>B</strong> = <code>docs/superpowers/specs/2026-07-08-infinite-buy-v4.0-reference.html</code> (레포 기존 레퍼런스)</p>
+
+<div class="ok"><strong>결론 요약</strong>: 두 문서의 <strong>핵심 규칙은 모순 없이 전부 일치</strong>한다 (별% 공식, T 갱신, 매수 배분, 매도 2단, 1회매수금, 소진모드 진입, 수치 예시까지 동일). 차이는 <strong>커버리지와 출처</strong>다 — B가 실행 세부(LOC 사다리·큰수매수·프리장 운영)와 구현 관점(V2.2 비교·체결 동기화 설계)을 훨씬 넓게 다루고, A는 B에 없는 메타 정보 4가지(통합식의 비공식성, V3.0 계보, 30분할 추론식, 소진모드 조건의 공식화)를 담고 있다.</div>
+
+<h2>1. 두 문서의 정체</h2>
+<table>
+  <tr><th></th><th>A — Downloads 가이드</th><th>B — 레포 레퍼런스</th></tr>
+  <tr><td>출처</td><td><strong>quantstack.app</strong> 공개 정리 기반 (문서 스스로 "비공식 학습 자료"임을 명시, V4.0/V3.0/V2.2/계산기 링크 포함)</td><td>라오어 카페 <strong>원문</strong> "무한매수법 V4.0 방법론 _ (일반모드)" 기반 학습 노트</td></tr>
+  <tr><td>형식</td><td>Codex 시각화 위젯 — iframe <code>srcdoc</code> + CDN 의존(floating-ui, lucide). 스크립트는 툴팁·아이콘용이라 차단돼도 본문 열람 가능</td><td>자체 완결형 HTML (외부 의존성 0), CLAUDE.md 표준 템플릿</td></tr>
+  <tr><td>성격</td><td>규칙 요약 + 수치 검산표. 간결한 카드/표 중심</td><td>규칙 + 직관 해설(별의 일생 등 예시 4종) + V2.2 대비 + <strong>구현 아키텍처 함의</strong></td></tr>
+  <tr><td>주의 표기</td><td>"첨부 원문은 재가공·편집 자료의 외부 제공 금지" — 개인 학습용 한정</td><td>"구현 전 원문 재검증 권장"</td></tr>
+</table>
+
+<h2>2. 핵심 규칙 대조 — 전 항목 일치</h2>
+<table>
+  <tr><th>항목</th><th>A</th><th>B</th><th>판정</th></tr>
+  <tr><td>별% 공식 (종목×분할)</td><td>20분할 TQQQ (15−1.5T)% · 40분할 TQQQ (15−0.75T)% · 20분할 SOXL (20−2T)% · 40분할 SOXL (20−T)%</td><td>동일 (40분할 SOXL을 (20−1·T)%로 표기)</td><td class="match">일치</td></tr>
+  <tr><td>통합식</td><td><code>별% = P×(1−2T/N)</code>, P=15/20</td><td><code>별% = base×(1−2T/분할)</code>, base=15/20</td><td class="match">일치 (기호만 다름)</td></tr>
+  <tr><td>별지점·매수점</td><td>별지점 = 평단×(1+별%) · 매수점 = 별지점−$0.01 · 매도점 = 별지점</td><td>동일</td><td class="match">일치</td></tr>
+  <tr><td>T 갱신</td><td>+1 / +0.5 / 쿼터매도 ×0.75 / 지정가매도 후 LOC매수 ×0.25+1 (또는 +0.5)</td><td>동일</td><td class="match">일치</td></tr>
+  <tr><td>전반전 매수</td><td>1≤T&lt;N/2 · ½ 별지점 LOC + ½ 평단 LOC</td><td>동일 (0&lt;T&lt;분할/2)</td><td class="match">일치</td></tr>
+  <tr><td>후반전 매수</td><td>N/2≤T≤N−1 · 1회분 전체 별지점 LOC</td><td>동일</td><td class="match">일치</td></tr>
+  <tr><td>매도 (전·후반 공통)</td><td>1/4 별지점 LOC + 나머지 지정가 TQQQ+15% / SOXL+20%</td><td>동일</td><td class="match">일치</td></tr>
+  <tr><td>1회매수금</td><td>잔금 기반 매일 재계산 — 예: 19,522÷(40−1)=$500.56</td><td><code>잔금÷(분할−T)</code> — 같은 예시, 같은 수치</td><td class="match">일치</td></tr>
+  <tr><td>소진모드 진입</td><td><code>N−T&lt;1</code> (남은 회차 1 미만) — 예: T=38.8+1=39.8 → 잔여 0.2회 → 진입</td><td>"T &gt; 분할−1" + "1회분 미만 남은 시점"</td><td class="match">일치 (동치 표현)</td></tr>
+  <tr><td>종료</td><td>보유량 0이면 종료</td><td>동일 (+ 복리/단리 선택 세부)</td><td class="match">일치</td></tr>
+  <tr><td>검산 예시</td><td>SOXL N=20·T=8.6·평단 38.30 → 별% 2.8%·별지점 39.37</td><td>동일 예시·동일 수치</td><td class="match">일치</td></tr>
+</table>
+<p class="muted">A의 수치를 독립 검산함: T=25·N=40·TQQQ → 별% −3.75%·별지점 $48.13 ✓ / T=39 → −14.25% ✓ / 쿼터매도 후 29.25 → −6.9375% ✓. 계산 오류 없음.</p>
+
+<h2>3. B에만 있는 내용 (A에는 없음)</h2>
+<table>
+  <tr><th>항목</th><th>내용</th><th>비고</th></tr>
+  <tr><td class="only">첫 매수 세부</td><td>종가 <strong>+10~15% 큰수 LOC</strong> + 아래 LOC 사다리</td><td>A는 "T=0에서 1회분을 LOC로 시도"로만 단순화 — 모순은 아니나 A만 보면 큰수 개념을 놓침</td></tr>
+  <tr><td class="only">LOC 사다리</td><td>매일 별지점/평단 주문 아래로 여러 단의 LOC 추가 (급락 대비)</td><td>A에 전혀 없음 — <strong>가장 큰 누락</strong>. V4.0 매수의 실행 절반이 사다리</td></tr>
+  <tr><td class="only">큰수매수 (§8)</td><td>증권사 ±20% 매매거부 회피 목적</td><td>세부는 양쪽 다 미확보 (카페 53077)</td></tr>
+  <tr><td class="only">지정가매도 운영</td><td>프리장(서머 17시/비서머 18시)에 걸어 프리~본장~애프터 활용, 주간장 미사용</td><td>실행 시점 규칙 — A 없음</td></tr>
+  <tr><td class="only">원금·분할 운영</td><td>종목별 원금 독립, 같은 종목 다른 분할이면 계좌 분리, 종료 후 복리/단리 선택</td><td></td></tr>
+  <tr><td class="only">직관 해설</td><td>"별"의 성질(평단 추종·T에 따른 하강), 예시 ①~④ (별의 일생, −0.01의 이유, 체결이 별을 미는 방향, 후반전 부분 손절)</td><td></td></tr>
+  <tr><td class="only">V2.2 대비 + 전환 판단</td><td>차이표, 장단점 8개 축, 안전한 전환 순서 4단계</td><td>레포 구현 맥락 전용</td></tr>
+  <tr><td class="only">구현 함의 (§10)</td><td>T·잔금 영속화, 체결 동기화 as-is(<code>syncSellFills</code>)/to-be 설계, 정합성 크로스체크</td><td>레포 구현 맥락 전용</td></tr>
+  <tr><td class="only">미확보 목록 (§11)</td><td>소진모드 전체 규칙, 사다리 배분 공식, T 트리거 정밀화, 반올림 규칙</td><td>A도 "소진모드 자료 없음"만 언급</td></tr>
+</table>
+
+<h2>4. A에만 있는 내용 (B에 반영 가치 있음)</h2>
+<table>
+  <tr><th>항목</th><th>내용</th><th>B 반영 권고</th></tr>
+  <tr><td class="only">① 통합식의 지위</td><td><code>P×(1−2T/N)</code>은 "공개된 20·40분할 공식을 하나로 묶은 <strong>수학적 정리이며, 별도로 발표된 일반 공식은 아님</strong>"을 명시</td><td><strong>반영 권장</strong> — B는 이 식을 출처 구분 없이 "일반화"로 제시. 구현 시 20·40분할 외 값에 함부로 적용하지 않도록 주석 필요</td></tr>
+  <tr><td class="only">② 30분할 추론식</td><td>통합식 대입 시 TQQQ (15−T)%, SOXL (20−4T/3)% — 단 "공개 자료엔 20·40분할만 명시, 공식 확인 전 실주문 기준으로 쓰지 말 것" 경고 동반</td><td>참고용 반영 — B는 "20/30/40분할 권장"이라 쓰면서 30분할 별% 공식이 없다는 공백을 짚지 않음</td></tr>
+  <tr><td class="only">③ V3.0 계보</td><td>"V4.0은 V3.0의 종목별 15%·20% 구조를 이어받음" + V2.2 (10−T/2)%와 V4.0 T 계산법 혼용 금지</td><td>반영 권장 — 버전 이력 이해에 유용 (V2.2 → V3.0에서 base 15/20 도입 → V4.0에서 연속 T 결합)</td></tr>
+  <tr><td class="only">④ 소진모드 조건 공식화</td><td><code>N−T&lt;1</code>로 명시 + 경계 수치 예시 2건 (T=38.8+1→잔여 0.2회 진입 / T=39 쿼터매도→29.25로 복귀)</td><td>반영 권장 — B의 "T&gt;분할−1"과 동치지만, <strong>연속 T에서의 판정식으로는 N−T&lt;1이 구현에 더 직접적</strong></td></tr>
+  <tr><td class="only">⑤ 별% 극한 명시</td><td>T=0 → +P% / T=N/2 → 0% / T=N → −P% 3점 요약</td><td>선택 — B 예시 표(T=1~39)와 같은 내용의 압축 표현</td></tr>
+</table>
+
+<h2>5. 모순 여부 정밀 점검</h2>
+<table>
+  <tr><th>의심 지점</th><th>판정</th></tr>
+  <tr><td>첫 매수: A "1회분 LOC 시도" vs B "종가+10~15% 큰수 LOC + 사다리"</td><td>모순 아님 — A가 방식을 생략한 단순화. 둘 다 "T=0에서 1회분, 전부 LOC"</td></tr>
+  <tr><td>전반전 시작점: A "1≤T" vs B "0&lt;T" (예: T=0.5)</td><td>실질 동일 — A는 T=0을 "첫 매수" 단계로 분리했을 뿐. 절반 체결로 T=0.5가 되는 경우의 매수 배분은 <strong>양쪽 모두 명시하지 않음</strong> (기존 §11 미확정과 같은 계열)</td></tr>
+  <tr><td>소진모드: A "N−T&lt;1" vs B "T&gt;N−1"</td><td>동치</td></tr>
+  <tr><td>40분할 SOXL: A "(20−T)%" vs B "(20−1·T)%"</td><td>동일</td></tr>
+</table>
+<div class="ok">규칙 충돌 <strong>0건</strong>. A는 B의 부분집합 + 메타 정보 4건으로 볼 수 있다.</div>
+
+<h2>6. 종합 판단</h2>
+<ul>
+  <li><strong>구현 기준 문서는 B 유지</strong> — 실행 세부(사다리·큰수·프리장)와 구현 설계가 B에만 있다. A만으로 구현하면 매수 주문의 절반(사다리)이 빠진다.</li>
+  <li><strong>A의 가치는 교차 검증 + 메타 정보</strong> — 독립 출처(quantstack)가 같은 규칙·같은 수치를 제시해 B의 정확성을 방증하고, §4의 ①~④는 B에 없는 정보다.</li>
+  <li><strong>신뢰도 주의</strong> — A의 원천인 quantstack 스스로 "비공식"을 명시. B의 기존 원칙("구현 전 원문 재검증")은 그대로 유효하며, 특히 30분할 추론식은 실주문 기준 사용 금지.</li>
+  <li>후속 작업 후보: B(레퍼런스)에 §4의 ①~④를 반영하는 소규모 갱신. 요청 시 진행.</li>
+</ul>
+</body>
+</html>

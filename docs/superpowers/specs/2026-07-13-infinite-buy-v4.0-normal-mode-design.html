@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>무한매수법 V4.0 일반모드 기능 설계 (스펙)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .ok { border-left: 3px solid #38a169; background: #f0fff4; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .warn { border-left: 3px solid #c53030; background: #fff5f5; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .muted { color: #718096; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<h1>무한매수법 V4.0 일반모드 기능 설계 (스펙)</h1>
+<p class="muted">작성 2026-07-13 · 사용자 브레인스토밍·설계 승인 완료 · 규칙 원문: <code>docs/superpowers/specs/2026-07-08-infinite-buy-v4.0-reference.html</code> (이하 "레퍼런스")</p>
+
+<h2>1. 목표 · 확정 결정</h2>
+<ul>
+  <li>company-map 무한매수 자동매매에 <strong>V4.0 일반모드</strong>를 별도 버전(<code>"v4.0"</code>)으로 추가한다. <strong>기존 v1·v2.2 경로는 무변경</strong>.</li>
+  <li><strong>범위 = 코어만</strong> (사용자 확정): 별지점 매수(전반 ½+½ / 후반 전액) + 2단 매도 + 연속 T·잔금 영속화 + 체결 동기화 자동화. <strong>LOC 사다리·소진모드·큰수매수 세부는 제외</strong> — 원문 미확보 규칙에 창작을 넣지 않는다.</li>
+  <li><strong>검증 = 다른 종목 dryRun</strong> (사용자 확정): TQQQ v2.2 LIVE는 그대로 두고, V4.0은 다른 종목(권장 SOXL)의 신규 dryRun 사이클로 검증. 심볼당 active 1개 제약 유지.</li>
+  <li><strong>아키텍처 = A안</strong> (사용자 확정): 사이클 테이블 확장(nullable) + 순수 코어 <code>strategy-v4.ts</code> + 공용 체결 동기화 lib <code>sync.ts</code> (worker 편입).</li>
+</ul>
+
+<h2>2. 범위 제외 · 소진 시 동작</h2>
+<table>
+  <tr><th>항목</th><th>1차 버전 동작</th><th>사유</th></tr>
+  <tr><td>LOC 사다리</td><td>없음 (별지점/평단 주문만)</td><td>배분 공식 미확보 (레퍼런스 §11-3)</td></tr>
+  <tr><td>소진모드(리버스)</td><td><code>T &gt; 분할−1</code> 도달 시 주문 중단, 사이클 status <code>exhausted</code> + 대시보드 경고. 이후 수동 판단</td><td>원문 미확보 (§11-1)</td></tr>
+  <tr><td>큰수매수 세부</td><td>첫매수 큰수 리밋 = 현재가×(1+bigBuyPremium%) 1건만 (기본 12%, 원문 10~15% 범위)</td><td>세부 글 미확보 (§11-2)</td></tr>
+  <tr><td>쿼터모드/쿼터손절</td><td>없음</td><td>V2.2 때 사용자 제외 결정, V4.0 원문에도 일반모드 규칙 아님</td></tr>
+  <tr><td>사이클 자동 재시작</td><td>보유 0 감지 시 status <code>completed</code>로 종료만. 재시작(복리/단리·원금 재설정)은 수동 생성</td><td>복리/단리 선택은 사용자 몫 (원문 §7)</td></tr>
+</table>
+
+<h2>3. 데이터 모델</h2>
+<h3>InfiniteBuyCycle 확장 (전부 nullable → 기존 행 무영향, 마이그레이션 1회)</h3>
+<table>
+  <tr><th>필드</th><th>타입</th><th>의미</th></tr>
+  <tr><td><code>tValue</code></td><td>Float?</td><td>연속 T. v4 전용. 생성 시 0. 기존 <code>round</code>는 v1/v2.2 전용 유지(v4에선 주문 로그의 <code>round</code>에 <code>floor(tValue)</code> 스냅샷 기록)</td></tr>
+  <tr><td><code>cashRemaining</code></td><td>Float?</td><td>잔금(USD). 생성 시 <code>principal</code>로 초기화. 체결 기반 증감(§5)</td></tr>
+  <tr><td><code>starBase</code></td><td>Float?</td><td>별% base이자 지정가매도 %(원문에서 동일 값). TQQQ=15, SOXL=20 자동, 그 외 심볼은 생성 시 수동 입력 필수(미입력 시 생성 거부)</td></tr>
+  <tr><td><code>note</code></td><td>String?</td><td>마지막 경고/보류 사유 — 대시보드 경고 배지 소스 (성공 실행 시 null로 초기화)</td></tr>
+</table>
+<h3>InfiniteBuyOrder 확장</h3>
+<table>
+  <tr><th>필드</th><th>타입</th><th>의미</th></tr>
+  <tr><td><code>stateApplied</code></td><td>Boolean?</td><td>이 주문의 체결이 T/잔금에 반영됐는지 — 이중 반영 방지 멱등 마커</td></tr>
+</table>
+<ul>
+  <li><code>version</code>·<code>kind</code>는 String이라 스키마 변경 없음. v4 kind는 <strong>ΔT 가중치를 kind에서 유도</strong>할 수 있게 세분화: <code>first_big_loc</code>(첫매수 큰수, 가중 1) · <code>loc_star_half</code>(전반 ½ @매수점, 0.5) · <code>loc_avg_half</code>(전반 ½ @평단, 0.5) · <code>loc_star_full</code>(후반 전액, 1) · <code>sell_loc_star</code>(쿼터 LOC) · <code>sell_lim_target</code>(지정가 +starBase%).</li>
+  <li>status 값 추가: 사이클 <code>exhausted</code>, 주문 <code>simulated_filled</code>(dryRun 가상 체결) · <code>expired</code>(dryRun 미체결 종료 — 재판정 방지).</li>
+  <li>마이그레이션: <code>yarn workspace company-map prisma migrate dev</code> + generate. <strong>generate 후 dev 서버·worker 재시작 필수</strong>(globalThis PrismaClient 캐시).</li>
+</ul>
+
+<h2>4. 코어 전략 — <code>src/lib/infinite-buy/strategy-v4.ts</code> (순수 함수)</h2>
+<h3>입력 <code>V4State</code></h3>
+<pre><code>{ t, splits, cash, starBase, bigBuyPremium,
+  avgPrice, currentPrice, holdingQty }   // LIVE=토스 스냅샷 / dryRun=가상 체결 이력에서 파생(§6)</code></pre>
+<h3>일일 계산</h3>
+<pre><code>별%       = starBase × (1 − 2t / splits)
+별지점    = px(avgPrice × (1 + 별%/100))      // px = 소수 2자리 반올림
+매수점    = 별지점 − 0.01
+1회매수금 = cash / (splits − t)               // t &gt; splits−1 이면 소진(주문 없음)</code></pre>
+<h3>주문 규칙 (전부 매일 신규 발주, LOC=LIMIT+CLS, 지정가=LIMIT+DAY)</h3>
+<table>
+  <tr><th>국면</th><th>조건</th><th>매수</th><th>매도(보유&gt;0 공통)</th></tr>
+  <tr><td>첫매수</td><td><code>t=0 &amp;&amp; 보유=0</code></td><td>큰수 LOC: 리밋 <code>px(현재가×(1+bigBuyPremium%))</code>, 수량 <code>floor(1회매수금÷리밋)</code></td><td>—</td></tr>
+  <tr><td>전반전</td><td><code>0 &lt; t &lt; splits/2</code></td><td>½: <code>floor(반회분÷매수점)</code> @매수점 + ½: <code>floor(반회분÷평단)</code> @평단</td><td rowspan="2">쿼터 <code>floor(N×0.25)</code> @별지점 LOC + 나머지 <code>N−floor(N×0.25)</code> @<code>px(평단×(1+starBase%))</code> 지정가. 쿼터 0주면 생략</td></tr>
+  <tr><td>후반전</td><td><code>splits/2 ≤ t ≤ splits−1</code></td><td>전액: <code>floor(1회매수금÷매수점)</code> @매수점</td></tr>
+  <tr><td>소진</td><td><code>t &gt; splits−1</code></td><td colspan="2">주문 없음 → <code>exhausted</code> 플래그 반환 (호출부가 status 변경)</td></tr>
+</table>
+<ul>
+  <li>반올림(§11-5 미확정 → v2.2 관행 채택): 쿼터 floor, 나머지를 지정가에 몰아 매도 합계 = 보유수량. 수량 0 주문은 생략.</li>
+  <li>출력: <code>orders[]</code> + <code>exhausted</code> 플래그. <strong>T·잔금 갱신은 반환하지 않는다</strong> — 상태 갱신은 체결 동기화(§5)만이, 사이클 종료(<code>completed</code>) 판정은 apply 단계(§7-②)만이 수행.</li>
+</ul>
+
+<h2>5. 체결 동기화 — <code>src/lib/infinite-buy/sync.ts</code> (신규 공용 lib)</h2>
+<h3>syncFills(cycle)</h3>
+<ul>
+  <li>토스 CLOSED 주문 조회(사이클 생성일 이후·심볼 필터) → <code>tossOrderId</code> 매칭 → <strong>BUY·SELL 모두</strong> <code>filledQty/filledPrice/filledAt</code> 기록. 이미 filled·수량 동일이면 skip(멱등).</li>
+  <li>기존 서버 액션 <code>syncSellFills</code>는 이 lib을 부르는 얇은 래퍼로 교체(대시보드 버튼 동작 유지, BUY까지 반영되도록 확장).</li>
+</ul>
+<h3>applyFillsToV4State(cycle) — 사용자 승인된 해석 2건 포함</h3>
+<ul>
+  <li><code>stateApplied</code>가 아닌 filled/simulated_filled 주문을 <strong>체결시각 순</strong>으로 반영:</li>
+  <li><strong>매수</strong> (해석 ①, 주문 단위 비례): 전반전 두 주문은 각각 절반치 → <code>ΔT = 0.5 × (체결수량÷주문수량)</code>. 후반 전액·첫매수 주문 → <code>ΔT = 1 × (체결수량÷주문수량)</code>. 전량 체결 시 원문 검증점 +1/+0.5와 일치.</li>
+  <li><strong>쿼터매도</strong>(sell_loc_star): <code>T ← T × 0.75</code>. <strong>지정가매도</strong>(sell_lim_target): <code>T ← T × 0.25</code>. 매도 배수는 <strong>부분체결이어도 전량 기준 적용</strong>(원문에 세분 규칙 부재 — 확정). 같은 날 지정가매도와 매수가 함께 체결되면 <strong>×0.25 먼저, 매수 ΔT 나중</strong>(원문 §2 "×0.25 + 1/0.5").</li>
+  <li><strong>잔금</strong> (해석 ②, 체결 기반): 매수 <code>cash −= 체결가×체결수량</code>, 매도 <code>cash += 체결가×체결수량</code>.</li>
+  <li>반영 후 <code>stateApplied=true</code>. CLOSED 주문만 동기화하므로 <code>filledQty</code>는 최종값 — boolean 마커로 충분(증분 추적 불필요).</li>
+  <li>같은 거래일 내 적용 순서(체결시각 동일 케이스): <code>sell_lim_target</code>(장중) → <code>sell_loc_star</code>(종가) → 매수(종가). 쿼터매도와 LOC 매수는 1센트 분리로 같은 날 동시 발동 불가.</li>
+</ul>
+<h3>정합성 크로스체크 (LIVE 전용, dryRun은 skip)</h3>
+<ul>
+  <li>동기화 후 <code>Σ매수체결 − Σ매도체결 ≠ 토스 실제 보유수량</code>이면: 해당 사이클 <strong>그날 주문 보류</strong> + 경고 로그 + 대시보드 배지. 수동 매매 혼입·동기화 누락으로 오염된 T로 주문 내는 것을 막는 마지막 방어선.</li>
+</ul>
+<h3>실패 정책</h3>
+<ul>
+  <li>동기화 실패(토스 API 에러 등) 시: <strong>v4.0은 그날 주문 보류</strong>(다음 15분 폴에서 자동 재시도), v1/v2.2는 경고 후 진행(회차가 체결 비의존). — 레퍼런스 §10 to-be 그대로.</li>
+</ul>
+
+<h2>6. dryRun 가상 체결 — <code>src/lib/infinite-buy/dry-fill.ts</code></h2>
+<ul>
+  <li>dryRun 사이클은 실제 체결이 없으므로, <strong>다음 실행 시 전일 일봉</strong>(<code>getDailyCandles</code>)으로 전일 simulated 주문의 체결을 판정한다:</li>
+</ul>
+<table>
+  <tr><th>주문</th><th>체결 조건</th><th>체결가</th></tr>
+  <tr><td>LOC 매수</td><td>종가 ≤ 리밋</td><td>종가</td></tr>
+  <tr><td>LOC 매도(쿼터)</td><td>종가 ≥ 리밋</td><td>종가</td></tr>
+  <tr><td>지정가 매도</td><td>고가 ≥ 리밋</td><td>리밋가</td></tr>
+</table>
+<ul>
+  <li>판정 로직은 순수 함수(일봉 주입)로 작성해 단위 테스트. 체결 시 <code>simulated_filled</code> + filledQty/filledPrice 기록, <strong>미체결은 <code>expired</code>로 종료</strong>(다음날 재판정 방지) → <strong>라이브와 동일한 체결 적용 경로</strong>로 T·잔금 갱신. dryRun에서도 평단·보유는 가상 체결 누적으로 추정(라이브 스냅샷 없음): 사이클 자체 필드가 아닌 filled 이력에서 평단·보유를 파생해 <code>V4State</code>를 구성한다.</li>
+  <li>고가 판정을 위해 <code>DailyCandle</code>(toss/client.ts)에 <code>high</code> 필드 추가(응답에 없으면 close로 대체 — 보수적 판정). 기존 소비자(차트·RSI)는 close만 사용하므로 무영향.</li>
+</ul>
+
+<h2>7. 실행 흐름 (worker · run)</h2>
+<pre><code>infinite-buy-loop (기존 15분 폴, US 정규장 거래일당 1회) — v4 사이클 처리 순서:
+① sync      : LIVE → syncFills / dryRun → dry-fill 판정
+② apply     : applyFillsToV4State → T·잔금 갱신 (보유 0 &amp;&amp; t&gt;0 → completed 종료)
+③ check     : LIVE 크로스체크 (불일치 → 그날 보류 + 경고)
+④ compute   : computeDailyOrdersV4 (exhausted → status 변경 후 종료)
+⑤ submit    : 기존 buying-power 체크 → 주문 제출/로깅 (dryRun은 simulated 기록)</code></pre>
+<ul>
+  <li>v4 실행은 <code>run.ts</code> 수정 대신 <strong>신규 <code>run-v4.ts</code> 오케스트레이터</strong>가 ①~⑤ 전체를 한 함수로 강제(②를 건너뛴 ④가 구조적으로 불가능). worker와 수동실행 액션(runCycleNow)이 공유. 기존 v1/v2.2 경로(run.ts)는 무변경.</li>
+  <li>불변식: <strong>"상태 갱신은 항상 최신 체결 반영 후"</strong> — ②를 건너뛴 ④는 금지.</li>
+  <li>주문은 거래일당 1회(<code>lastRunDate</code> 관행 유지), sync/apply는 폴마다 실행해도 멱등이라 안전.</li>
+</ul>
+
+<h2>8. UI · 액션</h2>
+<ul>
+  <li><code>createCycle</code>: version <code>"v4.0"</code> 옵션. starBase 자동(TQQQ 15/SOXL 20), 그 외 심볼은 입력 필수. <code>tValue=0, cashRemaining=principal</code> 초기화. 항상 dryRun 시작(기존 관행).</li>
+  <li><code>CycleView</code>/대시보드: v4 사이클에 T(소수 표시)·잔금·오늘의 별지점·1회매수금 표시, <code>exhausted</code>·크로스체크 불일치 경고 배지.</li>
+</ul>
+
+<h2>9. 에러 처리 · 가드</h2>
+<ul>
+  <li>기존 <code>assertSubmittable</code>(수량·가격 유효성) 재사용.</li>
+  <li>v4 전용 가드: 잔금 ≤ 0, <code>starBase</code> 미설정, <code>t=0 &amp;&amp; 보유&gt;0</code>(사이클 밖 기보유 혼입) → 그날 주문 보류 + 경고.</li>
+  <li><code>INFINITE_BUY_DISABLED=1</code> 킬스위치·매수가능금액 체크 등 기존 안전장치 그대로 적용.</li>
+</ul>
+
+<h2>10. 테스트 계획 (Vitest, 소스 옆 co-locate)</h2>
+<table>
+  <tr><th>파일</th><th>케이스</th></tr>
+  <tr><td><code>strategy-v4.test.ts</code></td><td>별%·별지점·1회매수금 공식(레퍼런스 부록 A 수치로 검증: T=1 별지점 57.13 등), 전/후반 경계 t=splits/2, 첫매수 수량, 소진 판정 t&gt;splits−1, floor 수량·매도 합계=보유, 쿼터 0주 생략, 수량 0 주문 생략</td></tr>
+  <tr><td><code>sync.test.ts</code></td><td>ΔT 시나리오(+1, +0.5, 부분체결 비례, ×0.75, ×0.25+1 같은 날 순서), 잔금 회계, stateApplied 멱등(이중 반영 방지), 부분체결 증분 반영, 크로스체크 불일치 → 보류</td></tr>
+  <tr><td><code>dry-fill.test.ts</code></td><td>일봉 종가/고가 대비 LOC·지정가 체결 판정 3규칙, 미체결 케이스</td></tr>
+</table>
+<ul>
+  <li>검증 게이트: <code>yarn workspace company-map test</code> 전체 통과 + 변경 파일 <code>npx eslint &lt;files&gt;</code> 통과 (워크스페이스 lint는 기존 에러로 게이트 불가).</li>
+</ul>
+
+<h2>11. 파일 변경 목록</h2>
+<table>
+  <tr><th>구분</th><th>파일</th><th>내용</th></tr>
+  <tr><td rowspan="4">신규</td><td><code>src/lib/infinite-buy/strategy-v4.ts</code></td><td>순수 코어</td></tr>
+  <tr><td><code>src/lib/infinite-buy/sync.ts</code></td><td>체결 동기화 + V4 상태 적용 + 크로스체크</td></tr>
+  <tr><td><code>src/lib/infinite-buy/dry-fill.ts</code></td><td>dryRun 가상 체결 판정</td></tr>
+  <tr><td>각 <code>.test.ts</code> 3종</td><td>§10</td></tr>
+  <tr><td rowspan="6">수정</td><td><code>prisma/schema.prisma</code></td><td>§3 필드 + 마이그레이션</td></tr>
+  <tr><td><code>src/lib/infinite-buy/run-v4.ts</code> <strong>(신규)</strong></td><td>v4 오케스트레이터 — run.ts 수정 대신 신규 파일로 ①~⑤ 순서 불변식 강제</td></tr>
+  <tr><td><code>worker/infinite-buy-loop.ts</code></td><td>①~⑤ 순서 편입</td></tr>
+  <tr><td><code>src/actions/infinite-buy.ts</code></td><td>createCycle v4, syncSellFills→lib 위임, CycleView 확장</td></tr>
+  <tr><td><code>src/app/stocks/infinite-buy/InfiniteBuyManager.tsx</code></td><td>v4 표시·경고 배지</td></tr>
+  <tr><td><code>src/lib/infinite-buy/toss-adapter.ts</code></td><td>(필요 시) 주문 조회 dep 추가</td></tr>
+</table>
+<p class="muted">참고: 작업 트리에 미커밋 변경(v1·v2.2 보유0 리셋 가드, realizedPnl)이 있음 — 구현은 그 위에 쌓는다.</p>
+
+<h2>12. 참고</h2>
+<ul>
+  <li>규칙 원문 정리: <code>docs/superpowers/specs/2026-07-08-infinite-buy-v4.0-reference.html</code> (§10 아키텍처 함의·§11 미확보 목록·부록 A 수치표)</li>
+  <li>문서 교차 검증: <code>docs/superpowers/specs/2026-07-12-infinite-buy-v4-guide-comparison.html</code></li>
+</ul>
+</body>
+</html>
