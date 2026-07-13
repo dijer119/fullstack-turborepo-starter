@@ -237,7 +237,16 @@ export async function createCycle(input: {
 export async function updateCycle(
   id: string,
   data: Partial<{ dryRun: boolean; status: string; principal: number; profitTarget: number; bigBuyPremium: number; lossCut: number }>,
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; reason?: string }> {
+  if (data.dryRun === false) {
+    const cycle = await db.infiniteBuyCycle.findUnique({ where: { id } });
+    if (cycle?.version === "v4.0") {
+      return {
+        ok: false,
+        reason: "v4.0 LIVE 전환은 아직 미지원 (dryRun 검증 전용). LIVE가 필요하면 별도 작업 후 새 사이클로 시작하세요.",
+      };
+    }
+  }
   await db.infiniteBuyCycle.update({ where: { id }, data });
   revalidatePath("/stocks/infinite-buy");
   return { ok: true };

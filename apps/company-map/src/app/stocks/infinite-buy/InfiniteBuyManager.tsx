@@ -69,7 +69,8 @@ export function InfiniteBuyManager({
   const toggleDryRun = (c: CycleView) =>
     start(async () => {
       if (c.dryRun && !confirm(`${c.symbol}를 LIVE로 전환합니다. 실제 주문이 체결됩니다. 계속할까요?`)) return;
-      await updateCycle(c.id, { dryRun: !c.dryRun });
+      const r = await updateCycle(c.id, { dryRun: !c.dryRun });
+      if (!r.ok) { setMsg(r.reason ?? "전환 실패"); return; }
       router.refresh();
     });
 
