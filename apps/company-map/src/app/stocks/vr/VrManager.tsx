@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  createVrAccount, getVrCycleLogs, getVrOrders, runVrNow, setVrStatus,
+  createVrAccount, getVrCycleLogs, getVrOrders, runVrNow, setVrStatus, updateVrSettings,
   type CreateVrInput, type VrAccountView,
 } from "@/actions/vr";
 import {
@@ -26,6 +26,7 @@ export function VrManager({ accounts }: { accounts: VrAccountView[] }) {
   const [logs, setLogs] = useState<CycleLogRow[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [showCreate, setShowCreate] = useState(false);
+  const [settingsId, setSettingsId] = useState<string | null>(null);
 
   const toggleDetail = (id: string) => {
     if (openId === id) {
@@ -109,7 +110,18 @@ export function VrManager({ accounts }: { accounts: VrAccountView[] }) {
             >
               {a.status === "active" ? "일시정지" : "재개"}
             </button>
+            <button
+              className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800"
+              disabled={pending}
+              onClick={() => setSettingsId(settingsId === a.id ? null : a.id)}
+            >
+              {settingsId === a.id ? "설정 닫기" : "설정"}
+            </button>
           </div>
+
+          {settingsId === a.id && (
+            <SettingsForm account={a} onDone={() => setSettingsId(null)} />
+          )}
 
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <OrderPreview title={`오늘의 매수표 (LOC, ${a.buyOrders.length}건)`} orders={a.buyOrders} />
@@ -255,6 +267,65 @@ function CreateForm({ onDone }: { onDone: () => void }) {
         dryRun으로 생성
       </button>
       <p className="mt-2 text-[11px] text-gray-400">LIVE 모드는 지원하지 않습니다. 중도 합류는 현재 V·Pool·보유수량을 입력하세요.</p>
+    </div>
+  );
+}
+
+function SettingsForm({ account, onDone }: { account: VrAccountView; onDone: () => void }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [gValue, setGValue] = useState(account.gValue);
+  const [contribution, setContribution] = useState(account.contribution);
+  const [bandPct, setBandPct] = useState(account.bandPct);
+
+  return (
+    <div className="mt-3 rounded-lg border border-gray-200 p-4 text-sm dark:border-gray-700">
+      {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Field label="G">
+          <input
+            className={inputCls}
+            type="number"
+            value={gValue}
+            onChange={(e) => setGValue(Number(e.target.value))}
+          />
+        </Field>
+        <Field label="사이클 적립금 ($)">
+          <input
+            className={inputCls}
+            type="number"
+            value={contribution}
+            onChange={(e) => setContribution(Number(e.target.value))}
+            disabled={account.type === "lumpsum"}
+          />
+        </Field>
+        <Field label="밴드 ±%">
+          <input
+            className={inputCls}
+            type="number"
+            value={bandPct}
+            onChange={(e) => setBandPct(Number(e.target.value))}
+          />
+        </Field>
+      </div>
+      <button
+        className="mt-3 rounded bg-blue-600 px-3 py-1.5 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
+        disabled={pending}
+        onClick={() =>
+          startTransition(async () => {
+            const r = await updateVrSettings(account.id, { gValue, contribution, bandPct });
+            if (!r.ok) {
+              setError(r.error ?? "저장 실패");
+              return;
+            }
+            router.refresh();
+            onDone();
+          })
+        }
+      >
+        저장
+      </button>
     </div>
   );
 }

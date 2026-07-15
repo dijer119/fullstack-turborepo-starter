@@ -93,6 +93,9 @@ export async function createVrAccount(input: CreateVrInput): Promise<{ ok: boole
   // LIVE 게이팅: dryRun은 항상 true로 생성. (스키마 default지만 명시적으로 고정)
   if (!input.symbol || input.initialV <= 0) return { ok: false, error: "symbol/초기 V가 유효하지 않습니다" };
   if (input.initialPool < 0 || input.initialQty < 0) return { ok: false, error: "Pool/보유수량은 음수 불가" };
+  if (input.gValue <= 0) return { ok: false, error: "G는 0보다 커야 합니다" };
+  if (input.bandPct <= 0 || input.bandPct >= 100) return { ok: false, error: "밴드 ±%는 0~100 사이여야 합니다" };
+  if (input.contribution < 0) return { ok: false, error: "사이클 적립금은 음수 불가" };
   const today = todayIso();
   const acc = await db.vrAccount.create({
     data: {
@@ -129,9 +132,20 @@ export async function setVrStatus(id: string, status: "active" | "paused" | "sto
 export async function updateVrSettings(
   id: string,
   patch: { gValue?: number; contribution?: number; bandPct?: number; poolLimitMode?: string; poolLimitPct?: number | null },
-): Promise<void> {
+): Promise<{ ok: boolean; error?: string }> {
+  if (patch.gValue !== undefined && patch.gValue <= 0) return { ok: false, error: "G는 0보다 커야 합니다" };
+  if (patch.bandPct !== undefined && (patch.bandPct <= 0 || patch.bandPct >= 100)) {
+    return { ok: false, error: "밴드 ±%는 0~100 사이여야 합니다" };
+  }
+  if (patch.contribution !== undefined && patch.contribution < 0) {
+    return { ok: false, error: "사이클 적립금은 음수 불가" };
+  }
+  if (patch.poolLimitPct !== undefined && patch.poolLimitPct !== null && (patch.poolLimitPct < 0 || patch.poolLimitPct > 100)) {
+    return { ok: false, error: "Pool 한도%는 0~100 사이여야 합니다" };
+  }
   await db.vrAccount.update({ where: { id }, data: patch });
   revalidatePath(PAGE);
+  return { ok: true };
 }
 
 /** 현재 열린 US 정규장 세션의 거래일. 없으면 null. (worker와 동일 판정) */

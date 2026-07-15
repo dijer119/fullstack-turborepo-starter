@@ -1,5 +1,5 @@
 // 토스 클라이언트 → VrRunDeps. 시세·일봉 읽기 전용 (주문 경로 없음 — dryRun 전용).
-import { getDailyCandles, getPrices } from "@/lib/toss/client";
+import { getDailyCandles } from "@/lib/toss/client";
 import type { VrRunDeps } from "./run-vr";
 
 /** before(미포함) 직전 날짜의 종가. 순수 함수 — 테스트 대상. */
@@ -15,10 +15,6 @@ export function pickPrevClose(
 
 export function tossVrDeps(): VrRunDeps {
   return {
-    async getCurrentPrice(symbol) {
-      const [p] = await getPrices([symbol]);
-      return Number(p?.lastPrice ?? 0);
-    },
     async getDailyCandle(symbol, date) {
       const candles = await getDailyCandles(symbol, 30);
       const c = candles.find((x) => x.date === date);

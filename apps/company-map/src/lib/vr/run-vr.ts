@@ -9,7 +9,6 @@ import { autoPoolLimitPct, weeksBetween, type VrType } from "./pool-limit";
 import { buyTable, sellTable } from "./order-table";
 
 export interface VrRunDeps {
-  getCurrentPrice(symbol: string): Promise<number>;
   getDailyCandle(symbol: string, date: string): Promise<DryCandle | null>;
   /** before(미포함) 직전 US 거래일 종가 — 공식의 E 계산용 */
   getPrevTradeClose(symbol: string, before: string): Promise<number | null>;
@@ -176,7 +175,7 @@ export async function runVr(
   // 함께 스킵된다 — 중복 방지가 우선이므로 안전한 방향으로 그대로 둔다.
   const alreadyToday = await db.vrOrder.count({ where: { accountId: acc.id, tradeDate } });
   if (alreadyToday > 0) {
-    await db.vrAccount.update({ where: { id: acc.id }, data: { lastRunDate: tradeDate } });
+    await db.vrAccount.update({ where: { id: acc.id }, data: { lastRunDate: tradeDate, note: null } });
     return { simulated: 0, cycled, blocked: null };
   }
 
@@ -193,6 +192,6 @@ export async function runVr(
       },
     });
   }
-  await db.vrAccount.update({ where: { id: acc.id }, data: { lastRunDate: tradeDate } });
+  await db.vrAccount.update({ where: { id: acc.id }, data: { lastRunDate: tradeDate, note: null } });
   return { simulated: orders.length, cycled, blocked: null };
 }
