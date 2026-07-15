@@ -21,6 +21,7 @@ import {
   Star,
   Landmark,
   Repeat,
+  Scale,
 } from "lucide-react";
 
 type Service = {
@@ -147,6 +148,13 @@ const TOOLS: Tool[] = [
     description: "미국 3배 레버리지 무한매수 자동매매",
     path: "/stocks/infinite-buy",
     icon: Repeat,
+  },
+  {
+    key: "vr",
+    name: "밸류리밸런싱 VR",
+    description: "라오어 VR 5.0 — 2주 사이클 목표가치 리밸런싱 (dryRun)",
+    path: "/stocks/vr",
+    icon: Scale,
   },
 ];
 
