@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>밸류리밸런싱(VR) 매매법 Flow 도식 — 라오어 VR 5.0</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; background: #f9f9f7; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; border: 1px solid #e2e8f0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  a { color: #2b6cb0; text-decoration: none; } a:hover { text-decoration: underline; }
+  .meta { color: #52514e; font-size: 0.95em; }
+  .cap { color: #898781; font-size: 0.85em; margin-top: 0.5rem; }
+
+  .card { background: #fcfcfb; border: 1px solid rgba(11,11,11,0.10); border-radius: 8px; padding: 1rem 1.1rem; margin: 0.8rem 0; }
+
+  /* ── 용어 카드 ── */
+  .terms { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.6rem; margin: 0.8rem 0; }
+  .term { background: #fcfcfb; border: 1px solid rgba(11,11,11,0.10); border-radius: 8px; padding: 0.6rem 0.7rem; }
+  .term b { display: block; font-size: 1.15em; color: #1c5cab; }
+  .term span { font-size: 0.8em; color: #52514e; line-height: 1.45; display: block; }
+
+  /* ── 플로우차트 ── */
+  .fc { display: flex; flex-direction: column; align-items: stretch; gap: 0; }
+  .fstep { position: relative; background: #fff; border: 1.5px solid #2a78d6; border-radius: 10px; padding: 0.65rem 0.9rem 0.65rem 3.2rem; font-size: 0.92em; }
+  .fstep .n { position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); width: 1.7em; height: 1.7em; border-radius: 50%; background: #2a78d6; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 0.95em; }
+  .fstep b { color: #1c5cab; }
+  .fstep .sub { color: #52514e; font-size: 0.9em; }
+  .setup { border-color: #104281; background: #f4f8fe; }
+  .setup .n { background: #104281; }
+  .down { text-align: center; color: #898781; font-size: 1.25em; line-height: 1.1; padding: 0.15rem 0; }
+  .down small { display: inline-block; font-size: 0.62em; color: #898781; vertical-align: 0.18em; margin-left: 0.4rem; }
+
+  /* 분기(판정) */
+  .branch { border: 1.5px dashed #c3c2b7; border-radius: 12px; padding: 0.7rem 0.8rem 0.8rem; background: #fcfcfb; }
+  .branch > .q { text-align: center; font-weight: 600; color: #0b0b0b; margin-bottom: 0.6rem; }
+  .branch > .q small { display: block; font-weight: 400; color: #898781; }
+  .outs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.6rem; }
+  .out { border-radius: 8px; padding: 0.55rem 0.7rem; font-size: 0.85em; line-height: 1.5; background: #fff; }
+  .out b { display: block; font-size: 1.0em; }
+  .out .act { display: block; margin-top: 0.15rem; }
+  .sell { border: 1.5px solid #2a78d6; }  .sell b { color: #1c5cab; }
+  .buy  { border: 1.5px solid #e34948; }  .buy b { color: #b32423; }
+  .hold { border: 1.5px dashed #c3c2b7; color: #52514e; }
+  .pooltag { display: inline-block; margin-top: 0.3rem; border-radius: 999px; font-size: 0.85em; padding: 0 0.55rem; background: #f0efec; color: #52514e; }
+
+  /* 루프 표시 */
+  .loopwrap { position: relative; margin: 0.8rem 0; padding-left: 26px; }
+  .loopwrap .loopline { position: absolute; left: 0; top: 26px; bottom: 26px; width: 14px; border: 2px solid #9ec5f4; border-right: none; border-radius: 10px 0 0 10px; }
+  .loopwrap .looplabel { position: absolute; left: -46px; top: 50%; transform: translateY(-50%) rotate(-90deg); transform-origin: center; background: #fcfcfb; color: #1c5cab; font-size: 0.82em; white-space: nowrap; padding: 0 0.5rem; font-weight: 700; z-index: 1; }
+  .loopwrap .arrowup { position: absolute; left: 2px; top: 16px; color: #9ec5f4; font-size: 0.9em; }
+
+  /* 공식 비교 */
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+  .duo .card { margin: 0; }
+  .duo h4 { margin: 0 0 0.4rem; color: #1c5cab; }
+  .duo svg { width: 100%; height: auto; display: block; margin-top: 0.4rem; }
+  .duo .axis { stroke: #c3c2b7; stroke-width: 1; }
+  .duo .vline { stroke: #2a78d6; stroke-width: 2; fill: none; }
+  .duo .pline { stroke: #898781; stroke-width: 1.5; fill: none; stroke-dasharray: 3 3; }
+  .duo text { fill: #52514e; font-size: 10px; }
+
+  /* 한도 스텝 차트 */
+  .steps svg { width: 100%; height: auto; display: block; }
+  .steps .tick { fill: #898781; font-size: 10px; font-variant-numeric: tabular-nums; }
+  .steps .dl { fill: #52514e; font-size: 10.5px; }
+
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  @media (max-width: 720px) { .terms { grid-template-columns: repeat(2, 1fr); } .outs, .duo { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<h1>밸류리밸런싱(VR) 매매법 Flow</h1>
+<p class="meta">작성일: 2026-07-09 · 기준: 라오어 <a href="https://cafe.naver.com/f-e/cafes/30372164/articles/38944" target="_blank">VR 5.0 방법론 개요</a>(카페 원문) + <a href="https://cafe.naver.com/f-e/cafes/30372164/articles/41908" target="_blank">실력공식 해설</a> + <a href="https://cafe.naver.com/f-e/cafes/30372164/articles/46491" target="_blank">Pool 사용한도 스케줄</a></p>
+
+<blockquote>VR(Value Rebalancing)은 <strong>"계좌가 따라가야 할 목표 가치 V"를 공식으로 미리 정해 두고</strong>, 실제 평가금이 V의 밴드를 벗어날 때만 기계적으로 사고파는 TQQQ 장기 운용법이다. 시황 판단이 개입할 자리가 없다 — 매 2주, 같은 절차를 반복한다. (단기 분할매수인 무한매수법과는 별개 전략)</blockquote>
+
+<h2>1. 다섯 가지 구성요소</h2>
+<div class="terms">
+  <div class="term"><b>V</b><span>Value. TQQQ 평가금이 지향해야 할 가이드 수치. 밴드·상승률의 기준</span></div>
+  <div class="term"><b>Pool</b><span>보유 현금(예수금). 매수 재원이자 V 상승률을 결정하는 요소</span></div>
+  <div class="term"><b>G</b><span>gradient(기울기). 클수록 V가 완만해져 안정적. 적립·거치식 10, 인출식 20으로 시작</span></div>
+  <div class="term"><b>밴드</b><span>V×0.85 ~ V×1.15 (±15% 가이드. ±10%, ±5% 선택 가능)</span></div>
+  <div class="term"><b>사이클</b><span>2주. 사이클마다 V를 갱신하고 매수표·매도표를 다시 만든다</span></div>
+</div>
+
+<h2>2. 전체 Flow</h2>
+<div class="card">
+  <div class="fc">
+    <div class="fstep setup"><span class="n">0</span><b>시작 설정 (최초 1회)</b><br>
+      <span class="sub">원금으로 TQQQ 매수 + 현금(Pool) 확보 · G 선택(적립/거치 <code>G=10</code>, 인출 <code>G=20</code>) · 밴드 폭 선택(가이드 ±15%) · 적립액 결정 — <em>예: 10억 프로젝트(VR 1기)는 5,000$로 TQQQ 52주 매수 + 매 2주 250$(월 50만원) 적립</em></span>
+    </div>
+    <div class="down">↓</div>
+
+    <div class="loopwrap">
+      <div class="loopline"></div>
+      <div class="looplabel">↻ 2주마다 반복</div>
+      <div class="fc">
+        <div class="fstep"><span class="n">1</span><b>적립 / 인출 반영</b><br>
+          <span class="sub">적립식은 정기 적립금을 Pool에 추가(+250$ 등), 거치식은 없음, 인출식은 인출(−)</span>
+        </div>
+        <div class="down">↓</div>
+        <div class="fstep"><span class="n">2</span><b>V 갱신 — 기본공식</b><br>
+          <span class="sub"><code>다음V = 현재V + Pool÷G + 적립금</code> &nbsp;예) V 9,000$ · Pool 1,000$ · G=10 · 적립 250$ → <code>9,000 + 100 + 250 = 9,350$</code><br>
+          Pool이 많으면 V가 가파르게 올라가 <strong>공격적 매수</strong>를 유도하고, Pool이 마르면 V가 평평해져 <strong>매도 우선</strong>이 된다 (62주차부터는 실력공식 — §3)</span>
+        </div>
+        <div class="down">↓</div>
+        <div class="fstep"><span class="n">3</span><b>밴드 산출</b><br>
+          <span class="sub">하단(매수선) = <code>V × 0.85</code> · 상단(매도선) = <code>V × 1.15</code> → 보유 주식 수로 나누면 매수점·매도점 <strong>주가</strong>가 나온다</span>
+        </div>
+        <div class="down">↓</div>
+        <div class="fstep"><span class="n">4</span><b>매수표·매도표 작성 → LOC 주문 걸기</b><br>
+          <span class="sub">가격대별 수량 표를 만들어 다음 2주치 <strong>LOC(장마감 지정가) 주문</strong>을 미리 걸어 둔다 — 장중 대응 불필요</span>
+        </div>
+        <div class="down">↓ <small>2주간 매 장마감마다 자동 판정</small></div>
+
+        <div class="branch">
+          <div class="q">종가 기준 평가금이 밴드의 어디에 있나?<small>걸어 둔 LOC 주문이 조건 충족 시 자동 체결된다</small></div>
+          <div class="outs">
+            <div class="out sell"><b>평가금 &gt; V×1.15 (상단 돌파)</b><span class="act">초과분만큼 <strong>LOC 매도</strong> → 밴드 안으로 복귀</span><span class="pooltag">매도 대금 → Pool 적립</span></div>
+            <div class="out buy"><b>평가금 &lt; V×0.85 (하단 이탈)</b><span class="act">부족분만큼 <strong>LOC 매수</strong> — 단, <strong>Pool 사용한도</strong> 내에서만(§4)</span><span class="pooltag">Pool 차감</span></div>
+            <div class="out hold"><b>밴드 안 (85%~115%)</b><span class="act">아무것도 하지 않는다. Pool은 다음 기회를 위해 대기</span><span class="pooltag">Pool 유지</span></div>
+          </div>
+        </div>
+
+        <div class="down">↓</div>
+        <div class="fstep"><span class="n">5</span><b>사이클 종료</b><br>
+          <span class="sub">체결 결과로 보유 주수·Pool 확정 → 새 Pool 값으로 다시 <strong>①</strong>부터. 목표(10억) 도달까지, 이후엔 <strong>인출식</strong>으로 전환해 평생 운용하는 것이 최종 그림</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cap">매수(빨강)·매도(파랑)는 국내 시세 표기 관례를 따른 구분색. 판정은 "장중 가격"이 아니라 <strong>종가(LOC)</strong> 기준이라는 점이 이 방법의 핵심 — 그래서 주문을 미리 걸어 두고 2주간 방치할 수 있다.</div>
+</div>
+
+<h2>3. 기본공식 vs 실력공식 — 긴 하락장에서 갈린다</h2>
+<div class="duo">
+  <div class="card">
+    <h4>기본공식 (0~60주차)</h4>
+    <code>다음V = 현재V + Pool÷G + 적립금</code>
+    <p style="font-size:0.88em; margin:0.4rem 0 0">단순하고 이해가 쉽다. 그러나 하락장이 길어져 <strong>Pool이 0에 가까워지면 V가 수평</strong>이 되어, 사실상 분할매수 후 존버와 비슷해진다.</p>
+    <svg viewBox="0 0 260 92" role="img" aria-label="기본공식: Pool 고갈 시 V가 수평이 되는 궤적">
+      <line class="axis" x1="10" y1="78" x2="250" y2="78"/>
+      <path class="vline" d="M12,66 C60,52 95,42 125,38 L245,36"/>
+      <path class="pline" d="M12,60 C60,58 100,68 130,75 L245,76"/>
+      <text x="128" y="30">V 수평 유지</text>
+      <text x="150" y="70">Pool ≈ 0</text>
+      <text x="14" y="52">─ V &nbsp;&nbsp;┄ Pool</text>
+    </svg>
+  </div>
+  <div class="card">
+    <h4>실력공식 (62주차~ 적용)</h4>
+    <code>다음V = 현재V + Pool÷G + (E − 현재V)÷(2√G) ± 적립금·인출금</code>
+    <p style="font-size:0.88em; margin:0.4rem 0 0"><strong>E = 마지막 평가금</strong>(주식 평가액). 기본공식에 (E−V)÷(2√G) 항이 추가돼, 평가금이 V보다 낮으면 <strong>V도 함께 내려가고</strong> 높으면 가속된다. 매도점이 일찍 오고(때로는 평단 아래 매도도 발생), 매도로 Pool을 빨리 회복해 VR을 지속한다. 백테스트 성능은 기본공식과 대등.<br>
+    <span style="color:#666">62주차 실례: V 15205.76, E 5282.11, Pool 76.73, G 11, 적립 250 → 새V = 15205.76 + 6.98 − 1496.05 + 250 = <strong>13966.69</strong> (출처: 62주차 영상)</span></p>
+    <svg viewBox="0 0 260 92" role="img" aria-label="실력공식: Pool 고갈 시 V가 하락을 반영하는 궤적">
+      <line class="axis" x1="10" y1="78" x2="250" y2="78"/>
+      <path class="vline" d="M12,66 C60,52 95,42 125,38 C160,40 200,52 245,58"/>
+      <path class="pline" d="M12,60 C60,58 100,68 130,75 C170,72 210,62 245,58"/>
+      <text x="150" y="38">V가 하락 반영</text>
+      <text x="60" y="70">Pool 회복 →</text>
+    </svg>
+  </div>
+</div>
+
+<h2>4. 매수 브레이크 — Pool 사용한도</h2>
+<div class="card steps">
+  <p style="font-size:0.92em; margin:0 0 0.3rem">한 사이클에 매수로 쓸 수 있는 Pool의 비율. <strong>시간이 갈수록 한도를 조여</strong> 계좌가 커진 뒤의 폭락(리먼급)에도 버티게 만든다 — "천천히 G값을 올리는 것과 같은 컨셉".</p>
+  <svg viewBox="0 0 840 150" role="img" aria-label="VR 1기 Pool 사용한도: 75%에서 시작해 26주마다 5%p씩 낮춰 338주차부터 10% 고정">
+    <line x1="46" y1="120" x2="820" y2="120" stroke="#c3c2b7" stroke-width="1"/>
+    <text class="tick" x="40" y="34" text-anchor="end">75%</text>
+    <text class="tick" x="40" y="124" text-anchor="end">0%</text>
+    <path fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"
+      d="M46,30 H98 V36 H150 V42 H202 V48 H254 V54 H306 V60 H358 V66 H410 V72 H462 V78 H514 V84 H566 V90 H618 V96 H670 V102 H722 V108 H774 V108 H820"/>
+    <text class="dl" x="50" y="24">75% (0주차)</text>
+    <text class="dl" x="640" y="92" text-anchor="start">26주마다 −5%p</text>
+    <text class="dl" x="818" y="122" text-anchor="end">10% 고정 (338주차~)</text>
+    <text class="tick" x="46" y="136">0주</text>
+    <text class="tick" x="433" y="136" text-anchor="middle">169주</text>
+    <text class="tick" x="820" y="136" text-anchor="end">338주~</text>
+  </svg>
+  <table style="margin-top:0.7rem">
+    <tr><th>유형</th><th>시작 한도</th><th>비고</th></tr>
+    <tr><td>적립식 VR</td><td class="num">75%</td><td>적립금 반영 후 기준 · 26주(6개월)마다 5%p씩 축소 → 최종 10%</td></tr>
+    <tr><td>거치식 VR</td><td class="num">50%</td><td>—</td></tr>
+    <tr><td>인출식 VR</td><td class="num">10~25%</td><td>인출 후 기준. 안정성 최우선 (2025.06 실전은 10%로 시작)</td></tr>
+    <tr><td>0원 시작 VR</td><td class="num">100%</td><td>첫 1년만 100%, 둘째 해부터 위 스케줄 적용</td></tr>
+  </table>
+</div>
+
+<h2>5. 세 가지 운용 유형과 실전 기수</h2>
+<table>
+  <tr><th>유형</th><th>매 사이클 현금 흐름</th><th>G (시작)</th><th>실전 사례 (카페 중계)</th></tr>
+  <tr><td><strong>적립식</strong></td><td>일정액 투입 (+)</td><td class="num">10</td><td>VR 1기: 5,000$+250$/2주, 목표 10억 (2021.04~, 270주차+) · VR 3기: 월 10만원→2억 (2023.05~, 161주차+)</td></tr>
+  <tr><td><strong>거치식</strong></td><td>추가 투입 없음</td><td class="num">10</td><td>VR 2기: 거치식 7년 계획 (2021.09~, 2026.05 목표 달성)</td></tr>
+  <tr><td><strong>인출식</strong></td><td>일정액 인출 (−)</td><td class="num">20</td><td>2025.06 실전 시작 — "돈을 빼내면서 장투"가 VR의 최종 목표</td></tr>
+</table>
+<p class="meta">VR 1기는 236주차에 계획대로 G를 10→15로 상향(기울기 완화). Pool 한도 축소와 G 상향 모두 "시간이 갈수록 방어적으로"라는 같은 방향의 장치다.</p>
+
+<h2>6. 한 장 요약</h2>
+<blockquote>
+  <strong>V를 공식으로 올리고(Pool÷G+적립), 평가금이 V±15%를 벗어난 만큼만 LOC로 사고판다. 2주마다 반복.</strong><br>
+  상승 과열이면 자동으로 이익이 Pool에 쌓이고, 폭락이면 쌓아둔 Pool이 자동으로 저점을 산다. 시황 예측·장중 대응이 전혀 없고, 시간이 갈수록 Pool 한도·G로 방어력을 높인다 — 그래서 "10년 이상, 평생" 운용이 전제다.
+</blockquote>
+
+<h2>출처</h2>
+<ul style="font-size:0.9em">
+  <li><a href="https://cafe.naver.com/f-e/cafes/30372164/articles/38944" target="_blank">밸류리밸런싱 VR5.0 방법론의 개요</a> — V·Pool·G·밴드·기본공식·Pool 한도 원문 (라오어, 2022-04-15)</li>
+  <li><a href="https://cafe.naver.com/f-e/cafes/30372164/articles/41908" target="_blank">실력공식 편을 공개하기에 앞서</a> — 기본공식의 한계와 실력공식의 차이 (라오어, 2022-06-07)</li>
+  <li><a href="https://cafe.naver.com/f-e/cafes/30372164/articles/46491" target="_blank">pool의 사용한도를 천천히 줄여나가겠습니다</a> — 한도 스케줄 75%→10% (라오어, 2022-10-07)</li>
+  <li><a href="https://cafe.naver.com/f-e/cafes/30372164/articles/3596" target="_blank">VR방법으로 10억만들기, 10년 동안 같이 가겠습니다</a> — 프로젝트 초기 설정 (라오어, 2021-04-09)</li>
+  <li><a href="https://www.youtube.com/playlist?list=PLhSnYilB2g9xwP9Jv8c43rAADIILiiVPQ" target="_blank">유튜브 중계 재생목록</a> — LOC 주문 실행법 (4·8·10주차), <a href="https://www.youtube.com/watch?v=cIp8G3AVtnM" target="_blank">실력공식 적용 (62주차, 2022-06-18)</a> — 실력공식 수식·62주차 실계산 예시는 이 영상 슬라이드에서 확인</li>
+</ul>
+</body>
+</html>

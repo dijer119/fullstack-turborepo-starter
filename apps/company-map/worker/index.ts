@@ -7,6 +7,7 @@ import { tradeSyncTick } from "./trade-sync-loop";
 import { priceChangeLoop } from "./price-change-loop";
 import { etfPdfLoop } from "./etf-pdf-loop";
 import { infiniteBuyLoop } from "./infinite-buy-loop";
+import { vrLoop } from "./vr-loop";
 
 const TWO_MINUTES_MS = 120_000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -86,5 +87,8 @@ if (process.argv.includes("--once")) {
   );
   infiniteBuyLoop().catch((err) =>
     console.error("[worker] infinite-buy loop crashed:", err),
+  );
+  vrLoop().catch((err) =>
+    console.error("[worker] vr loop crashed:", err),
   );
 }

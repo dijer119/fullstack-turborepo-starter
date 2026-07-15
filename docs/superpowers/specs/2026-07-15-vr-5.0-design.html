@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VR 5.0 (밸류리밸런싱) company-map 구현 — 설계 스펙</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; font-size: 0.94em; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .muted { color: #718096; font-size: 0.88em; }
+</style>
+</head>
+<body>
+
+<h1>VR 5.0 (밸류리밸런싱) company-map 구현 — 설계 스펙</h1>
+<p class="muted">작성일 2026-07-15 · 상태: 사용자 승인 대기 · 선행: 무한매수법 V4.0 (dryRun 전용 자동매매 패턴)</p>
+
+<h2>1. 목표와 범위</h2>
+<ul>
+  <li>라오어 <strong>VR 5.0</strong>(목표가치 V 추종·2주 사이클·LOC 리밸런싱)을 company-map의 <strong>dryRun 전용 자동매매</strong>로 구현한다. 무한매수법 V4.0과 같은 패턴: worker 폴링 + 토스 주문 계산 + 가상 체결 + 대시보드. <strong>LIVE 주문은 게이팅으로 차단</strong>(V4.0과 동일).</li>
+  <li>운용 유형: <strong>적립식 + 거치식</strong> (거치식 = 사이클 적립금 0). 인출식은 범위 외.</li>
+  <li>V 갱신 공식: <strong>기본공식·실력공식 둘 다</strong> 구현, 계좌 생성 시 선택 (기본값: 실력공식).</li>
+  <li>아키텍처: <strong>독립 모듈</strong> — <code>src/lib/vr/</code> + 새 테이블 + <code>/stocks/vr</code> 페이지 + <strong>AppMenu 별도 메뉴 항목</strong>. 무한매수법 코드는 건드리지 않고, 재사용은 공용 자원(토스 클라이언트·일봉·dry-fill 판정 로직)만.</li>
+</ul>
+
+<h3>범위에서 제외 (후속 과제)</h3>
+<ul>
+  <li>갭 하락 시 시초가 시장가 보정 매수 (라오어 62주차의 수동 대응 — Pool 한도 소진 보정)</li>
+  <li>인출식 VR (G=20, 음수 현금흐름, Pool 한도 10~25%)</li>
+  <li>과거 데이터 백테스터</li>
+  <li>LIVE 주문 (dryRun 검증 후 별도 결정)</li>
+</ul>
+
+<h2>2. 참조 자료</h2>
+<ul>
+  <li><code>docs/vr-value-rebalancing-flow-2026-07-09.html</code> — VR 5.0 방법론 (카페 원문 기반, 실력공식 수식 포함)</li>
+  <li>62주차 유튜브(cIp8G3AVtnM) 슬라이드 — 실력공식 수식·실계산·매수표/매도표 실측값 (테스트 픽스처의 원천)</li>
+  <li>무한매수법 V4.0 구현 (<code>src/lib/infinite-buy/</code>) — 오케스트레이터·sync·dry-fill·게이팅 패턴</li>
+</ul>
+
+<h2>3. 데이터 모델 (Prisma, SQLite — 새 테이블 3개)</h2>
+
+<h3>VrAccount — 계좌(운용 단위) + 현재 상태</h3>
+<table>
+  <tr><th>필드</th><th>타입</th><th>설명</th></tr>
+  <tr><td>id</td><td>String uuid</td><td>PK</td></tr>
+  <tr><td>symbol / name</td><td>String</td><td>토스 심볼(예: TQQQ) / 표시명</td></tr>
+  <tr><td>accountSeq</td><td>Int?</td><td>토스 계좌 (null=기본계좌)</td></tr>
+  <tr><td>type</td><td>String</td><td><code>accumulate</code>(적립) | <code>lumpsum</code>(거치)</td></tr>
+  <tr><td>formula</td><td>String</td><td><code>basic</code> | <code>skill</code> (기본값 skill)</td></tr>
+  <tr><td>gValue</td><td>Float</td><td>G (기본 10, 수동 조정 가능 — 라오어도 수동 상향)</td></tr>
+  <tr><td>bandPct</td><td>Float</td><td>밴드 ± % (기본 15)</td></tr>
+  <tr><td>contribution</td><td>Float</td><td>사이클(2주)당 적립금 USD (거치식 0)</td></tr>
+  <tr><td>poolLimitMode / poolLimitPct</td><td>String / Float?</td><td><code>auto</code>(유형별 스케줄) | <code>manual</code>(고정 %)</td></tr>
+  <tr><td><strong>vValue / pool</strong></td><td>Float</td><td><strong>현재 V / 현재 Pool(USD)</strong> — 체결 반영·사이클 갱신으로만 변경</td></tr>
+  <tr><td>startDate</td><td>String</td><td>시작 US 거래일 (주차·Pool한도 스케줄 앵커)</td></tr>
+  <tr><td>cycleIndex / cycleStartDate</td><td>Int / String?</td><td>현재 사이클 번호(0부터) / 현재 사이클 시작 거래일</td></tr>
+  <tr><td>status</td><td>String</td><td>active | paused | stopped</td></tr>
+  <tr><td>dryRun</td><td>Boolean</td><td>기본 true. <strong>false 생성·전환 차단</strong>(LIVE 게이팅)</td></tr>
+  <tr><td>note / lastRunDate</td><td>String?</td><td>경고 배지 / 마지막 실행 US 거래일 (중복 실행 방지)</td></tr>
+</table>
+<p>생성 폼 입력: 초기 V·초기 Pool·(참고용) 보유수량 — 신규 시작(V=초기 매수금액)과 중도 합류 모두 커버. dryRun 계좌는 가상 보유수량을 <code>VrOrder</code> 체결 누적으로 파생(무한매수 V4 방식)하되, 생성 시 초기 보유수량을 seed 체결로 기록한다.</p>
+
+<h3>VrOrder — 주문·체결 이력 (InfiniteBuyOrder 패턴)</h3>
+<p>accountId, cycleIndex, tradeDate(US), side(BUY|SELL), kind(<code>loc_buy</code>|<code>limit_sell</code>|<code>seed</code>), orderType(LIMIT|MARKET), tif(CLS|DAY), price, quantity, filledQty/filledPrice/filledAt, tossOrderId, <strong>stateApplied</strong>(V·Pool 반영 멱등 마커), dryRun, status(<code>simulated</code>|<code>simulated_filled</code>|<code>expired</code>|<code>submitted</code>|<code>filled</code>|<code>failed</code>|<code>skipped</code>), error.</p>
+
+<h3>VrCycleLog — 사이클 경계 기록 (그래프·감사용)</h3>
+<p>accountId, cycleIndex, date, <strong>vValue(갱신 후), evalAmount(E), pool, contribution, gValue, poolLimitPct, holdingQty</strong>. 사이클마다 1행 — 대시보드의 "V vs 평가금" 그래프 원천.</p>
+
+<h2>4. 핵심 로직 — <code>src/lib/vr/</code> (순수 함수 우선)</h2>
+
+<h3>formula.ts</h3>
+<pre><code>nextV({v, pool, g, evalAmount, contribution, formula}):
+  basic: V₂ = V + Pool/G + 적립금
+  skill: V₂ = V + Pool/G + (E − V)/(2√G) + 적립금
+band(v, bandPct): { min: v×(1−p/100), max: v×(1+p/100) }</code></pre>
+<p>검증 픽스처(62주차 실측): V₁ 15205.76, E 5282.11, Pool 76.73, G 11, 적립 250 → skill 새V = <strong>13966.69</strong>, 밴드 = <strong>11871.69 / 16061.69</strong>.</p>
+
+<h3>pool-limit.ts</h3>
+<pre><code>poolLimitPct(type, weeksSinceStart):
+  accumulate: max(10, 75 − 5 × floor(주차 / 26))   // 75% 시작, 26주마다 −5%p, 최저 10%
+  lumpsum:    50                                    // 고정
+manual 모드면 poolLimitPct 값 사용</code></pre>
+
+<h3>order-table.ts — 매수표·매도표 (62주차 슬라이드에서 역산·검증한 규칙)</h3>
+<ul>
+  <li><strong>매수</strong> (보유 n주, k = n+1, n+2, …): k주째 매수점 가격 = <code>밴드하단 / (k−1)</code>. 주문 = LOC 매수(LIMIT + CLS) 1주. 누적 예상 매수액이 <code>Pool × 사용한도%</code>를 넘는 레벨부터 제외. <span class="muted">검산: 하단 11871.69, 보유 233 → 234주째 = 11871.69/233 = 50.95 ✓, 235주째 = /234 = 50.73 ✓</span></li>
+  <li><strong>매도</strong> (k = n−1, n−2, …): k주로 줄이는 매도점 가격 = <code>밴드상단 / (k+1)</code>. 주문 = 지정가 매도(LIMIT + DAY) 1주. 보유수량까지만. <span class="muted">검산: 상단 16061.69, 보유 233 → 232로 = 16061.69/233 = 68.93 ✓, 231로 = /232 = 69.23 ✓</span></li>
+  <li>주문 레벨 상한: 매수·매도 각 <strong>20레벨</strong> (주문 폭주 방지 — Pool 한도로 대부분 그 이하로 잘림).</li>
+  <li>평가금이 밴드 안이면 해당 방향 주문이 자연히 트리거되지 않는 가격에 걸린다 — 별도 분기 불필요 (라오어 방식 그대로).</li>
+</ul>
+
+<h3>run-vr.ts — 오케스트레이터 (V4 패턴, 순서 불변식: 상태 반영 → 주문 계산)</h3>
+<pre><code>① sync   : 전일 주문 체결 판정
+           dryRun → 전일 일봉으로 judgeDryFill (infinite-buy/dry-fill.ts 재사용)
+           LIVE  → 토스 체결 대조 (범위 외, 인터페이스만 준비)
+② apply  : 미반영 체결(stateApplied=false)을 Pool·보유에 반영
+           BUY: pool −= 체결가×수량 / SELL: pool += 체결가×수량 (멱등)
+③ cycle  : 오늘 ≥ cycleStartDate + 14일의 첫 US 거래일이면 사이클 경계:
+           pool += contribution → E(평가금) 산출 → nextV → VrCycleLog 기록
+           → cycleIndex++, cycleStartDate 갱신 (cycleIndex 기반 멱등)
+④ compute: order-table로 오늘의 매수·매도표 계산
+⑤ submit : dryRun → simulated 기록 / LIVE → 차단(게이팅)
+           전일 미체결 simulated는 sync에서 expired 처리 (당일 만료 주문이므로 매일 재계산·재제출)</code></pre>
+<p>blocked(일봉 미확보·크로스체크 실패 등) 시 lastRunDate를 갱신하지 않아 다음 폴에서 자동 재시도. 같은 거래일 재실행은 lastRunDate로 차단 (V4 교훈).</p>
+
+<h3>E(평가금) 산출 — 용도별로 분리</h3>
+<ul>
+  <li><strong>공식의 E (사이클 경계, V 갱신용)</strong>: 파생 보유수량 × <strong>직전 US 거래일 종가</strong>(일봉) — 라오어의 "마지막 평가금 E"와 일치. 결정적(deterministic)이라 재시도에도 같은 값.</li>
+  <li><strong>대시보드 표시용 평가금</strong>: 파생 보유수량 × 당일 현재가(토스 시세) — 공식 계산에는 쓰지 않는다.</li>
+</ul>
+
+<h2>5. 실행 — worker</h2>
+<ul>
+  <li><code>worker/vr-loop.ts</code> 신설, <code>worker/index.ts</code>에 편입 — infinite-buy-loop과 동일한 15분 폴 패턴, US 거래일·장 시간 판단 로직 재사용.</li>
+  <li>사이클 경계가 아닌 날도 매일 실행: 주문 재계산·재제출 + 체결 반영 (V·밴드는 사이클 내 고정, 보유·Pool만 변동).</li>
+</ul>
+
+<h2>6. UI</h2>
+<ul>
+  <li><strong>AppMenu에 별도 메뉴 항목 추가</strong> — key <code>vr</code>, name "밸류리밸런싱 VR", path <code>/stocks/vr</code>, 무한매수법 항목과 분리·병렬. (사용자 요구사항)</li>
+  <li><code>/stocks/vr</code> 페이지 + <code>src/actions/vr.ts</code> Server Actions:
+    <ul>
+      <li>계좌 카드: V·Pool·평가금·밴드(하단/상단)·보유·주차·다음 사이클일·수익률, dryRun 배지, note 경고 배지</li>
+      <li>V vs 평가금 그래프 (VrCycleLog, Recharts — 라오어 "최대최소 그래프" 형태: V·밴드 점선 + 평가금 실선)</li>
+      <li>오늘의 매수표·매도표 (가격·수량·Pool 잔액 시뮬레이션 — 62주차 슬라이드 표 형태)</li>
+      <li>주문·체결 이력 테이블</li>
+      <li>생성 폼(§3) / 일시정지·재개 / 수동 실행(runCycleNow 상당) / G·적립금·밴드 수정</li>
+    </ul>
+  </li>
+</ul>
+
+<h2>7. 가드·에러 처리 (V4 교훈 재사용)</h2>
+<table>
+  <tr><th>가드</th><th>내용</th></tr>
+  <tr><td>LIVE 게이팅</td><td>dryRun=false 생성·전환을 액션 레벨에서 거부, UI에 "LIVE 미지원" 명시</td></tr>
+  <tr><td>중복 실행 방지</td><td>lastRunDate = 오늘 US 거래일이면 skip (수동 실행 포함)</td></tr>
+  <tr><td>사이클 멱등성</td><td>경계 판정·V 갱신은 cycleIndex 단위로 1회만 (재시도 안전)</td></tr>
+  <tr><td>체결 멱등성</td><td>stateApplied 마커 — 같은 체결이 Pool에 두 번 반영되지 않음</td></tr>
+  <tr><td>주문 가드</td><td>assertSubmittable 상당: 수량·가격 유효성, Pool 음수 방지</td></tr>
+  <tr><td>graceful block</td><td>①~⑤ 중 실패 시 note 기록 + lastRunDate 미갱신 → 다음 폴 재시도</td></tr>
+</table>
+
+<h2>8. 테스트 전략 (Vitest, 순수 함수 단위)</h2>
+<ul>
+  <li><strong>formula.test.ts</strong> — 62주차 실측 검산: skill 공식 → 13966.69, 밴드 → 11871.69/16061.69. basic 공식, E≈V일 때 두 공식 근사 일치, 적립금 0(거치식).</li>
+  <li><strong>pool-limit.test.ts</strong> — 0주 75% / 26주 70% / 169주 45% / 338주+ 10% 고정 / 거치식 50% / manual 오버라이드.</li>
+  <li><strong>order-table.test.ts</strong> — 62주차 매수표(50.95, 50.73, 50.52…)·매도표(68.93, 69.23, 69.53…) 재현, Pool 한도 컷, 레벨 상한, 보유 0·Pool 0 엣지.</li>
+  <li><strong>run-vr.test.ts</strong> — 사이클 경계 판정(14일+첫 거래일), 멱등성(같은 날 재실행·경계 중복), 체결 apply 후 V 갱신 순서, blocked 시 lastRunDate 미갱신.</li>
+  <li>기존 <code>dry-fill.ts</code> 판정은 이미 테스트됨 — 재사용만.</li>
+</ul>
+
+<h2>9. 결정 사항 요약 (Q&A)</h2>
+<table>
+  <tr><th>질문</th><th>결정</th></tr>
+  <tr><td>구현 범위</td><td>V4.0 패턴 dryRun 전용 자동매매 (백테스터·수동계산기 아님)</td></tr>
+  <tr><td>운용 유형</td><td>적립식 + 거치식 (인출식 제외)</td></tr>
+  <tr><td>공식</td><td>기본·실력 둘 다, 생성 시 선택 (기본값 실력공식)</td></tr>
+  <tr><td>아키텍처</td><td>A안 독립 모듈 (lib/vr + 새 테이블 + 별도 페이지)</td></tr>
+  <tr><td>메뉴</td><td><strong>AppMenu에 무한매수법과 분리된 별도 항목으로 추가</strong></td></tr>
+  <tr><td>매도 주문 방식</td><td>지정가 DAY (라오어 62주차 방식), 매수는 LOC(CLS)</td></tr>
+  <tr><td>주문 재제출</td><td>당일 만료 주문이므로 매일 표 재계산·재제출</td></tr>
+</table>
+
+</body>
+</html>
