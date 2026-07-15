@@ -483,3 +483,83 @@ model MarketRate {
 
   @@map("market_rates")
 }
+
+// 밸류리밸런싱(VR 5.0) 계좌. V·Pool은 체결 반영·사이클 갱신으로만 변경.
+// 보유수량은 저장하지 않고 VrOrder 체결(seed 포함) 누적으로 파생한다.
+model VrAccount {
+  id             String   @id @default(uuid())
+  symbol         String                                  // 토스 심볼(US 티커, 예: TQQQ)
+  name           String                                  // 표시용 종목명
+  accountSeq     Int?     @map("account_seq")            // 토스 계좌(null=기본계좌)
+  type           String   @default("accumulate")         // accumulate(적립) | lumpsum(거치)
+  formula        String   @default("skill")              // basic | skill (V 갱신 공식)
+  gValue         Float    @default(10) @map("g_value")   // G 기울기 (수동 조정 가능)
+  bandPct        Float    @default(15) @map("band_pct")  // 밴드 ±%
+  contribution   Float    @default(0)                    // 사이클(2주)당 적립금 USD (거치식 0)
+  poolLimitMode  String   @default("auto") @map("pool_limit_mode") // auto | manual
+  poolLimitPct   Float?   @map("pool_limit_pct")         // manual일 때 고정 %
+  vValue         Float    @map("v_value")                // 현재 목표가치 V
+  pool           Float                                   // 현재 Pool(USD)
+  startDate      String   @map("start_date")             // 시작 US 거래일 (주차 앵커)
+  cycleIndex     Int      @default(0) @map("cycle_index")
+  cycleStartDate String   @map("cycle_start_date")       // 현재 사이클 시작 거래일
+  status         String   @default("active")             // active | paused | stopped
+  dryRun         Boolean  @default(true) @map("dry_run")
+  note           String?                                 // 마지막 경고/보류 사유 (대시보드 배지)
+  lastRunDate    String?  @map("last_run_date")          // 마지막 실행 US 거래일 (중복 실행 방지)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  orders    VrOrder[]
+  cycleLogs VrCycleLog[]
+
+  @@map("vr_accounts")
+}
+
+model VrOrder {
+  id           String   @id @default(uuid())
+  accountId    String   @map("account_id")
+  cycleIndex   Int      @map("cycle_index")
+  tradeDate    String   @map("trade_date")     // US 거래일
+  side         String                          // BUY | SELL
+  kind         String                          // seed | loc_buy | limit_sell
+  orderType    String   @map("order_type")     // LIMIT | MARKET
+  tif          String                          // CLS | DAY
+  price        Float?
+  quantity     Float
+  filledQty    Float?   @map("filled_qty")
+  filledPrice  Float?   @map("filled_price")
+  filledAt     String?  @map("filled_at")
+  tossOrderId  String?  @map("toss_order_id")
+  stateApplied Boolean? @map("state_applied")  // 이 체결이 Pool에 반영됐는지(멱등 마커)
+  dryRun       Boolean  @map("dry_run")
+  status       String                          // simulated | simulated_filled | expired | submitted | filled | failed | skipped
+  error        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  account VrAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, tradeDate])
+  @@map("vr_orders")
+}
+
+// 사이클 경계(V 갱신) 기록. 대시보드 그래프 + 감사 추적용. accountId+cycleIndex 유니크로 멱등 보강.
+model VrCycleLog {
+  id           String   @id @default(uuid())
+  accountId    String   @map("account_id")
+  cycleIndex   Int      @map("cycle_index")    // 갱신 후 사이클 번호
+  date         String                          // 사이클 시작 US 거래일
+  vValue       Float    @map("v_value")        // 갱신 후 V
+  evalAmount   Float    @map("eval_amount")    // 공식에 쓴 E (직전 거래일 종가 × 보유)
+  pool         Float                           // 갱신 시점 Pool (적립 반영 후)
+  contribution Float
+  gValue       Float    @map("g_value")
+  poolLimitPct Float    @map("pool_limit_pct")
+  holdingQty   Float    @map("holding_qty")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  account VrAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, cycleIndex])
+  @@map("vr_cycle_logs")
+}
