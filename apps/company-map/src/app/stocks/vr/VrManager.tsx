@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   createVrAccount, getVrCycleLogs, getVrOrders, runVrNow, setVrStatus,
   type CreateVrInput, type VrAccountView,
@@ -18,6 +19,7 @@ type CycleLogRow = Awaited<ReturnType<typeof getVrCycleLogs>>[number];
 type OrderRow = Awaited<ReturnType<typeof getVrOrders>>[number];
 
 export function VrManager({ accounts }: { accounts: VrAccountView[] }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -50,9 +52,11 @@ export function VrManager({ accounts }: { accounts: VrAccountView[] }) {
             <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
               {a.type === "accumulate" ? "적립식" : "거치식"} · {a.formula === "skill" ? "실력공식" : "기본공식"} · G {a.gValue}
             </span>
-            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-              dryRun
-            </span>
+            {a.dryRun && (
+              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                dryRun
+              </span>
+            )}
             {a.note && (
               <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-700 dark:bg-red-900/40 dark:text-red-300">
                 {a.note}
@@ -74,30 +78,32 @@ export function VrManager({ accounts }: { accounts: VrAccountView[] }) {
 
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             <button
-              className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800"
               disabled={pending}
               onClick={() => toggleDetail(a.id)}
             >
               {openId === a.id ? "상세 닫기" : "그래프·주문 이력"}
             </button>
             <button
-              className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800"
               disabled={pending}
               onClick={() =>
                 startTransition(async () => {
                   const r = await runVrNow(a.id);
                   setMessage(r.message);
+                  router.refresh();
                 })
               }
             >
               지금 실행
             </button>
             <button
-              className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:hover:bg-gray-800"
+              className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800"
               disabled={pending}
               onClick={() =>
                 startTransition(async () => {
                   await setVrStatus(a.id, a.status === "active" ? "paused" : "active");
+                  router.refresh();
                 })
               }
             >
@@ -123,7 +129,7 @@ export function VrManager({ accounts }: { accounts: VrAccountView[] }) {
                     <YAxis fontSize={11} domain={["auto", "auto"]} />
                     <Tooltip />
                     <Line type="monotone" dataKey="평가금" stroke="#dc2626" dot={false} strokeWidth={2} />
-                    <Line type="monotone" dataKey="V" stroke="#2563eb" dot={false} />
+                    <Line type="monotone" dataKey="V" stroke="#2563eb" strokeDasharray="4 4" dot={false} />
                     <Line type="monotone" dataKey="최소" stroke="#94a3b8" strokeDasharray="4 4" dot={false} />
                     <Line type="monotone" dataKey="최대" stroke="#94a3b8" strokeDasharray="4 4" dot={false} />
                   </LineChart>
@@ -196,6 +202,7 @@ function OrderPreview({ title, orders }: { title: string; orders: { price: numbe
 }
 
 function CreateForm({ onDone }: { onDone: () => void }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<CreateVrInput>({
@@ -240,6 +247,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
               setError(r.error ?? "생성 실패");
               return;
             }
+            router.refresh();
             onDone();
           })
         }
