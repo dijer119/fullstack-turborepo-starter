@@ -169,6 +169,17 @@ export async function runVr(
     cycled = true;
   }
 
+  // 같은 거래일 중복 제출 방지: 이미 오늘 이 계좌에 생성한 주문이 있으면 재제출하지 않는다.
+  // 주문 생성과 lastRunDate 갱신 사이 크래시/재시도 시, simulateDryFills/applyFills가
+  // 중복 행을 각각 독립 판정해 Pool·보유를 이중 반영하는 것을 막는다 (run-v4.ts와 동일 패턴).
+  // 주의: 계좌 생성일에 kind="seed" 체결이 같은 tradeDate로 이미 있으면 그날 신규 주문 생성도
+  // 함께 스킵된다 — 중복 방지가 우선이므로 안전한 방향으로 그대로 둔다.
+  const alreadyToday = await db.vrOrder.count({ where: { accountId: acc.id, tradeDate } });
+  if (alreadyToday > 0) {
+    await db.vrAccount.update({ where: { id: acc.id }, data: { lastRunDate: tradeDate } });
+    return { simulated: 0, cycled, blocked: null };
+  }
+
   // ④ 오늘의 매수·매도표 → ⑤ simulated 기록 (당일 만료 주문 — 매 거래일 재계산·재제출)
   const b = band(acc.vValue, acc.bandPct);
   const budget = round2(acc.pool * (resolvePoolLimitPct(acc, tradeDate) / 100));
