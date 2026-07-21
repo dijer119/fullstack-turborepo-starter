@@ -306,7 +306,9 @@ export function InfiniteBuyManager({
                     : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"}`}>
                     {c.dryRun ? "dryRun" : "LIVE"}
                   </span>
-                  <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                  <span className={`rounded px-1.5 py-0.5 text-xs ${c.status === "active"
+                    ? "bg-red-50 font-semibold text-red-600 dark:bg-red-950/40 dark:text-red-400"
+                    : "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"}`}>
                     {c.status}
                   </span>
                   <span className="rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">

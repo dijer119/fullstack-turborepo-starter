@@ -193,6 +193,9 @@ export async function listCycles(): Promise<CycleView[]> {
       starPrice: v4Star, perBuyAmount: v4PerBuy,
     });
   }
+  // 진행 중(active) 사이클을 위로. 그 외(paused/completed/stopped/exhausted)는 아래.
+  // 안정 정렬이라 각 그룹 내 생성일 순서는 유지된다.
+  views.sort((a, b) => (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1));
   return views;
 }
 
