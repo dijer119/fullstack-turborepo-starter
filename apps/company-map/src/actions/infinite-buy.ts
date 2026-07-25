@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import {
   getHoldings, getDefaultAccountSeq, getBuyingPower, getDailyCandles, getOrders,
-  isTossConfigured, type DailyCandle,
+  getMarketCalendarUS, isTossConfigured, type DailyCandle,
 } from "@/lib/toss/client";
 import { runCycle, type CycleConfig } from "@/lib/infinite-buy/run";
 import { tossRunDeps, prismaPersistence, isKilled, tossV4Deps } from "@/lib/infinite-buy/toss-adapter";
@@ -12,6 +12,7 @@ import { rsi14, RSI_UNIVERSE } from "@/lib/infinite-buy/rsi";
 import { starPct, px } from "@/lib/infinite-buy/strategy-v4";
 import { syncFillsFromToss, loadFillEvents, derivePositionFromFills } from "@/lib/infinite-buy/sync";
 import { runV4 } from "@/lib/infinite-buy/run-v4";
+import { pickLastClosedTradeDate, isMissedRun } from "@/lib/infinite-buy/missed-run";
 
 export interface CycleView {
   id: string;
@@ -40,6 +41,23 @@ export interface CycleView {
   note: string | null;
   starPrice: number | null;     // 오늘의 별지점 (평단 있을 때)
   perBuyAmount: number | null;  // 1회매수금 = 잔금/(분할−T)
+  // active인데 마지막 실행일이 최근 마감 거래일보다 뒤처지면 그 거래일. 정상이면 null.
+  missedSince: string | null;
+}
+
+// 최근 "마감된" US 정규 거래일. 실행 누락 판정 기준(진행 중 세션은 아직 누락 아님).
+// 토스 미설정·조회 실패 시 null → 누락 판정을 하지 않는다(오탐 방지).
+async function lastClosedUsTradeDate(): Promise<string | null> {
+  if (!isTossConfigured()) return null;
+  try {
+    const cal = await retryRead(() => getMarketCalendarUS());
+    return pickLastClosedTradeDate(
+      [cal.previousBusinessDay, cal.today, cal.nextBusinessDay],
+      Date.now(),
+    );
+  } catch {
+    return null;
+  }
 }
 
 // 토스 읽기 호출 재시도. worker와 토큰/요청한도 경합으로 간헐 실패 시 대시보드가
@@ -143,6 +161,7 @@ export async function getRsiTable(force = false): Promise<RsiTable> {
 export async function listCycles(): Promise<CycleView[]> {
   const rows = await db.infiniteBuyCycle.findMany({ orderBy: { createdAt: "asc" } });
   const live = await liveHoldingMap();
+  const lastClosed = await lastClosedUsTradeDate();
 
   // 사이클별 누적 실현수익 = 체결 확인된(SELL·filled) 매도의 (체결가 − 평단) × 체결수량 합.
   // 체결 확인은 "토스 체결 동기화"(syncSellFills)가 filled로 마킹한 것만 — dryRun/미체결 제외.
@@ -191,6 +210,7 @@ export async function listCycles(): Promise<CycleView[]> {
       realizedPnl: pnlByCycle.get(c.id) ?? null,
       tValue: c.tValue, cashRemaining: c.cashRemaining, starBase: c.starBase, note: c.note,
       starPrice: v4Star, perBuyAmount: v4PerBuy,
+      missedSince: isMissedRun(c.status, c.lastRunDate, lastClosed) ? lastClosed : null,
     });
   }
   // 진행 중(active) 사이클을 위로. 그 외(paused/completed/stopped/exhausted)는 아래.

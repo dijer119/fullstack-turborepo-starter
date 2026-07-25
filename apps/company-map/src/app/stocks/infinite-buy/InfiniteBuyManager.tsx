@@ -319,6 +319,14 @@ export function InfiniteBuyManager({
                       ⚠ {c.note.length > 30 ? `${c.note.slice(0, 30)}…` : c.note}
                     </span>
                   )}
+                  {c.missedSince && (
+                    <span
+                      className="rounded bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white"
+                      title={`마지막 실행 ${c.lastRunDate ?? "없음"} · 최근 마감 거래일 ${c.missedSince} — worker 미가동이나 머신 절전으로 그날 주문이 나가지 않았을 수 있습니다(설계상 지난 거래일은 재실행되지 않음)`}
+                    >
+                      ⚠ 실행 누락 ({c.missedSince})
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 text-xs">
                   <button onClick={() => toggleDryRun(c)} disabled={pending} className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
