@@ -60,8 +60,14 @@ export async function listDcaAccounts(): Promise<DcaAccountView[]> {
   const views: DcaAccountView[] = [];
 
   for (const acc of accounts) {
+    // 계좌의 현재 모드와 같은 주문만 센다 — 시뮬레이션으로 몇 주 돌린 뒤 LIVE로 전환한
+    // 계좌에서 종이 체결과 실제 체결이 섞여 보유·평가액이 실보유와 어긋나는 것을 막는다.
     const fills = await db.dcaOrder.findMany({
-      where: { accountId: acc.id, status: { in: ["simulated_filled", "filled"] } },
+      where: {
+        accountId: acc.id,
+        dryRun: acc.dryRun,
+        status: { in: ["simulated_filled", "filled"] },
+      },
       select: { symbol: true, filledQty: true },
     });
     const holdings = deriveHoldings(fills);
@@ -190,16 +196,22 @@ export async function createDcaAccount(
   if (!(input.thresholdPct > 0) || input.thresholdPct >= 100) {
     return { ok: false, error: "하락 임계%는 0~100 사이여야 합니다" };
   }
-  if (!(input.dailyAmountKrw > 0)) return { ok: false, error: "거래일당 적립액은 0보다 커야 합니다" };
+  // Infinity 방어 — Number("Infinity")는 `> 0` 검사를 통과한다. dailyAmountKrw가 Infinity면
+  // accrue가 영구 무동작이 되고, peakPrice가 Infinity면 낙폭이 항상 −100%라 매일 레버리지를 산다.
+  if (!(input.dailyAmountKrw > 0) || !Number.isFinite(input.dailyAmountKrw)) {
+    return { ok: false, error: "거래일당 적립액은 0보다 커야 합니다" };
+  }
   if (!(input.premiumPct >= 0) || input.premiumPct >= 100) {
     return { ok: false, error: "LOC 프리미엄%는 0~100 사이여야 합니다" };
   }
-  if (!(input.initialCashKrw >= 0)) return { ok: false, error: "초기 잔액은 음수 불가" };
+  if (!(input.initialCashKrw >= 0) || !Number.isFinite(input.initialCashKrw)) {
+    return { ok: false, error: "초기 잔액은 음수 불가" };
+  }
 
   const today = todayIso();
   let peakPrice = input.peakPrice;
   let peakDate = today;
-  if (peakPrice == null || !(peakPrice > 0)) {
+  if (peakPrice == null || !(peakPrice > 0) || !Number.isFinite(peakPrice)) {
     const seed = await previewSeedPeak(base);
     if (!seed) {
       return { ok: false, error: `${base} 일봉을 받지 못했습니다 — 최고가를 직접 입력하세요` };
@@ -251,16 +263,26 @@ export async function updateDcaSettings(
   if (patch.thresholdPct !== undefined && (!(patch.thresholdPct > 0) || patch.thresholdPct >= 100)) {
     return { ok: false, error: "하락 임계%는 0~100 사이여야 합니다" };
   }
-  if (patch.dailyAmountKrw !== undefined && !(patch.dailyAmountKrw > 0)) {
+  // Infinity 방어 — createDcaAccount와 같은 이유(Number("Infinity")가 `> 0`을 통과한다).
+  if (
+    patch.dailyAmountKrw !== undefined &&
+    (!(patch.dailyAmountKrw > 0) || !Number.isFinite(patch.dailyAmountKrw))
+  ) {
     return { ok: false, error: "거래일당 적립액은 0보다 커야 합니다" };
   }
   if (patch.premiumPct !== undefined && (!(patch.premiumPct >= 0) || patch.premiumPct >= 100)) {
     return { ok: false, error: "LOC 프리미엄%는 0~100 사이여야 합니다" };
   }
-  if (patch.cashKrw !== undefined && !(patch.cashKrw >= 0)) {
+  if (
+    patch.cashKrw !== undefined &&
+    (!(patch.cashKrw >= 0) || !Number.isFinite(patch.cashKrw))
+  ) {
     return { ok: false, error: "이월 잔액은 음수 불가" };
   }
-  if (patch.peakPrice !== undefined && !(patch.peakPrice > 0)) {
+  if (
+    patch.peakPrice !== undefined &&
+    (!(patch.peakPrice > 0) || !Number.isFinite(patch.peakPrice))
+  ) {
     return { ok: false, error: "최고가는 0보다 커야 합니다" };
   }
   const { confirmLive, ...data } = patch;

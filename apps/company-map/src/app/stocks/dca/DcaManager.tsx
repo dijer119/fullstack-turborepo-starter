@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   createDcaAccount,
@@ -98,7 +98,7 @@ export function DcaManager({ accounts }: { accounts: DcaAccountView[] }) {
             />
             <Stat label="최고 종가" value={`$${fmt(a.peakPrice)} (${a.peakDate})`} />
             <Stat
-              label="지금 매수 대상"
+              label="지금 매수 대상 (현재가 기준)"
               value={a.pickedSymbol ? `${a.pickedSymbol}${a.leveraged ? " (레버리지)" : ""}` : "—"}
             />
             <Stat label="이월 잔액" value={krw(a.cashKrw)} />
@@ -111,7 +111,9 @@ export function DcaManager({ accounts }: { accounts: DcaAccountView[] }) {
           </div>
 
           <div className="mt-3 rounded border border-gray-200 p-2 text-xs dark:border-gray-700">
-            <div className="mb-1 font-semibold text-gray-600 dark:text-gray-300">오늘 주문 미리보기</div>
+            <div className="mb-1 font-semibold text-gray-600 dark:text-gray-300">
+              오늘 주문 미리보기 (현재가 기준)
+            </div>
             {a.plan ? (
               <div className="font-mono">
                 {a.pickedSymbol} LOC 매수 · 지정가 ${fmt(a.plan.price)} × {a.plan.quantity}주 · 최대{" "}
@@ -244,6 +246,9 @@ function OrderHistory({ orders }: { orders: OrderRow[] }) {
   );
 }
 
+/** 설정 폼에서 사용자가 직접 수정할 수 있는 숫자 필드 */
+type EditableKey = "thresholdPct" | "dailyAmountKrw" | "premiumPct" | "cashKrw" | "peakPrice";
+
 function SettingsForm({
   account,
   onDone,
@@ -259,6 +264,19 @@ function SettingsForm({
   const [cashKrw, setCashKrw] = useState(String(account.cashKrw));
   const [peakPrice, setPeakPrice] = useState(String(account.peakPrice));
   const [dryRun, setDryRun] = useState(account.dryRun);
+
+  // 마운트 시점의 원본 문자열. 워커가 cashKrw·peakPrice를 계속 갱신하는데 이 폼의 state는
+  // props가 바뀌어도 그대로이므로, 사용자가 직접 고치지 않은 필드를 절대값으로 되돌려 쓰면
+  // 그 사이 반영된 적립·체결 차감·peak 갱신이 유실된다. 바뀐 필드만 patch에 담는다.
+  const initial = useRef<Record<EditableKey, string>>({
+    thresholdPct: String(account.thresholdPct),
+    dailyAmountKrw: String(account.dailyAmountKrw),
+    premiumPct: String(account.premiumPct),
+    cashKrw: String(account.cashKrw),
+    peakPrice: String(account.peakPrice),
+  });
+  const edited = (key: EditableKey, value: string): number | undefined =>
+    value === initial.current[key] ? undefined : Number(value);
 
   return (
     <div className="mt-3 rounded border border-gray-200 p-3 dark:border-gray-700">
@@ -301,13 +319,15 @@ function SettingsForm({
                 if (!ok) return;
               }
               const r = await updateDcaSettings(account.id, {
-                thresholdPct: Number(thresholdPct),
-                dailyAmountKrw: Number(dailyAmountKrw),
-                premiumPct: Number(premiumPct),
-                cashKrw: Number(cashKrw),
-                peakPrice: Number(peakPrice),
+                thresholdPct: edited("thresholdPct", thresholdPct),
+                dailyAmountKrw: edited("dailyAmountKrw", dailyAmountKrw),
+                premiumPct: edited("premiumPct", premiumPct),
+                cashKrw: edited("cashKrw", cashKrw),
+                peakPrice: edited("peakPrice", peakPrice),
                 dryRun,
-                confirmLive: true,
+                // 시뮬레이션 → LIVE 전환일 때만 보낸다. 항상 true로 보내면 서버의
+                // LIVE 전환 가드가 무력화되고 클라이언트 confirm만 남는다.
+                confirmLive: !dryRun && account.dryRun ? true : undefined,
               });
               router.refresh();
               onDone(r.ok ? "설정을 저장했습니다" : r.error);

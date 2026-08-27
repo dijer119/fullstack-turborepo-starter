@@ -612,7 +612,8 @@ model DcaOrder {
   tossOrderId  String?  @map("toss_order_id")
   stateApplied Boolean? @map("state_applied")  // cashKrw 반영 여부(멱등 마커)
   dryRun       Boolean  @map("dry_run")
-  status       String                          // simulated | simulated_filled | expired | submitted | filled | failed
+  status       String                          // simulated | simulated_filled | expired | submitting | submitted | filled | submit_unknown
+                                               //   submitting: 제출 직전에 만든 뮤텍스 행 / submit_unknown: 제출 결과 미확인(수동 확인 필요)
   error        String?
   createdAt    DateTime @default(now()) @map("created_at")
 

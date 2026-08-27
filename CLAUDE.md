@@ -153,7 +153,7 @@ packages/
 - **lint를 게이트로 쓸 수 없음** — 기존 파일의 `react-hooks/set-state-in-effect` 에러로 워크스페이스 lint가 항상 exit 1. 변경 파일만 `npx eslint <files>`로 스코프 검증할 것. (useEffect 내 동기 setState 금지; `await` 이후 setState는 허용)
 - **ETF 스냅샷은 각 ETF Top10만 저장**(`worker/etf-snapshot.ts`의 `topN(...,10)`) → ETF 비중 합산·전일대비(`/stocks/etf/combined`)도 Top10 기준이라는 한계가 있음.
 - **QQQ·QLD 적립식(`/stocks/dca`)의 자금 상태는 `cashKrw` 하나에 모인다** — 적립은 `lastAccrualDate`, 체결 차감은 주문의 `stateApplied`, 주문 생성은 "당일 주문 존재" 카운트로 각각 독립 멱등을 보장한다. 세 가드 중 하나를 `lastRunDate`로 합치면 보류·재시도 시 중복 적립이나 이중 차감이 발생한다. 또 워커가 꺼져 있던 거래일은 적립이 누락되며 보정 로직이 없으므로 설정 폼에서 `cashKrw`를 수동으로 맞춘다.
-- **DCA 동시 실행 레이스가 미해결 상태로 남아있음** — "지금 실행"은 Next dev 서버에서, `dca-loop`는 별도 워커 프로세스에서 같은 SQLite 파일에 붙기 때문에 이론상 동시 실행이 가능하다. 당일 주문 중복 방지는 `count` 후 `create`(재확인 1회로 창을 좁혔을 뿐 DB 제약은 아님)라 극히 드물게 같은 거래일에 중복 주문(LIVE면 실주문 중복 체결)이 생길 수 있고, `updateDcaSettings`는 `cashKrw`를 절대값으로 쓰는 반면 `runDca`는 증분으로 쓰므로 설정 저장과 "지금 실행"이 겹치면 수동 잔액 보정이 유실될 수 있다. LIVE 전환 전에는 반드시 인지할 것.
+- **DCA 동시 실행 레이스는 좁혀졌지만 DB 제약은 아직 없음** — "지금 실행"은 Next 서버에서, `dca-loop`는 별도 워커 프로세스에서 같은 SQLite 파일에 붙어 동시 실행이 가능하다. **닫힌 것**: LIVE도 제출 *전에* 주문 행(`submitting`)을 먼저 만들고 예수금 조회를 재확인 앞으로 옮겨, 재확인~행 생성 사이가 dryRun·LIVE 모두 로컬 쓰기 1회로 줄었다(이전엔 LIVE만 네트워크 왕복 3회 뒤에 행이 생겼다). 설정 폼은 `useRef`로 마운트 시점 값을 기억해 **사용자가 고친 필드만** 보내므로 폼을 열어둔 사이 워커가 반영한 `cashKrw`·`peakPrice`가 옛 스냅샷으로 덮이지 않는다. **남은 것**: 당일 주문 중복 방지는 여전히 `count` 후 `create`이고 `@@unique([accountId, tradeDate])`가 없어서 그 한 번의 쓰기 사이에 정확히 겹치면 중복 주문(LIVE면 실주문 중복 체결)이 가능하다 — 권장 후속 작업. 잔액을 *의도적으로* 보정해 저장하는 순간에 실행이 겹치면 절대값 쓰기가 그 사이 증감을 덮으므로 보정은 정규장 밖에서 할 것. 또 주문 이력에 `submit_unknown`/`submitting`이 보이면 제출 결과를 알 수 없다는 뜻이라 **토스 앱에서 체결 여부를 직접 확인하고 `cashKrw`를 수동 보정**해야 한다(자동 정산 대상이 아님). LIVE 전환 전에는 반드시 인지할 것.
 
 ## 개발 명령어
 

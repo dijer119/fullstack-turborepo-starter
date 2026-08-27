@@ -159,10 +159,10 @@ export async function runDca(
   let acc = await db.dcaAccount.findUniqueOrThrow({ where: { id: accountId } });
   if (acc.status !== "active") return { ...none, blocked: "not_active" };
   if (acc.lastRunDate === tradeDate) return { ...none, blocked: "already_ran" };
-  // killed면 아무것도 하지 않고 즉시 반환 — settleDryOrders/settleLiveOrders는 계좌의
-  // dryRun으로 정산 대상을 가르므로, 여기서 시뮬레이션 행을 만들면 LIVE 계좌에서는
-  // 어느 정산 경로에도 걸리지 않는 고아 행이 된다. lastRunDate를 건드리지 않으므로
-  // 킬 스위치가 풀리면 다음 폴에서 그대로 재시도된다.
+  // killed면 아무것도 하지 않고 즉시 반환 — LIVE 계좌에 시뮬레이션 행을 남기면 실제로
+  // 사지 않은 주식이 잔액에서 차감되고(applyPendingFills는 행의 dryRun을 보지 않는다)
+  // 보유·평가액 표시와도 어긋난다. lastRunDate를 건드리지 않으므로 킬 스위치가 풀리면
+  // 다음 폴에서 그대로 재시도된다.
   if (killed) return { ...none, blocked: "disabled" };
 
   const block = async (reason: string, accrued: boolean): Promise<DcaRunResult> => {
@@ -170,10 +170,13 @@ export async function runDca(
     return { ...none, accrued, blocked: reason };
   };
 
-  // ① 체결 정산
+  // ① 체결 정산 — 두 정산은 계좌가 아니라 "주문 행"의 dryRun으로 대상이 갈리고(각 where절)
+  // 두 조건은 서로 배타적이다. 계좌의 dryRun으로 분기하면 LIVE 전환 후 남아 있던 simulated
+  // 행(또는 dryRun 복귀 후의 submitted 행)이 어느 정산도 받지 못해 얼어붙으므로 항상 둘 다
+  // 돌린다. 어느 쪽이 실패해도 blocked로 다음 폴에서 재시도된다.
   try {
-    if (acc.dryRun) await settleDryOrders(db, deps, acc.id, tradeDate);
-    else await settleLiveOrders(db, deps, acc);
+    await settleDryOrders(db, deps, acc.id, tradeDate);
+    await settleLiveOrders(db, deps, acc);
   } catch (e) {
     return block(`체결 동기화 실패: ${msg(e)}`, false);
   }
@@ -228,12 +231,11 @@ export async function runDca(
   const picked = { ...none, symbol: pick.symbol, drawdownPct: pick.drawdownPct, accrued: a.accrued };
 
   // 같은 거래일 중복 주문 방지 — "지금 실행"이 lastRunDate 가드를 우회하는 경로 대비.
+  // note는 지우지 않는다 — 직전 실행이 남긴 "제출 결과 미확인" 같은 경고가 이 경로에서
+  // 조용히 사라지면 화면에 그 신호가 아예 남지 않는다.
   const alreadyToday = await db.dcaOrder.count({ where: { accountId, tradeDate } });
   if (alreadyToday > 0) {
-    await db.dcaAccount.update({
-      where: { id: accountId },
-      data: { lastRunDate: tradeDate, note: null },
-    });
+    await db.dcaAccount.update({ where: { id: accountId }, data: { lastRunDate: tradeDate } });
     return picked;
   }
 
@@ -277,20 +279,40 @@ export async function runDca(
     drawdownPct: pick.drawdownPct,
   };
 
-  // 재확인 — 위 alreadyToday 체크 이후 시세·환율 조회(네트워크 왕복) 동안 동시 실행이
-  // 끼어들 여지가 있다. 같은 로직을 주문 기록 직전에 한 번 더 태워 창을 수백 ms에서
-  // 수 μs로 좁힌다.
+  // LIVE 예수금 확인은 재확인 카운트보다 먼저 끝낸다 — 재확인과 주문 행 생성 사이에
+  // 네트워크 왕복이 끼면 중복 주문 창이 그만큼 다시 넓어진다. 예수금 부족으로 보류할 때
+  // 주문 행이 아직 없어야 같은 거래일 안에 재시도가 가능하다는 점도 이 순서에 달려 있다.
+  const simulate = acc.dryRun;
+  let accountSeq = 0; // LIVE 경로에서만 쓴다
+  if (!simulate) {
+    accountSeq = acc.accountSeq ?? (await deps.getDefaultAccountSeq());
+    let buyingPower: number;
+    try {
+      buyingPower = await deps.getBuyingPowerUsd(accountSeq);
+    } catch (e) {
+      return block(`매수가능금액 조회 실패: ${msg(e)}`, a.accrued);
+    }
+    // fail-closed — 응답 필드 누락·개편으로 NaN이 오면 `NaN < estUsd`가 false여서
+    // 검사 없이 통과해버린다. 비교를 뒤집어 유한하지 않은 값은 항상 막는다.
+    if (!(buyingPower >= plan.estUsd)) {
+      const have = Number.isFinite(buyingPower) ? `$${buyingPower.toFixed(2)}` : "확인 불가";
+      return block(
+        `USD 예수금 부족: 필요 $${plan.estUsd.toFixed(2)} / 보유 ${have}`,
+        a.accrued,
+      );
+    }
+  }
+
+  // 재확인 — 위 alreadyToday 체크 이후 시세·환율·예수금 조회(네트워크 왕복) 동안 동시
+  // 실행이 끼어들 여지가 있다. 같은 로직을 주문 기록 직전에 한 번 더 태워, 재확인과 주문
+  // 행 생성 사이를 로컬 SQLite 쓰기 1회로 좁힌다. (note는 위와 같은 이유로 지우지 않는다)
   const alreadyTodayRecheck = await db.dcaOrder.count({ where: { accountId, tradeDate } });
   if (alreadyTodayRecheck > 0) {
-    await db.dcaAccount.update({
-      where: { id: accountId },
-      data: { lastRunDate: tradeDate, note: null },
-    });
+    await db.dcaAccount.update({ where: { id: accountId }, data: { lastRunDate: tradeDate } });
     return picked;
   }
 
   // ⑦ 기록·제출. killed는 위에서 이미 걸러졌으므로 여기서는 계좌의 dryRun만 본다.
-  const simulate = acc.dryRun;
   if (simulate) {
     await db.dcaOrder.create({
       data: {
@@ -307,19 +329,11 @@ export async function runDca(
     return { ...picked, simulated: 1 };
   }
 
-  const accountSeq = acc.accountSeq ?? (await deps.getDefaultAccountSeq());
-  let buyingPower: number;
-  try {
-    buyingPower = await deps.getBuyingPowerUsd(accountSeq);
-  } catch (e) {
-    return block(`매수가능금액 조회 실패: ${msg(e)}`, a.accrued);
-  }
-  if (buyingPower < plan.estUsd) {
-    return block(
-      `USD 예수금 부족: 필요 $${plan.estUsd.toFixed(2)} / 보유 $${buyingPower.toFixed(2)}`,
-      a.accrued,
-    );
-  }
+  // 제출 전에 주문 행을 먼저 만들어 그 행 자체를 뮤텍스로 쓴다. 제출 후에 만들면 왕복
+  // 동안 다른 프로세스(워커 ↔ "지금 실행")가 같은 거래일 주문을 또 낼 수 있다.
+  const row = await db.dcaOrder.create({
+    data: { ...orderData, dryRun: false, status: "submitting", error: null },
+  });
 
   try {
     const r = await deps.submitOrder(
@@ -327,8 +341,9 @@ export async function runDca(
       { price: plan.price, quantity: plan.quantity },
       pick.symbol,
     );
-    await db.dcaOrder.create({
-      data: { ...orderData, tossOrderId: r.tossOrderId, dryRun: false, status: "submitted" },
+    await db.dcaOrder.update({
+      where: { id: row.id },
+      data: { status: "submitted", tossOrderId: r.tossOrderId },
     });
     await db.dcaAccount.update({
       where: { id: accountId },
@@ -336,12 +351,20 @@ export async function runDca(
     });
     return { ...picked, placed: 1 };
   } catch (e) {
-    await db.dcaOrder.create({
-      data: { ...orderData, dryRun: false, status: "failed", error: msg(e) },
+    // 실패로 단정하지 않는다 — tossFetch는 모든 호출에 10초 타임아웃을 걸므로 브로커가
+    // 접수한 주문의 응답이 늦기만 해도 여기로 온다. failed로 적으면 settleLiveOrders가
+    // submitted만 보므로 체결분이 영구히 cashKrw에서 차감되지 않는다. 사람이 확인해야
+    // 하는 상태로 남기고 lastRunDate는 갱신한다 — 자동 재시도가 진짜 이중 매수를 만든다.
+    await db.dcaOrder.update({
+      where: { id: row.id },
+      data: { status: "submit_unknown", error: msg(e) },
     });
     await db.dcaAccount.update({
       where: { id: accountId },
-      data: { lastRunDate: tradeDate, note: `주문 제출 실패: ${msg(e)}` },
+      data: {
+        lastRunDate: tradeDate,
+        note: `주문 제출 결과 미확인 — 토스 앱에서 체결 여부를 직접 확인하세요: ${msg(e)}`,
+      },
     });
     return picked;
   }
