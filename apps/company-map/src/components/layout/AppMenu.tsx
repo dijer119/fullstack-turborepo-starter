@@ -22,6 +22,7 @@ import {
   Landmark,
   Repeat,
   Scale,
+  CalendarClock,
 } from "lucide-react";
 
 type Service = {
@@ -155,6 +156,13 @@ const TOOLS: Tool[] = [
     description: "라오어 VR 5.0 — 2주 사이클 목표가치 리밸런싱 (dryRun)",
     path: "/stocks/vr",
     icon: Scale,
+  },
+  {
+    key: "dca",
+    name: "QQQ·QLD 적립식",
+    description: "QQQ 낙폭 10% 이상이면 QLD, 아니면 QQQ 매일 적립",
+    path: "/stocks/dca",
+    icon: CalendarClock,
   },
 ];
 
