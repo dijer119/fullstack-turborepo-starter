@@ -598,7 +598,7 @@ model DcaOrder {
   symbol        String // 실제 매수한 종목 (QQQ | QLD)
   side          String // BUY 고정
   kind          String // loc_buy 고정
-  orderType     String   @map("order_type") // LIMIT
+  orderType     String   @map("order_type") // MARKET
   tif           String? // 금액 기반 주문에는 없음
   price         Float? // 주문 시점 참조 시세(감사용). 금액 기반 주문에는 지정가가 없다
   quantity      Float? // 주문 시점 예상 수량(감사용). 실제 수량은 체결 시 결정된다

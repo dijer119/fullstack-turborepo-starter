@@ -24,18 +24,38 @@ describe("pickPrevTradeClose", () => {
 });
 
 describe("assertSubmittable", () => {
-  it("정상 주문은 통과", () => {
-    expect(() => assertSubmittable({ price: 94.57, quantity: 23 })).not.toThrow();
+  const ID = "dca-a1b2c3d4-20260828";
+
+  it("정상 금액·멱등성 키는 통과", () => {
+    expect(() => assertSubmittable({ amountUsd: 36.25, clientOrderId: ID })).not.toThrow();
+    expect(() => assertSubmittable({ amountUsd: 0.01, clientOrderId: ID })).not.toThrow();
+    // 절삭 결과가 부동소수 오차를 안고 와도 센트 단위면 통과해야 한다
+    expect(() =>
+      assertSubmittable({ amountUsd: Math.floor(36.255 * 100) / 100, clientOrderId: ID }),
+    ).not.toThrow();
   });
 
-  it("수량이 0 이하·정수 아님이면 throw", () => {
-    expect(() => assertSubmittable({ price: 94.57, quantity: 0 })).toThrow();
-    expect(() => assertSubmittable({ price: 94.57, quantity: -1 })).toThrow();
-    expect(() => assertSubmittable({ price: 94.57, quantity: 1.5 })).toThrow();
+  it("1센트 미만이면 throw", () => {
+    expect(() => assertSubmittable({ amountUsd: 0.005, clientOrderId: ID })).toThrow();
+    expect(() => assertSubmittable({ amountUsd: 0, clientOrderId: ID })).toThrow();
   });
 
-  it("지정가가 0 이하·NaN이면 throw", () => {
-    expect(() => assertSubmittable({ price: 0, quantity: 1 })).toThrow();
-    expect(() => assertSubmittable({ price: Number.NaN, quantity: 1 })).toThrow();
+  it("소수 3자리 이상이면 throw", () => {
+    expect(() => assertSubmittable({ amountUsd: 36.251, clientOrderId: ID })).toThrow();
+    expect(() => assertSubmittable({ amountUsd: 1.2345, clientOrderId: ID })).toThrow();
+  });
+
+  it("음수·NaN·Infinity면 throw", () => {
+    expect(() => assertSubmittable({ amountUsd: -36.25, clientOrderId: ID })).toThrow();
+    expect(() => assertSubmittable({ amountUsd: Number.NaN, clientOrderId: ID })).toThrow();
+    expect(() => assertSubmittable({ amountUsd: Number.POSITIVE_INFINITY, clientOrderId: ID })).toThrow();
+  });
+
+  it("clientOrderId가 비었거나 37자 이상이거나 허용 문자를 벗어나면 throw", () => {
+    expect(() => assertSubmittable({ amountUsd: 36.25, clientOrderId: "" })).toThrow();
+    expect(() => assertSubmittable({ amountUsd: 36.25, clientOrderId: "a".repeat(37) })).toThrow();
+    expect(() => assertSubmittable({ amountUsd: 36.25, clientOrderId: "a".repeat(36) })).not.toThrow();
+    expect(() => assertSubmittable({ amountUsd: 36.25, clientOrderId: "dca 20260828" })).toThrow();
+    expect(() => assertSubmittable({ amountUsd: 36.25, clientOrderId: "dca:20260828" })).toThrow();
   });
 });

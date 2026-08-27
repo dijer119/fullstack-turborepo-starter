@@ -9,10 +9,14 @@ import {
   getOrders,
   getPrices,
 } from "@/lib/toss/client";
+import { isAmountOrderWindowOpen } from "./market-window";
 import type { DcaRunDeps } from "./run-dca";
 
 /** 토스 일봉 조회 상한. peak 시딩 범위(약 10개월)를 결정한다. */
 export const PEAK_SEED_COUNT = 200;
+
+/** 멱등성 키 문자 제약(토스 명세: 최대 36자, 영숫자·하이픈·언더스코어). */
+const CLIENT_ORDER_ID_RE = /^[A-Za-z0-9\-_]+$/;
 
 /** before(미포함) 직전 거래일의 날짜·종가. 순수 함수 — 테스트 대상. */
 export function pickPrevTradeClose(
@@ -25,25 +29,32 @@ export function pickPrevTradeClose(
   return prev ? { date: prev.date, close: prev.close } : null;
 }
 
-/** 실주문 직전 방어 가드 — 비정상 주문이 브로커로 나가지 않게 throw. 정수 수량만 허용. */
-export function assertSubmittable(o: { price: number; quantity: number }): void {
-  if (!Number.isFinite(o.quantity) || o.quantity <= 0 || !Number.isInteger(o.quantity)) {
-    throw new Error(`invalid order quantity: ${o.quantity}`);
+/**
+ * 실주문 직전 방어 가드 — 비정상 주문이 브로커로 나가지 않게 throw.
+ * 금액 기반 주문이므로 검증 대상은 수량이 아니라 "달러 금액과 멱등성 키"다.
+ */
+export function assertSubmittable(o: { amountUsd: number; clientOrderId: string }): void {
+  if (!Number.isFinite(o.amountUsd) || o.amountUsd < 0.01) {
+    throw new Error(`invalid order amount: ${o.amountUsd}`);
   }
-  if (!Number.isFinite(o.price) || o.price <= 0) {
-    throw new Error(`invalid LOC price: ${o.price}`);
+  // 센트보다 잘게 쪼갠 금액은 토스가 거절한다. 부동소수 오차(1e-8 수준)는 통과시킨다.
+  const cents = o.amountUsd * 100;
+  if (Math.abs(cents - Math.round(cents)) > 1e-6) {
+    throw new Error(`invalid order amount precision: ${o.amountUsd}`);
+  }
+  if (
+    !o.clientOrderId ||
+    o.clientOrderId.length > 36 ||
+    !CLIENT_ORDER_ID_RE.test(o.clientOrderId)
+  ) {
+    throw new Error(`invalid clientOrderId: ${o.clientOrderId}`);
   }
 }
 
 export function tossDcaDeps(): DcaRunDeps {
   return {
     getDefaultAccountSeq,
-
-    async getDailyCandle(symbol: string, date: string) {
-      const candles = await getDailyCandles(symbol, PEAK_SEED_COUNT);
-      const c = candles.find((x) => x.date === date);
-      return c ? { close: c.close, high: c.high } : null;
-    },
+    isAmountOrderWindowOpen,
 
     async getPrevTradeClose(symbol: string, before: string) {
       const candles = await getDailyCandles(symbol, PEAK_SEED_COUNT);
@@ -74,17 +85,17 @@ export function tossDcaDeps(): DcaRunDeps {
 
     async submitOrder(
       accountSeq: number,
-      o: { price: number; quantity: number },
+      o: { amountUsd: number; clientOrderId: string },
       symbol: string,
     ): Promise<{ tossOrderId: string }> {
       assertSubmittable(o);
+      // 금액 기반 분기에는 quantity·price·timeInForce가 아예 없다(client.ts의 oneOf 배타 타입).
       const r = await createOrder(accountSeq, {
         symbol,
         side: "BUY",
-        orderType: "LIMIT",
-        quantity: String(o.quantity),
-        price: String(o.price),
-        timeInForce: "CLS",
+        orderType: "MARKET",
+        orderAmount: String(o.amountUsd),
+        clientOrderId: o.clientOrderId,
       });
       return { tossOrderId: r.orderId };
     },

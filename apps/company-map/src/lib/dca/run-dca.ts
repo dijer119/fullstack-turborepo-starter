@@ -1,12 +1,13 @@
 // QQQ·QLD 적립식 오케스트레이터. 순서 불변식:
-//   ① 체결 정산(dryRun: 일봉 판정 / LIVE: 토스 대조) → ② 잔액 반영 → ③ 적립
-//   → ④ peak 갱신 → ⑤ 종목 선택 → ⑥ 주문 계산 → ⑦ 기록·제출
+//   ① LIVE 체결 정산(토스 대조) → ② 잔액 반영 → ③ 적립 → ④ peak 갱신 → ⑤ 종목 선택
+//   → ⑥ 주문 접수 창 확인 → ⑦ 주문 금액 계산 → ⑧ 기록·제출
+// 주문은 금액 기반 시장가라 dryRun은 ⑧에서 즉시 체결로 기록하고 같은 실행 안에서 차감한다
+// (이전 LOC 모델의 "다음 거래일 일봉으로 판정" 단계가 없어졌다).
 // blocked 시 lastRunDate를 갱신하지 않아 다음 폴에서 자동 재시도된다 (run-vr.ts와 동일 패턴).
 // 적립은 lastAccrualDate로 별도 멱등을 보장하므로 재시도 시에도 중복되지 않는다.
 import type { PrismaClient } from "@prisma-clients/company-map";
-import { judgeDryFill, type DryCandle } from "@/lib/infinite-buy/dry-fill";
 import { pickSymbol, updatePeak } from "./peak";
-import { planBuy } from "./sizing";
+import { estimateQuantity, planAmountBuy } from "./sizing";
 import { accrue, applyFills } from "./state";
 
 export interface DcaClosedOrder {
@@ -17,15 +18,16 @@ export interface DcaClosedOrder {
 
 export interface DcaRunDeps {
   getDefaultAccountSeq(): Promise<number>;
-  getDailyCandle(symbol: string, date: string): Promise<DryCandle | null>;
   getPrevTradeClose(symbol: string, before: string): Promise<{ date: string; close: number } | null>;
   getCurrentPrice(symbol: string): Promise<number>;
   getUsdKrw(): Promise<number>;
   getBuyingPowerUsd(accountSeq: number): Promise<number>;
   getClosedOrders(accountSeq: number, symbol: string, from: string): Promise<DcaClosedOrder[]>;
+  /** 금액 기반 주문 접수 창(정규장 시작~종료 1시간 전)이 열려 있는지 */
+  isAmountOrderWindowOpen(): Promise<boolean>;
   submitOrder(
     accountSeq: number,
-    o: { price: number; quantity: number },
+    o: { amountUsd: number; clientOrderId: string },
     symbol: string,
   ): Promise<{ tossOrderId: string }>;
 }
@@ -43,39 +45,14 @@ export interface DcaRunResult {
 
 const msg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-// ① dryRun — 과거 거래일의 simulated 주문을 그 날 일봉으로 판정.
-async function settleDryOrders(
-  db: PrismaClient,
-  deps: DcaRunDeps,
-  accountId: string,
-  tradeDate: string,
-): Promise<void> {
-  const pending = await db.dcaOrder.findMany({
-    where: { accountId, dryRun: true, status: "simulated", tradeDate: { lt: tradeDate } },
-    orderBy: { tradeDate: "asc" },
-  });
-  const cache = new Map<string, DryCandle | null>();
-  for (const o of pending) {
-    const key = `${o.symbol}:${o.tradeDate}`;
-    if (!cache.has(key)) cache.set(key, await deps.getDailyCandle(o.symbol, o.tradeDate));
-    const candle = cache.get(key);
-    if (!candle) continue; // 일봉 미확보 — 다음 폴에서 재시도
-    const r = judgeDryFill(
-      { side: "BUY", orderType: o.orderType, tif: o.tif, price: o.price },
-      candle,
-    );
-    await db.dcaOrder.update({
-      where: { id: o.id },
-      data: r.filled
-        ? {
-            status: "simulated_filled",
-            filledQty: o.quantity,
-            filledPrice: r.fillPrice,
-            filledAt: o.tradeDate,
-          }
-        : { status: "expired" },
-    });
-  }
+/**
+ * 토스 멱등성 키. 같은 계좌·같은 거래일이면 **항상 같은 값**이어야 한다 — 워커와 "지금 실행"이
+ * 서로 다른 프로세스에서 동시에 제출해도 토스가 10분 안에는 앞선 주문 결과를 그대로 되돌려주므로,
+ * 이 안정성이 곧 중복 실주문 방어다. 결과는 항상 36자 이하이고 [A-Za-z0-9-_]만 쓴다.
+ * 예: ("a1b2c3d4-…", "2026-08-28") → "dca-a1b2c3d4-20260828"
+ */
+export function makeClientOrderId(accountId: string, tradeDate: string): string {
+  return `dca-${accountId.slice(0, 8)}-${tradeDate.replace(/-/g, "")}`;
 }
 
 // ① LIVE — 제출된 주문을 토스 CLOSED 목록과 대조해 체결/만료 확정.
@@ -170,12 +147,11 @@ export async function runDca(
     return { ...none, accrued, blocked: reason };
   };
 
-  // ① 체결 정산 — 두 정산은 계좌가 아니라 "주문 행"의 dryRun으로 대상이 갈리고(각 where절)
-  // 두 조건은 서로 배타적이다. 계좌의 dryRun으로 분기하면 LIVE 전환 후 남아 있던 simulated
-  // 행(또는 dryRun 복귀 후의 submitted 행)이 어느 정산도 받지 못해 얼어붙으므로 항상 둘 다
-  // 돌린다. 어느 쪽이 실패해도 blocked로 다음 폴에서 재시도된다.
+  // ① 체결 정산 — 대상은 계좌 모드가 아니라 "주문 행"의 dryRun으로 갈린다(where절).
+  // 계좌의 dryRun으로 분기하면 LIVE → dryRun 전환 후 남아 있던 submitted 행이 어느 정산도
+  // 받지 못해 얼어붙으므로 계좌 모드와 무관하게 항상 돌린다. dryRun 주문은 생성 시점에
+  // 즉시 체결로 기록되므로 여기서 볼 것이 없다. 실패해도 blocked로 다음 폴에서 재시도된다.
   try {
-    await settleDryOrders(db, deps, acc.id, tradeDate);
     await settleLiveOrders(db, deps, acc);
   } catch (e) {
     return block(`체결 동기화 실패: ${msg(e)}`, false);
@@ -239,7 +215,20 @@ export async function runDca(
     return picked;
   }
 
-  // ⑥ 주문 계산
+  // ⑥ 주문 접수 창 — 금액 기반 주문은 정규장 종료 1시간 전에 마감된다. 창이 닫혔으면 그날은
+  // 재시도가 무의미하므로 lastRunDate를 소진시킨다. 정산(①)·적립(③)은 이미 끝났다.
+  if (!(await deps.isAmountOrderWindowOpen())) {
+    await db.dcaAccount.update({
+      where: { id: accountId },
+      data: {
+        lastRunDate: tradeDate,
+        note: "금액 기반 주문 접수 시간(정규장 종료 1시간 전) 경과 — 적립만 반영",
+      },
+    });
+    return picked;
+  }
+
+  // ⑦ 주문 금액 계산. 시세는 지정가가 아니라 예상 수량·dryRun 체결가·감사용 참조가로 쓴다.
   let price: number;
   let fx: number;
   try {
@@ -249,14 +238,9 @@ export async function runDca(
   }
   if (!(price > 0) || !(fx > 0)) return block("시세·환율 비정상 — 재시도 대기", a.accrued);
 
-  const plan = planBuy({
-    cashKrw: acc.cashKrw,
-    fxRate: fx,
-    price,
-    premiumPct: acc.premiumPct,
-  });
+  const plan = planAmountBuy({ cashKrw: acc.cashKrw, fxRate: fx });
   if (!plan) {
-    // 1주 미만 — 적립만 하고 종료. 잔액은 그대로 이월된다.
+    // 1센트 미만 — 적립만 하고 종료. 잔액은 그대로 이월된다.
     await db.dcaAccount.update({
       where: { id: accountId },
       data: { lastRunDate: tradeDate, note: null },
@@ -264,17 +248,19 @@ export async function runDca(
     return picked;
   }
 
+  const estQty = estimateQuantity(plan.amountUsd, price);
   const orderData = {
     accountId,
     tradeDate,
     symbol: pick.symbol,
     side: "BUY",
     kind: "loc_buy",
-    orderType: "LIMIT",
-    tif: "CLS",
-    price: plan.price,
-    quantity: plan.quantity,
-    amountKrw: plan.estKrw,
+    orderType: "MARKET",
+    tif: null,
+    price, // 지정가가 아니라 주문 시점 참조 시세(감사용)
+    quantity: estQty, // 예상 수량 — 실제 수량은 체결 시 토스가 정한다
+    amountUsd: plan.amountUsd,
+    amountKrw: plan.amountKrw,
     fxRate: fx,
     drawdownPct: pick.drawdownPct,
   };
@@ -292,36 +278,51 @@ export async function runDca(
     } catch (e) {
       return block(`매수가능금액 조회 실패: ${msg(e)}`, a.accrued);
     }
-    // fail-closed — 응답 필드 누락·개편으로 NaN이 오면 `NaN < estUsd`가 false여서
+    // fail-closed — 응답 필드 누락·개편으로 NaN이 오면 `NaN < amountUsd`가 false여서
     // 검사 없이 통과해버린다. 비교를 뒤집어 유한하지 않은 값은 항상 막는다.
-    if (!(buyingPower >= plan.estUsd)) {
+    if (!(buyingPower >= plan.amountUsd)) {
       const have = Number.isFinite(buyingPower) ? `$${buyingPower.toFixed(2)}` : "확인 불가";
       return block(
-        `USD 예수금 부족: 필요 $${plan.estUsd.toFixed(2)} / 보유 ${have}`,
+        `USD 예수금 부족: 필요 $${plan.amountUsd.toFixed(2)} / 보유 ${have}`,
         a.accrued,
       );
     }
   }
 
-  // 재확인 — 위 alreadyToday 체크 이후 시세·환율·예수금 조회(네트워크 왕복) 동안 동시
-  // 실행이 끼어들 여지가 있다. 같은 로직을 주문 기록 직전에 한 번 더 태워, 재확인과 주문
-  // 행 생성 사이를 로컬 SQLite 쓰기 1회로 좁힌다. (note는 위와 같은 이유로 지우지 않는다)
+  // 재확인 — 위 alreadyToday 체크 이후 창 확인·시세·환율·예수금 조회(네트워크 왕복) 동안
+  // 동시 실행이 끼어들 여지가 있다. 같은 로직을 주문 기록 직전에 한 번 더 태워, 재확인과
+  // 주문 행 생성 사이를 로컬 SQLite 쓰기 1회로 좁힌다. (note는 위와 같은 이유로 지우지 않는다)
   const alreadyTodayRecheck = await db.dcaOrder.count({ where: { accountId, tradeDate } });
   if (alreadyTodayRecheck > 0) {
     await db.dcaAccount.update({ where: { id: accountId }, data: { lastRunDate: tradeDate } });
     return picked;
   }
 
-  // ⑦ 기록·제출. killed는 위에서 이미 걸러졌으므로 여기서는 계좌의 dryRun만 본다.
+  // ⑧ 기록·제출. killed는 위에서 이미 걸러졌으므로 여기서는 계좌의 dryRun만 본다.
   if (simulate) {
+    // 시장가는 즉시 체결되므로 시뮬레이션도 그 자리에서 체결로 적는다. 체결가는 사이징에
+    // 쓴 그 시세다.
     await db.dcaOrder.create({
       data: {
         ...orderData,
         dryRun: true,
-        status: "simulated",
+        status: "simulated_filled",
+        clientOrderId: null,
+        filledQty: estQty,
+        filledPrice: price,
+        filledAt: tradeDate,
+        stateApplied: null, // 바로 아래 차감이 이 마커를 세운다
         error: null,
       },
     });
+    // 같은 실행 안에서 차감까지 끝낸다. 차감액의 권위는 state.ts의 applyFills
+    // (filledPrice × filledQty × fxRate)이고 amountKrw와는 센트 절삭 수준의 오차만 난다.
+    try {
+      await applyPendingFills(db, acc.id);
+    } catch (e) {
+      // 행은 남아 있으므로 다음 폴의 ②단계가 그대로 이어받아 차감한다.
+      return block(`잔액 반영 실패: ${msg(e)}`, a.accrued);
+    }
     await db.dcaAccount.update({
       where: { id: accountId },
       data: { lastRunDate: tradeDate, note: null },
@@ -331,14 +332,16 @@ export async function runDca(
 
   // 제출 전에 주문 행을 먼저 만들어 그 행 자체를 뮤텍스로 쓴다. 제출 후에 만들면 왕복
   // 동안 다른 프로세스(워커 ↔ "지금 실행")가 같은 거래일 주문을 또 낼 수 있다.
+  // clientOrderId는 그 방어의 2선 — 뮤텍스를 놓친 동시 제출도 토스가 같은 주문으로 합쳐준다.
+  const clientOrderId = makeClientOrderId(accountId, tradeDate);
   const row = await db.dcaOrder.create({
-    data: { ...orderData, dryRun: false, status: "submitting", error: null },
+    data: { ...orderData, dryRun: false, status: "submitting", clientOrderId, error: null },
   });
 
   try {
     const r = await deps.submitOrder(
       accountSeq,
-      { price: plan.price, quantity: plan.quantity },
+      { amountUsd: plan.amountUsd, clientOrderId },
       pick.symbol,
     );
     await db.dcaOrder.update({
