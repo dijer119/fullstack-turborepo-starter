@@ -456,6 +456,7 @@ export interface QuantityOrderInput extends CreateOrderCommon {
   quantity: string; // 수량(문자열)
   price?: string; // LIMIT 시 필수
   timeInForce?: "DAY" | "CLS"; // CLS는 미국주식 + LIMIT 조합만 지원
+  orderAmount?: never; // 금액 기반 필드와 동시 지정 금지(oneOf) — 타입 레벨에서 두 형태를 배타화
 }
 
 // 금액 기반 주문(신규, 소수 수량 매수용). MARKET 전용이며 체결 수량은 체결 시점 시장가로
@@ -464,6 +465,9 @@ export interface QuantityOrderInput extends CreateOrderCommon {
 export interface AmountOrderInput extends CreateOrderCommon {
   orderType: "MARKET";
   orderAmount: string; // 주문 금액(문자열, 달러 소수 가능). 지정 금액만큼 시장가 체결
+  quantity?: never; // 수량 기반 필드와 동시 지정 금지(oneOf)
+  price?: never;
+  timeInForce?: never;
 }
 
 // orderAmount 필드 존재 여부로 두 형태를 판별한다.
