@@ -1,57 +1,28 @@
-// 매수 주문 사이징. 이월 원화 잔액을 당일 환율로 환산해 LOC 지정가 기준 정수 수량만 산다.
-// 지정가(상한)로 나누는 이유: 체결가는 종가라 지정가 이하이므로 예산 초과가 구조적으로 불가능하다.
-// 남은 돈은 차감되지 않고 그대로 이월된다. 순수 함수만 둔다.
+// 매수 주문 사이징. 토스 금액 기반 주문(orderAmount)은 달러 금액을 확정하고 수량이 변동한다.
+// 정수 수량 제약이 없으므로 매 거래일 잔액 전액을 투입한다.
+// 센트 단위 절삭분만 다음 거래일로 이월된다. 순수 함수만 둔다.
 
-export interface DcaBuyPlan {
-  /** LOC 지정가(상한) USD */
-  price: number;
-  quantity: number;
-  /** 전량 지정가 체결 시 최대 소요 USD */
-  estUsd: number;
+export interface DcaAmountPlan {
+  /** 주문에 넣을 USD 금액(센트 단위 절삭) */
+  amountUsd: number;
   /** 위 금액의 원화 환산(주문 시 환율) */
-  estKrw: number;
+  amountKrw: number;
 }
 
-function locLimit(price: number, premiumPct: number): number {
-  return Math.round(price * (1 + premiumPct / 100) * 100) / 100;
-}
-
-/** 1주도 못 사면 null. 그 경우 잔액은 그대로 다음 거래일로 이월된다. */
-export function planBuy(args: {
-  cashKrw: number;
-  fxRate: number;
-  price: number;
-  premiumPct: number;
-}): DcaBuyPlan | null {
-  const { cashKrw, fxRate, price, premiumPct } = args;
+/** 환산액이 1센트 미만이면 null. 그 경우 잔액은 그대로 다음 거래일로 이월된다. */
+export function planAmountBuy(args: { cashKrw: number; fxRate: number }): DcaAmountPlan | null {
+  const { cashKrw, fxRate } = args;
   if (!Number.isFinite(cashKrw) || cashKrw <= 0) return null;
   if (!Number.isFinite(fxRate) || fxRate <= 0) return null;
-  if (!Number.isFinite(price) || price <= 0) return null;
-  if (!Number.isFinite(premiumPct) || premiumPct < 0) return null;
 
-  const limit = locLimit(price, premiumPct);
-  if (limit <= 0) return null;
+  const amountUsd = Math.floor((cashKrw / fxRate) * 100) / 100;
+  if (amountUsd < 0.01) return null;
 
-  const quantity = Math.floor(cashKrw / fxRate / limit);
-  if (quantity < 1) return null;
-
-  const estUsd = Math.round(quantity * limit * 100) / 100;
-  return { price: limit, quantity, estUsd, estKrw: Math.round(estUsd * fxRate) };
+  return { amountUsd, amountKrw: Math.round(amountUsd * fxRate) };
 }
 
-/** UI 안내용 — 지금 속도로 적립하면 몇 거래일 뒤에 1주를 살 수 있는지. 도달 불가면 null. */
-export function tradingDaysToOneShare(args: {
-  cashKrw: number;
-  dailyAmountKrw: number;
-  fxRate: number;
-  price: number;
-  premiumPct: number;
-}): number | null {
-  const { cashKrw, dailyAmountKrw, fxRate, price, premiumPct } = args;
-  if (!Number.isFinite(fxRate) || fxRate <= 0) return null;
-  if (!Number.isFinite(price) || price <= 0) return null;
-  const oneShareKrw = locLimit(price, premiumPct) * fxRate;
-  if (cashKrw >= oneShareKrw) return 0;
-  if (!Number.isFinite(dailyAmountKrw) || dailyAmountKrw <= 0) return null;
-  return Math.ceil((oneShareKrw - cashKrw) / dailyAmountKrw);
+/** 표시·시뮬레이션용 예상 수량. 실제 체결 수량은 주문 시점 시세로 토스가 정산한다. */
+export function estimateQuantity(amountUsd: number, price: number): number {
+  if (!Number.isFinite(price) || price <= 0) return 0;
+  return Math.round((amountUsd / price) * 1e6) / 1e6;
 }
