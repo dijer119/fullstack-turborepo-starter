@@ -9,7 +9,7 @@ import {
   getPrices,
 } from "@/lib/toss/client";
 import { drawdownPct, pickSymbol, seedPeak } from "@/lib/dca/peak";
-import { planBuy, tradingDaysToOneShare, type DcaBuyPlan } from "@/lib/dca/sizing";
+import { estimateQuantity, planAmountBuy, type DcaAmountPlan } from "@/lib/dca/sizing";
 import { deriveHoldings } from "@/lib/dca/state";
 import { runDca } from "@/lib/dca/run-dca";
 import { isDcaKilled, tossDcaDeps, PEAK_SEED_COUNT } from "@/lib/dca/toss-deps";
@@ -23,7 +23,6 @@ export interface DcaAccountView {
   leverSymbol: string;
   thresholdPct: number;
   dailyAmountKrw: number;
-  premiumPct: number;
   cashKrw: number;
   peakPrice: number;
   peakDate: string;
@@ -41,10 +40,10 @@ export interface DcaAccountView {
   leveraged: boolean;
   pickedPrice: number | null;
   fxRate: number | null;
-  /** 오늘 주문 미리보기. 1주 미만이면 null */
-  plan: DcaBuyPlan | null;
-  /** 1주까지 남은 거래일 수 (plan이 null일 때 안내용) */
-  daysToOneShare: number | null;
+  /** 오늘 주문 미리보기. 잔액이 1센트 미만이면 null */
+  plan: DcaAmountPlan | null;
+  /** plan 금액으로 지금 살 수 있는 예상 수량. 시세 조회 실패 등으로 plan이나 가격이 없으면 null */
+  estQuantity: number | null;
   /** 종목별 보유수량 */
   holdings: Record<string, number>;
   /** 보유 평가액 USD (시세 조회 실패 종목은 제외) */
@@ -98,25 +97,9 @@ export async function listDcaAccounts(): Promise<DcaAccountView[]> {
         : null;
     const pickedPrice = pick == null ? null : pick.leveraged ? leverPrice : basePrice;
 
-    const plan =
-      pickedPrice != null && fxRate != null
-        ? planBuy({
-            cashKrw: acc.cashKrw,
-            fxRate,
-            price: pickedPrice,
-            premiumPct: acc.premiumPct,
-          })
-        : null;
-    const daysToOneShare =
-      plan == null && pickedPrice != null && fxRate != null
-        ? tradingDaysToOneShare({
-            cashKrw: acc.cashKrw,
-            dailyAmountKrw: acc.dailyAmountKrw,
-            fxRate,
-            price: pickedPrice,
-            premiumPct: acc.premiumPct,
-          })
-        : null;
+    const plan = fxRate != null ? planAmountBuy({ cashKrw: acc.cashKrw, fxRate }) : null;
+    const estQuantity =
+      plan != null && pickedPrice != null ? estimateQuantity(plan.amountUsd, pickedPrice) : null;
 
     let evalUsd: number | null = null;
     if (basePrice != null && leverPrice != null) {
@@ -135,7 +118,6 @@ export async function listDcaAccounts(): Promise<DcaAccountView[]> {
       leverSymbol: acc.leverSymbol,
       thresholdPct: acc.thresholdPct,
       dailyAmountKrw: acc.dailyAmountKrw,
-      premiumPct: acc.premiumPct,
       cashKrw: acc.cashKrw,
       peakPrice: acc.peakPrice,
       peakDate: acc.peakDate,
@@ -151,7 +133,7 @@ export async function listDcaAccounts(): Promise<DcaAccountView[]> {
       pickedPrice,
       fxRate,
       plan,
-      daysToOneShare,
+      estQuantity,
       holdings,
       evalUsd,
     });
@@ -180,7 +162,6 @@ export interface CreateDcaInput {
   leverSymbol: string;
   thresholdPct: number;
   dailyAmountKrw: number;
-  premiumPct: number;
   /** 비우면 base 종목 일봉 최고 종가로 자동 시딩 */
   peakPrice: number | null;
   initialCashKrw: number;
@@ -200,9 +181,6 @@ export async function createDcaAccount(
   // accrue가 영구 무동작이 되고, peakPrice가 Infinity면 낙폭이 항상 −100%라 매일 레버리지를 산다.
   if (!(input.dailyAmountKrw > 0) || !Number.isFinite(input.dailyAmountKrw)) {
     return { ok: false, error: "거래일당 적립액은 0보다 커야 합니다" };
-  }
-  if (!(input.premiumPct >= 0) || input.premiumPct >= 100) {
-    return { ok: false, error: "LOC 프리미엄%는 0~100 사이여야 합니다" };
   }
   if (!(input.initialCashKrw >= 0) || !Number.isFinite(input.initialCashKrw)) {
     return { ok: false, error: "초기 잔액은 음수 불가" };
@@ -227,7 +205,6 @@ export async function createDcaAccount(
       leverSymbol: lever,
       thresholdPct: input.thresholdPct,
       dailyAmountKrw: input.dailyAmountKrw,
-      premiumPct: input.premiumPct,
       cashKrw: input.initialCashKrw,
       peakPrice,
       peakDate,
@@ -252,7 +229,6 @@ export async function updateDcaSettings(
   patch: {
     thresholdPct?: number;
     dailyAmountKrw?: number;
-    premiumPct?: number;
     cashKrw?: number;
     peakPrice?: number;
     dryRun?: boolean;
@@ -269,9 +245,6 @@ export async function updateDcaSettings(
     (!(patch.dailyAmountKrw > 0) || !Number.isFinite(patch.dailyAmountKrw))
   ) {
     return { ok: false, error: "거래일당 적립액은 0보다 커야 합니다" };
-  }
-  if (patch.premiumPct !== undefined && (!(patch.premiumPct >= 0) || patch.premiumPct >= 100)) {
-    return { ok: false, error: "LOC 프리미엄%는 0~100 사이여야 합니다" };
   }
   if (
     patch.cashKrw !== undefined &&
@@ -317,11 +290,19 @@ export async function runDcaNow(id: string): Promise<{ ok: boolean; message: str
   const r = await runDca(db, tossDcaDeps(), id, tradeDate, isDcaKilled());
   revalidatePath(PAGE);
   if (r.blocked) return { ok: false, message: `보류: ${r.blocked}` };
+  // 주문이 없는 경우의 사유는 두 가지: 마감 창(정규장 종료 1시간 전) 경과는 run-dca가 계좌
+  // note에 남기고, 잔액 1센트 미만은 note를 지운다. blocked가 아닌 이 경로에서 note가 남아
+  // 있다면 전자다.
+  let noOrder = "주문 없음(잔액 1센트 미만)";
+  if (r.placed === 0 && r.simulated === 0) {
+    const acc = await db.dcaAccount.findUnique({ where: { id }, select: { note: true } });
+    if (acc?.note) noOrder = acc.note;
+  }
   const parts = [
     r.symbol ? `대상 ${r.symbol}` : null,
     r.drawdownPct != null ? `낙폭 ${r.drawdownPct}%` : null,
     r.accrued ? "적립 반영" : "적립 이미 완료",
-    r.placed > 0 ? "실주문 1건 제출" : r.simulated > 0 ? "시뮬레이션 1건 기록" : "주문 없음(1주 미만)",
+    r.placed > 0 ? "실주문 1건 제출" : r.simulated > 0 ? "시뮬레이션 1건 기록" : noOrder,
   ].filter(Boolean);
   return { ok: true, message: parts.join(" · ") };
 }

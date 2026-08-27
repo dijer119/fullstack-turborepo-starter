@@ -65,7 +65,7 @@ export function DcaManager({ accounts }: { accounts: DcaAccountView[] }) {
               {a.baseSymbol} → {a.leverSymbol}
             </span>
             <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-              {krw(a.dailyAmountKrw)}/거래일 · 임계 −{a.thresholdPct}% · LOC +{a.premiumPct}%
+              {krw(a.dailyAmountKrw)}/거래일 · 임계 −{a.thresholdPct}%
             </span>
             {a.dryRun ? (
               <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
@@ -116,14 +116,12 @@ export function DcaManager({ accounts }: { accounts: DcaAccountView[] }) {
             </div>
             {a.plan ? (
               <div className="font-mono">
-                {a.pickedSymbol} LOC 매수 · 지정가 ${fmt(a.plan.price)} × {a.plan.quantity}주 · 최대{" "}
-                ${fmt(a.plan.estUsd)} ({krw(a.plan.estKrw)})
+                {a.pickedSymbol} 시장가 매수 · ${fmt(a.plan.amountUsd)} ({krw(a.plan.amountKrw)})
+                {a.estQuantity != null && ` · 약 ${fmt(a.estQuantity, 4)}주`}
               </div>
             ) : (
               <div className="text-gray-500 dark:text-gray-400">
-                1주 값에 못 미쳐 적립만 됩니다
-                {a.daysToOneShare != null && ` — 이 속도면 약 ${a.daysToOneShare}거래일 후 1주 가능`}
-                {a.pickedPrice != null && ` (1주 ≈ $${fmt(a.pickedPrice)})`}
+                주문 없음 — 잔액이 1센트 미만이거나 시세·환율을 가져오지 못했습니다
               </div>
             )}
           </div>
@@ -217,7 +215,7 @@ function OrderHistory({ orders }: { orders: OrderRow[] }) {
             <th className="px-2 py-1 text-left">거래일</th>
             <th className="px-2 py-1 text-left">종목</th>
             <th className="px-2 py-1 text-right">낙폭</th>
-            <th className="px-2 py-1 text-right">지정가</th>
+            <th className="px-2 py-1 text-right">주문금액</th>
             <th className="px-2 py-1 text-right">수량</th>
             <th className="px-2 py-1 text-left">상태</th>
             <th className="px-2 py-1 text-right">체결가</th>
@@ -230,8 +228,8 @@ function OrderHistory({ orders }: { orders: OrderRow[] }) {
               <td className="px-2 py-1">{o.tradeDate}</td>
               <td className="px-2 py-1">{o.symbol}</td>
               <td className="px-2 py-1 text-right">{o.drawdownPct}%</td>
-              <td className="px-2 py-1 text-right">${fmt(o.price)}</td>
-              <td className="px-2 py-1 text-right">{fmt(o.quantity, 0)}</td>
+              <td className="px-2 py-1 text-right">${fmt(o.amountUsd)}</td>
+              <td className="px-2 py-1 text-right">{fmt(o.quantity, 4)}</td>
               <td className="px-2 py-1">
                 {o.status}
                 {o.error && <span className="ml-1 text-red-600 dark:text-red-400">({o.error})</span>}
@@ -247,7 +245,7 @@ function OrderHistory({ orders }: { orders: OrderRow[] }) {
 }
 
 /** 설정 폼에서 사용자가 직접 수정할 수 있는 숫자 필드 */
-type EditableKey = "thresholdPct" | "dailyAmountKrw" | "premiumPct" | "cashKrw" | "peakPrice";
+type EditableKey = "thresholdPct" | "dailyAmountKrw" | "cashKrw" | "peakPrice";
 
 function SettingsForm({
   account,
@@ -260,7 +258,6 @@ function SettingsForm({
   const [pending, startTransition] = useTransition();
   const [thresholdPct, setThresholdPct] = useState(String(account.thresholdPct));
   const [dailyAmountKrw, setDailyAmountKrw] = useState(String(account.dailyAmountKrw));
-  const [premiumPct, setPremiumPct] = useState(String(account.premiumPct));
   const [cashKrw, setCashKrw] = useState(String(account.cashKrw));
   const [peakPrice, setPeakPrice] = useState(String(account.peakPrice));
   const [dryRun, setDryRun] = useState(account.dryRun);
@@ -271,7 +268,6 @@ function SettingsForm({
   const initial = useRef<Record<EditableKey, string>>({
     thresholdPct: String(account.thresholdPct),
     dailyAmountKrw: String(account.dailyAmountKrw),
-    premiumPct: String(account.premiumPct),
     cashKrw: String(account.cashKrw),
     peakPrice: String(account.peakPrice),
   });
@@ -288,10 +284,6 @@ function SettingsForm({
         <label>
           거래일당 적립액 (원)
           <input className={inputCls} value={dailyAmountKrw} onChange={(e) => setDailyAmountKrw(e.target.value)} />
-        </label>
-        <label>
-          LOC 프리미엄 %
-          <input className={inputCls} value={premiumPct} onChange={(e) => setPremiumPct(e.target.value)} />
         </label>
         <label>
           이월 잔액 (원) — 워커가 꺼져 있어 누락된 적립을 여기서 보정
@@ -321,7 +313,6 @@ function SettingsForm({
               const r = await updateDcaSettings(account.id, {
                 thresholdPct: edited("thresholdPct", thresholdPct),
                 dailyAmountKrw: edited("dailyAmountKrw", dailyAmountKrw),
-                premiumPct: edited("premiumPct", premiumPct),
                 cashKrw: edited("cashKrw", cashKrw),
                 peakPrice: edited("peakPrice", peakPrice),
                 dryRun,
@@ -353,7 +344,6 @@ type CreateFormState = {
   leverSymbol: string;
   thresholdPct: string;
   dailyAmountKrw: string;
-  premiumPct: string;
   peakPrice: string;
   initialCashKrw: string;
 };
@@ -367,7 +357,6 @@ function CreateForm({ onDone }: { onDone: (message?: string) => void }) {
     leverSymbol: "QLD",
     thresholdPct: "10",
     dailyAmountKrw: "50000",
-    premiumPct: "5",
     peakPrice: "",
     initialCashKrw: "0",
   });
@@ -398,10 +387,6 @@ function CreateForm({ onDone }: { onDone: (message?: string) => void }) {
         <label>
           거래일당 적립액 (원)
           <input className={inputCls} value={form.dailyAmountKrw} onChange={(e) => set("dailyAmountKrw", e.target.value)} />
-        </label>
-        <label>
-          LOC 프리미엄 %
-          <input className={inputCls} value={form.premiumPct} onChange={(e) => set("premiumPct", e.target.value)} />
         </label>
         <label>
           초기 이월 잔액 (원)
@@ -451,7 +436,6 @@ function CreateForm({ onDone }: { onDone: (message?: string) => void }) {
                 leverSymbol: form.leverSymbol,
                 thresholdPct: Number(form.thresholdPct),
                 dailyAmountKrw: Number(form.dailyAmountKrw),
-                premiumPct: Number(form.premiumPct),
                 peakPrice: form.peakPrice === "" ? null : Number(form.peakPrice),
                 initialCashKrw: Number(form.initialCashKrw),
               };
