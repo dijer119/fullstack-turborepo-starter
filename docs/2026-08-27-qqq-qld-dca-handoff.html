@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QQQ·QLD 적립식 — 구현 완료 인수인계</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; font-size: 0.94em; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; vertical-align: top; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .danger { border-left: 3px solid #c53030; background: #fff5f5; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .meta { color: #4a5568; font-size: 0.92rem; }
+  .metric { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.7rem; margin: 1rem 0; }
+  .card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 7px; padding: 0.7rem; }
+  .card strong { display: block; color: #2c5282; font-size: 1.3rem; }
+  .fix { color: #c53030; font-weight: bold; }
+  .park { color: #4a5568; }
+</style>
+</head>
+<body>
+<h1>QQQ·QLD 적립식 — 구현 완료 인수인계</h1>
+<p class="meta">브랜치 <code>feat/qqq-qld-dca</code> · <code>8d188c2</code> → <code>e71895b</code> (17커밋) · 2026-08-27</p>
+
+<div class="metric">
+  <div class="card"><span>테스트</span><strong>343 통과</strong>43파일 (신규 5파일)</div>
+  <div class="card"><span>타입체크</span><strong>exit 0</strong>tsc --noEmit</div>
+  <div class="card"><span>lint</span><strong>에러 0</strong>변경 파일 스코프</div>
+  <div class="card"><span>DB 잔여 행</span><strong>0 / 0</strong>임시 계좌 정리됨</div>
+</div>
+
+<h2>1. 지금 바로 해주실 것</h2>
+<ol>
+  <li><strong><code>nps dev</code> 재시작</strong> — Task 1에서 Prisma 스키마가 바뀌었는데 실행 중인 dev 서버가 <code>globalThis</code>에 옛 PrismaClient를 캐싱하고 있어 <code>/stocks/dca</code>가 500을 반환합니다. 응답 본문의 <code>Cannot read properties of undefined (reading 'findMany')</code>가 이를 확증합니다. <strong>코드 결함이 아닙니다.</strong></li>
+  <li>재시작 후 <strong>육안 확인 6가지</strong> — 이것만 자동 검증이 불가능했습니다.
+    <ol>
+      <li><code>http://localhost:3004/stocks/dca</code> 진입 — 헤더·경고문·"계좌 추가" 버튼</li>
+      <li>AppMenu에서 "밸류리밸런싱 VR" <strong>바로 아래</strong>에 "QQQ·QLD 적립식"이 있고 링크 동작</li>
+      <li>"계좌 추가" → "자동 시딩 값 확인" → <code>QQQ 일봉 200건 중 최고 종가 $746.16 (2026-06-02)</code> 형태로 표시</li>
+      <li>기본값으로 생성 → 카드에 낙폭·최고 종가·이월 잔액 0원·"약 21거래일 후 1주 가능" 표시</li>
+      <li>"지금 실행" → 정규장 중이면 <code>대상 QQQ · 낙폭 −4.x% · 적립 반영 · 주문 없음(1주 미만)</code>, 아니면 <code>보류: US 정규장이 열려있지 않습니다</code></li>
+      <li>정규장 중 "지금 실행"을 두 번 눌러 <code>적립 이미 완료</code>가 나오고 이월 잔액이 5만원에서 늘지 않음</li>
+    </ol>
+  </li>
+</ol>
+
+<div class="danger">
+<strong>LIVE 전환 전에 반드시 읽어주세요.</strong> 계좌는 항상 <code>dryRun: true</code>로 생성되고, 설정에서 dryRun을 끄면 <strong>실제 매수 주문이 제출됩니다</strong>. 아래 5장의 미해결 항목 — 특히 <code>@@unique</code> 미적용과 401 재시도 — 을 먼저 확인하세요.
+</div>
+
+<h2>2. 무엇이 만들어졌는가</h2>
+<table>
+  <thead><tr><th>계층</th><th>파일</th><th>역할</th></tr></thead>
+  <tbody>
+    <tr><td>데이터</td><td><code>prisma/schema.prisma</code></td><td><code>DcaAccount</code> / <code>DcaOrder</code> 2개 모델 + 마이그레이션 <code>20260827114947_add_dca_accounts</code></td></tr>
+    <tr><td>순수 함수</td><td><code>src/lib/dca/peak.ts</code></td><td>낙폭 판정 · 종목 선택 · peak 시딩</td></tr>
+    <tr><td>순수 함수</td><td><code>src/lib/dca/sizing.ts</code></td><td>LOC 지정가 · 정수 수량 · 1주까지 남은 거래일</td></tr>
+    <tr><td>순수 함수</td><td><code>src/lib/dca/state.ts</code></td><td>적립 · 체결 차감 · 종목별 보유 파생</td></tr>
+    <tr><td>어댑터</td><td><code>src/lib/dca/toss-deps.ts</code></td><td>토스 일봉·시세·환율·예수금·체결조회·주문제출 + kill switch</td></tr>
+    <tr><td>오케스트레이터</td><td><code>src/lib/dca/run-dca.ts</code></td><td>9단계 시퀀스. 순수 함수를 조립하고 결과만 저장</td></tr>
+    <tr><td>워커</td><td><code>worker/dca-loop.ts</code></td><td>15분 폴 · US 정규장 · 거래일당 계좌당 1회</td></tr>
+    <tr><td>액션</td><td><code>src/actions/dca.ts</code></td><td>조회·생성·설정·일시정지·지금 실행·이력·peak 미리보기</td></tr>
+    <tr><td>화면</td><td><code>src/app/stocks/dca/</code></td><td><code>/stocks/dca</code> — 카드·미리보기·이력·생성/설정 폼</td></tr>
+    <tr><td>테스트</td><td><code>src/lib/dca/*.test.ts</code></td><td>5파일 49건 (순수 함수 33 + 오케스트레이터 16)</td></tr>
+    <tr><td>스크립트</td><td><code>scripts/dca-smoke.ts</code></td><td>실DB 멱등성 스모크 — 임시 계좌를 만들고 지웁니다</td></tr>
+  </tbody>
+</table>
+
+<h3>기본 설정의 실제 거동 (2026-08-27 실측)</h3>
+<p>QQQ $715.87 / 200봉 최고 종가 $746.16(2026-06-02) → 낙폭 −4.06% → <strong>매수 대상 QQQ</strong>. USD/KRW 1379.1이므로 5만원 = $36.26이고 QQQ LOC 상한($751.66)은 약 103.7만원 → <strong>약 21거래일에 1주</strong>. QLD는 약 13만원이라 약 3거래일에 1주.</p>
+<blockquote>이 전략은 <strong>대부분의 거래일에 "적립만, 주문 없음"이 정상</strong>입니다. 주문이 안 나온다고 버그로 판단하지 마세요.</blockquote>
+
+<h2>3. 구현 중 계획을 바꾼 판정 (전체 26건)</h2>
+<p>계획·스펙과 다르게 결정한 것을 전부 남깁니다. 각 항목의 "틀렸을 때 비용"을 보고 되돌리고 싶은 것이 있으면 알려주세요.</p>
+
+<h3>3.1 진행 방식</h3>
+<table>
+  <thead><tr><th>#</th><th>결정</th><th>틀렸을 때 비용</th></tr></thead>
+  <tbody>
+    <tr><td>W1</td><td>worktree를 쓰지 않고 메인 작업 디렉토리에 브랜치 <code>feat/qqq-qld-dca</code>를 만들어 작업. worktree엔 gitignore된 SQLite DB도, node_modules도, 3004 dev 서버도 없어 계획의 검증 스텝(migrate·smoke·HTTP)을 전부 수행할 수 없음. master 직접 작업은 하지 않음</td><td>사용자의 기존 미커밋 변경과 작업 트리 공유 — 커밋을 경로 명시로 스코프해 섞이지 않음(9건 그대로 보존 확인)</td></tr>
+    <tr><td>C1</td><td>태스크별 커밋을 사전 승인받아 진행. push·merge는 하지 않음</td><td>없음 — 브랜치 로컬</td></tr>
+    <tr><td>B1</td><td>Task 2·3·4를 한 번의 dispatch로 배치 — 동일 형태(완성 코드가 있는 순수 모듈+테스트), 파일 비중첩</td><td>한 태스크 실패 시 fix loop가 셋을 함께 돎</td></tr>
+    <tr><td>B2</td><td>Task 5 리뷰와 Task 6 구현을 동시 실행. 리뷰어에게 "동시 태스크가 같은 파일을 수정 중이며 diff가 권위"라고 사실 전달</td><td>T5 리뷰가 Critical을 내면 T6이 결함 토대 위에 올라감 — 배선 계층이라 사후 흡수 가능</td></tr>
+    <tr><td>F4</td><td>Task 1·9의 사용자 조작 요구(dev 서버 재시작·육안 확인)를 실행 중 차단 지점에서 제거. HTTP 자동 확인으로 대체하고 체크리스트는 이 문서 1장으로 이관</td><td>스키마 반영 문제를 최종 단계에서야 발견 — 실제로 그렇게 됐고 코드 결함이 아님을 확인</td></tr>
+    <tr><td>P2 →<br>P2-rev</td><td>계획 문서의 코드 블록을 사후 수정하지 않음. 계획은 "무엇을 계획했는가"의 역사적 기록이라, 5개 지점을 소급 수정하면 계획이 처음부터 옳았던 것처럼 왜곡됨. 대신 <code>## 실행 중 판정으로 변경된 사항</code> 절을 덧붙이고, 코드와 일치해야 하는 <strong>스펙 HTML은 실제로 수정</strong></td><td>계획의 코드 블록만 읽은 사람이 최종 코드와 다르다고 오해 — 같은 문서 안 추가 절이 방지</td></tr>
+    <tr><td>P10</td><td>스펙 정확성 Important 1건과 Minor 2건을 한 라운드로 묶어 수정(원칙상 Minor는 fix loop 제외이나, 같은 문서·같은 라운드이고 이 문서의 목적이 "코드에 대한 진실"이며 비용이 0)</td><td>없음(문서)</td></tr>
+    <tr><td>FR6</td><td>제 금지 문구 "Do NOT set <code>dryRun: false</code> anywhere"가 지나치게 넓어 fix 에이전트가 fake db 안의 객체 리터럴조차 세우지 않았고, 그 결과 LIVE 제출 경로가 무테스트로 남음. 테스트 파일 안에서만 허용하도록 정정하고 LIVE 4케이스를 추가 지시. 제 지시 결함이 만든 공백이라 "두 번째 fix wave"가 아니라 첫 wave의 완성으로 판단</td><td>테스트 파일이 커짐</td></tr>
+  </tbody>
+</table>
+
+<h3>3.2 <span class="fix">코드를 고친 판정</span></h3>
+<table>
+  <thead><tr><th>#</th><th>발견한 결함과 결정</th><th>틀렸을 때 비용</th></tr></thead>
+  <tbody>
+    <tr><td>P1</td><td><strong>계획의 <code>pickSymbol</code>에 실제 결함.</strong> IEEE754로 <code>90/100-1 = -0.09999999999999998</code>이라 <code>ratio &lt;= -0.1</code>이 false → 계획 자신의 "정확히 임계값이면 레버리지" 테스트를 통과할 수 없었음. 제 pre-flight 스캔이 수학적으로만 검산해 놓친 것. 스펙 §4.2가 "경계 포함"을 명시하므로 스펙을 권위로 삼아 <code>1e-9</code> epsilon 승인(표시 반올림 경계 케이스의 간격 ~4e-5보다 4자리 작아 두 테스트 공존)</td><td>실제 낙폭이 임계보다 1e-9 이내로 얕은 순간에 레버리지 판정 — 가격 정밀도상 관측 불가</td></tr>
+    <tr><td>P4</td><td><strong>킬스위치가 정산 불가능한 주문 행을 만듦.</strong> 정산 분기는 <em>계좌</em>의 dryRun으로 갈리는데 killed 기록은 <code>dryRun:true</code>+<code>simulated</code>로 씀 → LIVE 계좌는 <code>settleLiveOrders</code>만 타므로 아무도 정산하지 않고, 그 계좌를 dryRun으로 되돌리면 +5% LOC로 거의 확실히 체결 판정돼 <strong>사지도 않은 주식 값이 실제 잔액에서 차감</strong>. 형제 <code>run-vr.ts</code> 관행대로 killed면 아무것도 하지 않고 <code>blocked: "disabled"</code>로 조기 반환 — 고아 행이 구조적으로 불가능하고 킬스위치 해제 시 재시도됨</td><td>킬스위치가 걸린 날의 dryRun 시뮬레이션 연속성이 한 거래일 끊김</td></tr>
+    <tr><td>P5<br>(절반)</td><td><code>cashKrw</code>가 트랜잭션 밖 읽기 + 절대값 쓰기라 동시 실행 시 적립 소실. 형제 <code>run-vr.ts</code>는 같은 자리에서 <code>increment</code>를 씀. 델타를 순수 함수 출력에서 도출해 <code>increment</code>/<code>decrement</code>로 전환(무경합 시 산술적으로 동일)</td><td>없음</td></tr>
+    <tr><td>P6</td><td><strong><code>updateDcaSettings</code>가 실거래 전환을 무검증 통과.</strong> <code>{ dryRun: false }</code>가 서버 가드 0으로 DB 직행. <code>createDcaAccount</code>는 <code>dryRun:true</code> 하드코딩으로 문을 닫았는데 그 옆에 무방비 문. Server Action은 HTTP 엔드포인트라 클라이언트 <code>window.confirm</code>은 서버 가드가 아님. <code>confirmLive</code> 의도 토큰 추가 — <strong>저장된 계좌가 dryRun인 상태에서 false로 바꾸는 전환일 때만</strong> 요구</td><td>LIVE 전환 시 인자 1개가 더 필요해짐</td></tr>
+    <tr><td>P7</td><td><code>cashKrw</code>·<code>initialCashKrw</code>만 <code>&lt; 0</code> 관용구를 써서 NaN을 통과(<code>NaN &lt; 0</code>은 false). NaN이 들어가면 <code>accrue</code>의 <code>Math.round(NaN + x)</code>가 영구 전파시켜 계좌가 복구 불가로 오염. 형제 4개 필드의 <code>!(x &gt;= 0)</code>로 통일</td><td>없음</td></tr>
+    <tr><td>P8</td><td><code>CreateForm</code>의 숫자 입력이 keystroke마다 <code>Number()</code>로 변환해 controlled value로 되돌리므로 비숫자 입력 시 입력창에 리터럴 <strong>"NaN"</strong>이 표시. 같은 파일 <code>SettingsForm</code>의 안전한 패턴(문자열 state + 제출 시 변환)으로 통일</td><td><code>CreateForm</code> state 타입이 string으로 바뀌어 변환 지점이 한 곳 늘어남</td></tr>
+    <tr><td class="fix">FR1</td><td><strong>병합을 막은 Critical.</strong> <code>SettingsForm</code>이 마운트 시점 스냅샷을 잡고 저장 시 <strong>사용자가 만지지 않은 <code>cashKrw</code>·<code>peakPrice</code>까지 절대값으로</strong> 전송 — 이 둘은 워커가 뒤에서 바꾸는 유일한 필드. 22:00 렌더(20만원) → 22:35 워커가 −18만 차감+5만 적립(DB 7만) → 23:10 임계%만 바꿔 저장 → DB가 20만원으로 되돌아가고 <code>stateApplied</code>가 이미 true라 <strong>그 차감은 다시는 적용되지 않음</strong>. 영구 유령 잔액이 LIVE 주문 크기를 정함. <strong>동시 클릭이 필요 없음</strong> — 제 Ruling P5/P9가 이를 좁은 경합으로 규정한 것은 오판이었고 실제 트리거는 "마운트 이후 워커 1회". <code>useRef</code>로 초기 문자열을 잡아 변경된 필드만 전송</td><td>없음</td></tr>
+    <tr><td>FR2</td><td>중복 실주문 창이 <code>count</code> 이후 네트워크 왕복 2회 폭이었음. <code>create</code>를 <code>submitOrder</code> <strong>앞으로</strong> 옮겨 주문 행을 뮤텍스로 사용 → 창이 로컬 SQLite 쓰기 1회로 축소. 또 10초 타임아웃으로 응답만 늦은 주문을 <code>failed</code>로 단정하던 것을 <code>submit_unknown</code>+note로 바꿔 사용자에게 보이게 함</td><td><code>@@unique</code> 없이는 마이크로초 창이 남고, <code>submit_unknown</code> 행은 브로커에서 수동 확인 필요</td></tr>
+    <tr><td>FR3</td><td><strong>스펙 §11의 "fake db 테스트를 만들지 않는다"를 뒤집음.</strong> 리뷰어가 "정산→차감 경로가 단 한 번도 실행된 적 없음"을 입증 — 스모크는 1·2회차가 같은 거래일인데 <code>settleDryOrders</code>는 <code>tradeDate &lt; today</code>만 조회하므로 <strong>구조적으로 도달 불가</strong>. <code>cashKrw</code>가 줄어드는 유일한 경로에 실행 증거가 0이고 그 잔액이 실주문 크기를 정함. 형제 <code>run-vr</code>는 dryRun 전용이라 선례가 전이되지 않음</td><td>스텁 6개 ~60줄의 유지 부담</td></tr>
+    <tr><td colspan="3" class="park">그 외 수정 판정: <strong>F1</strong> 죽은 뷰 필드가 되던 <code>basePrice</code>·<code>fxRate</code>를 삭제하지 않고 카드에 노출(낙폭 옆 현재가 + 환율 타일) / <strong>F2</strong> 계획 테스트 주석의 계산값 오류(1,036,566 → 1,036,614) 정정 / <strong>FR4</strong> killed 관련 deferred 2건은 해당 동작이 사라졌으므로 obsolete 처리</td></tr>
+  </tbody>
+</table>
+
+<h3>3.3 <span class="park">그대로 두기로 한 판정</span></h3>
+<table>
+  <thead><tr><th>#</th><th>지적과 결정</th><th>틀렸을 때 비용</th></tr></thead>
+  <tbody>
+    <tr><td>F3</td><td>계좌 루프 안 <code>getExchangeRate</code> 중복 호출 — 계좌 1~2개 전제이고, 루프 밖으로 올리면 계좌별 시세 실패 시 부분성공 처리가 복잡해짐. 최종 리뷰어도 독립적으로 "블로킹 가치 없음" 판정</td><td>계좌가 늘면 페이지 로드가 FX 호출 수에 비례해 느려짐</td></tr>
+    <tr><td>P3</td><td>"일봉 200봉을 런당 최대 4회 중복 fetch" 지적 — 규모를 직접 계산해 전제가 틀렸음을 확인: peak 시딩은 <code>runDca</code> 안이 아니라 계좌 생성 시에만, <code>settleDryOrders</code>는 이미 Map 캐시 보유, <code>runDca</code>는 거래일당 계좌당 1회. 실제 중복은 계좌당 거래일당 1회</td><td>계좌당 거래일당 토스 200봉 요청 1회 추가</td></tr>
+    <tr><td>P9</td><td>두 폼이 각자 독립 <code>useTransition</code>을 써서 설정 저장 중에도 "지금 실행" 버튼이 활성 — <code>VrManager.tsx</code>도 동일한 <strong>기존 하우스 패턴</strong>이고 계획 제약이 "기존 패턴을 따르고 고장나지 않은 것을 리팩터링하지 말 것"을 요구. 다만 이 판정이 근거로 든 "실제 위험"은 FR1로 별도 해결됨</td><td>설정 저장과 "지금 실행"을 겹쳐 누르면 수동 잔액 보정이 덮어써질 수 있음</td></tr>
+    <tr><td>FR5</td><td><code>accountSeq</code> 미사용 컬럼(스펙이 "null=기본계좌"로 설계한 필드, 실제 계좌 표시는 기능 요청) / <code>getClosedOrders</code>의 <code>limit</code> 100(무한매수법은 TQQQ·SOXL을 거래해 심볼이 겹치지 않음)</td><td>돈이 빠져나가는 계좌가 화면에 표시되지 않음; 같은 심볼을 다른 경로로 대량 거래하면 대조 대상이 100건 밖으로 밀려 조용히 미정산</td></tr>
+    <tr><td>FR7</td><td>최종 재리뷰의 잔여 5건 전부 park → 아래 5장</td><td>5장 참조</td></tr>
+  </tbody>
+</table>
+
+<h2>4. 검증된 것과 검증되지 않은 것</h2>
+<h3>검증됨</h3>
+<ul>
+  <li><strong>테스트 343건 전부 통과</strong>(43파일). 신규 5파일 49건 — 순수 함수 33 + 오케스트레이터 16.</li>
+  <li>오케스트레이터 테스트가 <strong>실제로 증거가 되는지</strong> 회의적으로 검증됨: fake의 <code>dcaAccount.update</code>가 Prisma의 <code>{increment}</code>/<code>{decrement}</code>를 실제로 해석하며 미지원 연산자엔 throw(무시하면 모든 <code>cashKrw</code> 단정이 무의미해짐), 차감 단정이 정확한 수치를 못 박음, "create가 submit보다 먼저"를 <strong>스텁 안 스냅샷으로 실제 순서를 관측</strong>, 멱등 케이스가 <code>lastRunDate</code>만 리셋해 단정이 자동으로 참이 되지 않음.</li>
+  <li>실DB 스모크 — 같은 거래일 2회 실행에 적립·주문 중복 없음. 임시 계좌 삭제 확인, 양 테이블 0행.</li>
+  <li><code>tsc --noEmit</code> exit 0, 변경 파일 lint 에러 0.</li>
+  <li>17개 커밋 전부 경로 명시 — 사용자의 무관한 미커밋 변경 9건이 세션 시작과 동일하게 보존됨.</li>
+</ul>
+<h3>검증되지 않음</h3>
+<ul>
+  <li><strong>브라우저 렌더링</strong> — dev 서버의 stale PrismaClient 때문에 <code>/stocks/dca</code>가 500. 1장의 육안 확인 6가지가 그래서 남아 있습니다.</li>
+  <li><strong>실제 주문 제출</strong> — 검증 중 실주문을 넣지 않는다는 제약을 지켰으므로, LIVE 경로의 근거는 fake db 테스트 4케이스 + 코드 판독입니다.</li>
+</ul>
+
+<h2>5. 남은 후속 과제 (LIVE 전환 전 검토)</h2>
+<table>
+  <thead><tr><th>우선</th><th>항목</th><th>왜 남겼는가</th></tr></thead>
+  <tbody>
+    <tr><td>높음</td><td><code>@@unique([accountId, tradeDate])</code>를 <code>DcaOrder</code>에 추가</td><td>중복 주문의 근본 가드. 최종 리뷰어가 "모든 코드 경로가 계좌·거래일당 정확히 1행만 만든다"를 확인했으므로 정상 흐름이 깨지지 않음. 마이그레이션 + <code>P2002</code> 처리가 필요해 최종 fix wave에서 스키마를 바꾸는 위험을 피함</td></tr>
+    <tr><td>높음</td><td><code>submit_unknown</code> 행의 자동 대조</td><td>제출 응답이 10초를 넘긴 주문. 현재는 상태+note로 <strong>사용자에게 보이게만</strong> 했고, 자동 대조는 <code>DcaRunDeps</code>에 OPEN 주문 조회가 없어 범위 밖. 이 상태가 보이면 <strong>토스 앱에서 체결 여부를 직접 확인</strong>하세요</td></tr>
+    <tr><td>중간</td><td>테스트 픽스처 2건 보강</td><td>현재 차감 단정은 "체결가 × 수량 × <strong>주문</strong>환율" 중 <code>×수량</code>과 "주문 시점 환율(vs 정산일 환율)"을 실제로 고정하지 않음 — 모든 픽스처가 수량 1이고 환율이 1400 고정. 구현이 정산일 환율을 쓰도록 바뀌어도 스위트가 통과합니다. 환율 상이 케이스 1개 + 수량 2주 케이스 1개면 닫힘</td></tr>
+    <tr><td>중간</td><td>fake db의 <code>matches</code>를 미지원 연산자에 throw로</td><td>현재 <code>{lt}</code>·<code>{in}</code>·<code>OR</code>·스칼라만 처리하고 그 외 조건은 조용히 전건 일치. where 조건을 하나 더 붙이면 필터가 무력화되고 테스트는 계속 초록으로 남는 유지보수 함정</td></tr>
+    <tr><td>낮음</td><td><code>tossFetch</code>의 401 재시도가 <code>POST /api/v1/orders</code>에도 적용</td><td>"행이 뮤텍스" 논리 밖의 유일한 재제출 경로. 401은 인증 실패라 주문이 생성되지 않았을 것이므로 실무상 무해하나, 주문 엔드포인트만 재시도에서 빼는 것을 검토할 만함. <strong>토스 클라이언트 공용 코드</strong>라 무한매수·VR도 함께 영향받으므로 이 브랜치 범위 밖</td></tr>
+    <tr><td>낮음</td><td>워커 미가동 거래일의 적립 누락</td><td>소급 적립 로직 없음. 설정 폼에서 <code>cashKrw</code>를 수동 보정하세요(FR1 수정 덕분에 이제 <strong>의도적으로 편집한 필드만</strong> 저장됩니다)</td></tr>
+  </tbody>
+</table>
+
+<h2>6. 알아두실 구조적 한계</h2>
+<ul>
+  <li><strong>배당 재투자 미반영</strong> — 백테스트는 수정주가를 썼지만 실운용은 현금 배당이 계좌에 쌓입니다. QQQ 배당수익률 ~0.5% 수준의 괴리.</li>
+  <li><strong>peak 시딩은 200봉(약 10개월)까지만</strong> — 토스 일봉 API 상한. 사상 최고가가 그 밖에 있으면 초기 낙폭이 과소평가되므로 생성 폼에서 직접 입력하세요.</li>
+  <li><strong>화면 판정 근거가 워커와 다름</strong> — 화면은 현재가, 워커는 전일 종가로 낙폭을 계산합니다. 세 타일 모두 "(현재가 기준)" 캡션을 달아 구분했습니다.</li>
+  <li><strong>시뮬→LIVE 전환 후 잔액 괴리</strong> — LIVE 계좌도 남은 시뮬레이션 체결의 차감을 흡수하므로(장부 내부 정합성 선택) 추적 잔액이 실제 브로커 현금과 일치하지 않습니다. 보유수량은 계좌 모드에 맞는 체결만 집계합니다.</li>
+  <li><strong>매도 경로 없음</strong> — 손절·익절은 수동입니다.</li>
+</ul>
+
+<h2>7. 관련 문서</h2>
+<ul>
+  <li><a href="superpowers/specs/2026-08-27-qqq-qld-dca-design.html">설계 스펙</a> — 코드와 일치하도록 갱신됨 (§12에 한계, §13에 검증 기준)</li>
+  <li><code>docs/superpowers/plans/2026-08-27-qqq-qld-dca.md</code> — 구현 계획 + <code>## 실행 중 판정으로 변경된 사항</code></li>
+  <li><code>apps/company-map/README.md</code> · <code>CLAUDE.md</code> — 기능 설명과 주의사항</li>
+</ul>
+</body>
+</html>
