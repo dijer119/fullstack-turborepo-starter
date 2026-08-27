@@ -104,7 +104,7 @@ export function DcaManager({ accounts }: { accounts: DcaAccountView[] }) {
             <Stat label="이월 잔액" value={krw(a.cashKrw)} />
             <Stat
               label="보유"
-              value={`${a.baseSymbol} ${fmt(a.holdings[a.baseSymbol] ?? 0, 0)} / ${a.leverSymbol} ${fmt(a.holdings[a.leverSymbol] ?? 0, 0)}주`}
+              value={`${a.baseSymbol} ${fmt(a.holdings[a.baseSymbol] ?? 0, 4)} / ${a.leverSymbol} ${fmt(a.holdings[a.leverSymbol] ?? 0, 4)}주`}
             />
             <Stat label="평가액" value={a.evalUsd != null ? `$${fmt(a.evalUsd)}` : "—"} />
             <Stat label="환율 (USD/KRW)" value={a.fxRate != null ? fmt(a.fxRate, 1) : "—"} />

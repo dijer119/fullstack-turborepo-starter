@@ -11,7 +11,7 @@ import {
 import { drawdownPct, pickSymbol, seedPeak } from "@/lib/dca/peak";
 import { estimateQuantity, planAmountBuy, type DcaAmountPlan } from "@/lib/dca/sizing";
 import { deriveHoldings } from "@/lib/dca/state";
-import { runDca } from "@/lib/dca/run-dca";
+import { runDca, type DcaNoOrderReason } from "@/lib/dca/run-dca";
 import { isDcaKilled, tossDcaDeps, PEAK_SEED_COUNT } from "@/lib/dca/toss-deps";
 
 const PAGE = "/stocks/dca";
@@ -284,25 +284,38 @@ async function currentUsTradeDate(): Promise<string | null> {
   return null;
 }
 
+/** noOrderReason별 사용자 안내 문구. 계좌 note(마지막 경고 배지)는 재사용하지 않는다 —
+ * note는 alreadyToday 경로에서 의도적으로 보존되므로 이번 실행과 무관한 과거 경고일 수 있다. */
+function noOrderMessage(reason: DcaNoOrderReason): string {
+  switch (reason) {
+    case "window_closed":
+      return "정규장 종료 1시간 전이 지나 오늘은 적립만 반영됐습니다";
+    case "below_min_amount":
+      return "잔액 환산액이 1센트 미만이라 적립만 반영됐습니다";
+    case "already_ordered":
+      return "오늘 이미 주문이 접수돼 추가 주문 없이 종료했습니다";
+    case "submit_unknown":
+      return "주문을 제출했지만 결과가 확인되지 않았습니다 — 토스 앱에서 체결 여부를 직접 확인하세요";
+  }
+}
+
 export async function runDcaNow(id: string): Promise<{ ok: boolean; message: string }> {
   const tradeDate = await currentUsTradeDate();
   if (!tradeDate) return { ok: false, message: "US 정규장이 열려있지 않습니다" };
   const r = await runDca(db, tossDcaDeps(), id, tradeDate, isDcaKilled());
   revalidatePath(PAGE);
   if (r.blocked) return { ok: false, message: `보류: ${r.blocked}` };
-  // 주문이 없는 경우의 사유는 두 가지: 마감 창(정규장 종료 1시간 전) 경과는 run-dca가 계좌
-  // note에 남기고, 잔액 1센트 미만은 note를 지운다. blocked가 아닌 이 경로에서 note가 남아
-  // 있다면 전자다.
-  let noOrder = "주문 없음(잔액 1센트 미만)";
-  if (r.placed === 0 && r.simulated === 0) {
-    const acc = await db.dcaAccount.findUnique({ where: { id }, select: { note: true } });
-    if (acc?.note) noOrder = acc.note;
-  }
   const parts = [
     r.symbol ? `대상 ${r.symbol}` : null,
     r.drawdownPct != null ? `낙폭 ${r.drawdownPct}%` : null,
     r.accrued ? "적립 반영" : "적립 이미 완료",
-    r.placed > 0 ? "실주문 1건 제출" : r.simulated > 0 ? "시뮬레이션 1건 기록" : noOrder,
+    r.placed > 0
+      ? "실주문 1건 제출"
+      : r.simulated > 0
+        ? "시뮬레이션 1건 기록"
+        : r.noOrderReason
+          ? noOrderMessage(r.noOrderReason)
+          : "주문 없음",
   ].filter(Boolean);
   return { ok: true, message: parts.join(" · ") };
 }
