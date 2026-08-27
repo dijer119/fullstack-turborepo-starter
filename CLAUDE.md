@@ -132,7 +132,7 @@ packages/
 - `src/lib/dart/` — DART 공시 API 연동 (공시목록, 재무제표, 지분, 영업이익 등). 루트 `.mcp.json`의 DART MCP 서버와는 별개로 앱 내부에서 직접 호출.
 - `src/lib/stocks/` — 네이버 스크래핑, 내재가치(intrinsic value), NCAV, 가격 이력 분석.
 - `src/lib/trade/` — 관세청 수출입 무역 데이터.
-- `worker/` — `tsx`로 실행되는 백그라운드 루프(2분 주기). KRX 종목 로드 → 종목 분석 → 무역 동기화. 메인 루프와 별개로 가격 변동(`price-change-loop`)·ETF PDF(`etf-pdf-loop`) 루프가 동시 실행됨. **NCAV·재무 전종목 배치는 DART 일일 한도를 크게 소비하므로 자동 루프에서 제외**되어 있고 `/stocks` "데이터 업데이트" 메뉴에서 수동 실행함 (refresh kind: `ncav_financials`).
+- `worker/` — `tsx`로 실행되는 백그라운드 루프(2분 주기). KRX 종목 로드 → 종목 분석 → 무역 동기화. 메인 루프와 별개로 가격 변동(`price-change-loop`)·ETF PDF(`etf-pdf-loop`)·무한매수(`infinite-buy-loop`)·VR(`vr-loop`)·적립식(`dca-loop`) 루프가 동시 실행됨. **NCAV·재무 전종목 배치는 DART 일일 한도를 크게 소비하므로 자동 루프에서 제외**되어 있고 `/stocks` "데이터 업데이트" 메뉴에서 수동 실행함 (refresh kind: `ncav_financials`).
 - `scripts/` — 개별 종목 리프레시·디버그용 일회성 `tsx` 스크립트.
 
 **핵심 파일:**
@@ -152,6 +152,8 @@ packages/
 - **Prisma 스키마 변경 후엔 반드시 dev 서버 재시작** — `src/lib/db.ts`가 `globalThis`에 PrismaClient를 캐싱해, generate 후에도 옛 클라이언트가 남아 새 모델/컬럼 접근 시 에러난다.
 - **lint를 게이트로 쓸 수 없음** — 기존 파일의 `react-hooks/set-state-in-effect` 에러로 워크스페이스 lint가 항상 exit 1. 변경 파일만 `npx eslint <files>`로 스코프 검증할 것. (useEffect 내 동기 setState 금지; `await` 이후 setState는 허용)
 - **ETF 스냅샷은 각 ETF Top10만 저장**(`worker/etf-snapshot.ts`의 `topN(...,10)`) → ETF 비중 합산·전일대비(`/stocks/etf/combined`)도 Top10 기준이라는 한계가 있음.
+- **QQQ·QLD 적립식(`/stocks/dca`)의 자금 상태는 `cashKrw` 하나에 모인다** — 적립은 `lastAccrualDate`, 체결 차감은 주문의 `stateApplied`, 주문 생성은 "당일 주문 존재" 카운트로 각각 독립 멱등을 보장한다. 세 가드 중 하나를 `lastRunDate`로 합치면 보류·재시도 시 중복 적립이나 이중 차감이 발생한다. 또 워커가 꺼져 있던 거래일은 적립이 누락되며 보정 로직이 없으므로 설정 폼에서 `cashKrw`를 수동으로 맞춘다.
+- **DCA 동시 실행 레이스가 미해결 상태로 남아있음** — "지금 실행"은 Next dev 서버에서, `dca-loop`는 별도 워커 프로세스에서 같은 SQLite 파일에 붙기 때문에 이론상 동시 실행이 가능하다. 당일 주문 중복 방지는 `count` 후 `create`(재확인 1회로 창을 좁혔을 뿐 DB 제약은 아님)라 극히 드물게 같은 거래일에 중복 주문(LIVE면 실주문 중복 체결)이 생길 수 있고, `updateDcaSettings`는 `cashKrw`를 절대값으로 쓰는 반면 `runDca`는 증분으로 쓰므로 설정 저장과 "지금 실행"이 겹치면 수동 잔액 보정이 유실될 수 있다. LIVE 전환 전에는 반드시 인지할 것.
 
 ## 개발 명령어
 

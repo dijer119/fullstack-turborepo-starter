@@ -24,6 +24,10 @@
 - ORM: Prisma (`prisma/schema.prisma` 단일 source of truth, type 자동 생성)
 - 시각화: React Flow + d3-force, 양방향(산업↔기업) 자유 탐색
 
+## 기능
+
+- **QQQ·QLD 적립식** (`/stocks/dca`) — 기준 종목이 직전 최고 종가 대비 임계% 이상 하락한 거래일에는 레버리지 종목을, 그 외에는 기준 종목을 매 거래일 설정 원화만큼 LOC 매수. 1주 미만이면 적립만 되고 잔액 이월. 워커 `dca-loop`가 US 정규장 중 15분 폴로 거래일당 1회 실행.
+
 ## 백업
 
 DB 파일(`data/company-map.db`)을 그대로 복사하면 끝. 다른 머신으로 옮기는 것도 같은 방법.

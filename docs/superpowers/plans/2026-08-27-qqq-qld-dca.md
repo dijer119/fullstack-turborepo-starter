@@ -2440,3 +2440,17 @@ git commit -m "docs(company-map): QQQ·QLD 적립식 기능 문서화"
 | 워커가 꺼져 있던 거래일 | 적립 누락 (보정 없음) — 설정 폼에서 `cashKrw` 수동 조정 |
 
 이 전략은 대부분의 거래일에 "적립만 하고 주문 없음"이 정상이다. 주문이 안 나온다고 버그로 판단하지 말 것.
+
+## 실행 중 판정으로 변경된 사항
+
+아래 위 태스크들의 코드 블록은 계획 당시 그대로 두고(계획이 무엇이었는지의 역사 기록이므로), 구현 중 리뷰를 거치며 실제로 달라진 부분만 여기 별도로 정리한다.
+
+1. **임계 비교에 부동소수점 허용오차 추가** (`4041cc2`) — `pickSymbol`(`src/lib/dca/peak.ts`)의 레버리지 판정을 `ratio <= -thresholdPct/100`에서 `ratio <= -thresholdPct/100 + 1e-9`로 바꿨다. IEEE754에서 `90/100 - 1`이 정확히 `-0.1`이 아니라 `-0.09999999999999998`로 계산돼, 허용오차 없이는 낙폭이 임계값에 정확히 도달한 경계 케이스가 레버리지 종목을 놓쳤다.
+
+2. **kill switch를 "아무것도 하지 않음"으로 변경** (`cbe67ee`) — 계획 당시엔 kill switch가 켜져 있어도 `dryRun: true` / `status: "simulated"` 행을 기록하는 안이었으나, `run-dca.ts`는 이제 `killed`면 체결 정산·잔액 반영·적립·주문 기록 전 단계에서 `blocked: "disabled"`를 즉시 반환하고 `lastRunDate`도 갱신하지 않는다. 옛 방식은 LIVE 계좌엔 어떤 정산 경로와도 매칭되지 않는 고아 행을 남겼고, 그 계좌가 나중에 dryRun으로 전환되면 실제로 사지 않은 주식이 체결로 오판돼 `cashKrw`가 잘못 차감될 위험이 있었다.
+
+3. **`cashKrw` 쓰기를 절대값에서 상대 증감으로 변경** (`cbe67ee`) — `applyPendingFills`의 차감은 Prisma `decrement`, 적립의 가산은 `increment`로 바꾸고 델타는 모두 `state.ts`의 순수 함수(`applyFills`/`accrue`) 출력에서 가져온다. 절대값 쓰기였다면 동시 실행이 적립을 반영하는 도중 다른 실행이 그 결과를 덮어쓸 수 있었다.
+
+4. **LIVE 전환에 서버 측 명시적 확인 요구** (`3286911`) — `updateDcaSettings`(`src/actions/dca.ts`)가 `confirmLive` 플래그를 받아, `dryRun: true → false` 전환 요청에 이 플래그가 없으면 `{ ok: false }`로 거부하고 저장하지 않는다. `confirmLive` 자체는 Prisma에 전달되지 않는다. 이미 LIVE인 계좌가 다른 설정을 저장하는 경우에는 영향이 없다. 같은 커밋에서 `cashKrw`/`initialCashKrw` 검증도 `< 0`에서 `!(x >= 0)` 형태로 바꿔 `NaN`이 조용히 저장되지 않도록 했다.
+
+5. **`CreateForm`의 숫자 필드를 문자열 state로 전환** (`9dab372`) — `SettingsForm`과 동일하게 값을 문자열로 들고 있다가 제출 시점에 변환하도록 바꿔, 입력창에 리터럴 "NaN"이 표시되는 경우를 없앴다.
