@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QQQ·QLD 적립식 전략 설계 (company-map)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .meta { color: #4a5568; font-size: 0.92rem; }
+  .small { color: #4a5568; font-size: 0.92rem; }
+</style>
+</head>
+<body>
+<h1>QQQ·QLD 적립식 전략 설계</h1>
+<p class="meta">대상: <code>apps/company-map</code> · 작성일 2026-08-27 · 상태: 설계 승인됨(구현 계획 대기)</p>
+
+<h2>1. 목적</h2>
+<p>QQQ가 직전 최고가 대비 일정 비율 이상 하락한 구간에서는 QLD(나스닥100 2배)를, 그 외에는 QQQ를 매 미국 거래일 일정 금액씩 매수하는 적립식 전략을 company-map 안에서 운용·추적한다. 기존 <strong>무한매수법</strong>·<strong>밸류리밸런싱 VR</strong>과 동일한 운용 관리 패턴(계좌 등록 → 워커가 거래일마다 신호 생성 → 주문 기록·제출 → 화면에서 상태 추적)을 따른다.</p>
+
+<blockquote>근거가 된 백테스트(2006-08-28 ~ 2026-08-26, 매 거래일 5만원): 10% 룰 XIRR 27.7% · MDD −52.7%, 15% 룰 26.9% · −50.7%, QQQ 단독 20.3% · −30.3%. 이 설계는 백테스트를 재현하는 것이 아니라 <strong>같은 규칙을 실계좌에 앞으로 적용</strong>하는 것이 목적이다.</blockquote>
+
+<h2>2. 범위</h2>
+<ul>
+  <li><strong>포함</strong>: 새 메뉴 항목(밸류리밸런싱 VR 아래), 계좌 CRUD, 거래일별 자동 실행 워커 루프, dryRun 가상 체결, LIVE 실주문 제출, 주문 이력·상태 화면.</li>
+  <li><strong>제외</strong>: 매도·리밸런싱 로직(전략상 매도 없음), 과거 데이터 백테스트 시뮬레이터, 세금·환전 스프레드 계산.</li>
+</ul>
+
+<h2>3. 사전 조사로 확정된 제약</h2>
+<table>
+  <thead><tr><th>항목</th><th>확인 결과</th><th>설계에 미친 영향</th></tr></thead>
+  <tbody>
+    <tr><td>토스 일봉 조회 상한</td><td><code>getDailyCandles(symbol, count)</code>는 <strong>count 200까지만</strong> 성공. 300 이상은 "요청이 올바르지 않습니다" 거부</td><td>최고가를 매번 재계산할 수 없음 → DB에 running peak 저장</td></tr>
+    <tr><td>QQQ 시세 (2026-08-27)</td><td>현재가 715.87 / 200봉 최고종가 746.16(2026-06-02) → 낙폭 −4.06%</td><td>시딩 직후 현재는 QQQ 매수 구간</td></tr>
+    <tr><td>환율</td><td><code>getExchangeRate("USD","KRW")</code> = 1379.1</td><td>5만원 ≈ $36.26</td></tr>
+    <tr><td>1주 단가</td><td>QQQ ≈ $716(약 20거래일치) · QLD ≈ $90(약 3거래일치)</td><td>대부분의 거래일은 적립만 되고 체결이 없음 → 잔액 이월이 핵심 상태</td></tr>
+    <tr><td>LOC 체결 판정</td><td><code>judgeDryFill</code>이 <code>tif: "CLS"</code> BUY를 이미 지원 (종가 ≤ 지정가면 종가 체결)</td><td>dryRun 판정 로직 그대로 재사용</td></tr>
+  </tbody>
+</table>
+
+<h2>4. 확정된 설계 선택</h2>
+<h3>4.1 매수 주문 방식 — LOC 종가매수</h3>
+<p><code>LIMIT</code> / <code>tif: "CLS"</code>, 지정가 = 현재가 × (1 + <code>premiumPct</code>/100). 백테스트가 종가 기준이므로 종가 체결이 가장 근접하고, dryRun 판정이 기존 <code>judgeDryFill</code>과 그대로 맞물린다. 장중 프리미엄을 넘겨 급등하면 미체결되고, 배정 원화는 그대로 남아 다음 거래일에 재시도된다.</p>
+
+<h3>4.2 낙폭 기준 최고가 — DB running peak</h3>
+<p>계좌 생성 시 200봉 최고 종가로 <code>peakPrice</code>를 자동 시딩하고(생성 폼에서 수동 입력으로 덮어쓸 수 있음), 이후 매 거래일 base 종목의 전일 종가로 갱신한다. 시딩 시점의 200봉(약 10개월) 밖에 진짜 사상 최고가가 있으면 초기 낙폭이 과소평가되므로, 생성 화면에 이 한계를 명시하고 수동 입력을 허용한다.</p>
+
+<h2>5. 데이터 모델</h2>
+<p><code>apps/company-map/prisma/schema.prisma</code>에 모델 2개를 추가한다. 기존 VR/무한매수 모델의 명명·매핑 관행(<code>@map</code> snake_case, 문자열 거래일 <code>YYYY-MM-DD</code>)을 그대로 따른다.</p>
+<pre><code>model DcaAccount {
+  id             String   @id @default(uuid())
+  name           String                                   // 표시용 이름
+  baseSymbol     String   @default("QQQ")  @map("base_symbol")
+  leverSymbol    String   @default("QLD")  @map("lever_symbol")
+  accountSeq     Int?     @map("account_seq")             // 토스 계좌(null=기본계좌)
+  thresholdPct   Float    @default(10)     @map("threshold_pct")    // 이 % 이상 하락 시 레버리지
+  dailyAmountKrw Float    @default(50000)  @map("daily_amount_krw") // 거래일당 적립액(원)
+  premiumPct     Float    @default(5)      @map("premium_pct")      // LOC 지정가 프리미엄 %
+  cashKrw        Float    @default(0)      @map("cash_krw")         // 미체결 이월 잔액(원)
+  peakPrice      Float    @map("peak_price")                        // base 종목 최고 종가
+  peakDate       String   @map("peak_date")
+  startDate      String   @map("start_date")
+  status         String   @default("active")               // active | paused | stopped
+  dryRun         Boolean  @default(true)   @map("dry_run")
+  note           String?                                   // 마지막 경고/보류 사유
+  lastRunDate    String?  @map("last_run_date")            // 거래일당 1회 보장
+  lastAccrualDate String? @map("last_accrual_date")        // 적립 멱등 마커 (10장 참조)
+  createdAt      DateTime @default(now())  @map("created_at")
+  updatedAt      DateTime @updatedAt       @map("updated_at")
+
+  orders DcaOrder[]
+
+  @@map("dca_accounts")
+}
+
+model DcaOrder {
+  id           String   @id @default(uuid())
+  accountId    String   @map("account_id")
+  tradeDate    String   @map("trade_date")
+  symbol       String                            // 실제 매수한 종목(QQQ | QLD)
+  side         String                            // BUY 고정
+  kind         String                            // loc_buy 고정
+  orderType    String   @map("order_type")       // LIMIT
+  tif          String                            // CLS
+  price        Float                             // LOC 지정가(상한)
+  quantity     Float
+  amountKrw    Float    @map("amount_krw")       // 주문 시 배정한 원화(추정)
+  fxRate       Float    @map("fx_rate")          // 주문 시 USD/KRW
+  drawdownPct  Float    @map("drawdown_pct")     // 판정에 쓴 낙폭(%) — 감사용
+  filledQty    Float?   @map("filled_qty")
+  filledPrice  Float?   @map("filled_price")
+  filledAt     String?  @map("filled_at")
+  tossOrderId  String?  @map("toss_order_id")
+  stateApplied Boolean? @map("state_applied")    // cashKrw 반영 여부(멱등 마커)
+  dryRun       Boolean  @map("dry_run")
+  status       String                            // simulated | simulated_filled | expired | submitted | filled | failed | skipped
+  error        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  account DcaAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, tradeDate])
+  @@map("dca_orders")
+}</code></pre>
+
+<h3>상태 불변식</h3>
+<ul>
+  <li><code>cashKrw</code>는 "아직 주식으로 바뀌지 않은 원화 적립 잔액"이다. 거래일마다 <code>dailyAmountKrw</code>가 더해지고, <strong>체결이 확정된 순간에만</strong> 차감된다. 주문 제출은 잔액을 건드리지 않는다 — 미체결 시 원복 로직이 필요 없어진다.</li>
+  <li>차감액(원) = <code>filledPrice × filledQty × 주문에 기록된 fxRate</code>. 체결 시점 환율이 아니라 주문 시점 환율을 쓴다(근사).</li>
+  <li>보유수량은 상태로 저장하지 않고 체결 이력에서 파생한다(VR <code>deriveHolding</code>과 동일). 매수 전용이라 주문 계산에는 쓰이지 않고 화면 표시 전용이다.</li>
+  <li>모든 상태 변경은 <code>stateApplied</code>·<code>lastRunDate</code>·"당일 주문 존재" 3중 가드로 멱등하다.</li>
+</ul>
+
+<h2>6. 실행 흐름 (runDca)</h2>
+<p>거래일당 1회. 실패하면 <code>lastRunDate</code>를 갱신하지 않아 다음 폴에서 자동 재시도한다(VR·무한매수 v4와 동일한 blocked 패턴).</p>
+<ol>
+  <li><strong>체결 정산</strong> — dryRun이면 <code>tradeDate</code>보다 이전인 <code>simulated</code> 주문을 그 날 일봉 + <code>judgeDryFill</code>로 판정해 <code>simulated_filled</code> / <code>expired</code>로 확정. LIVE면 <code>getOrders(accountSeq, {status:"CLOSED", symbol, from})</code>로 대조해 <code>filled</code> / <code>expired</code> 확정.</li>
+  <li><strong>잔액 반영</strong> — <code>stateApplied</code>가 아직 아닌 체결을 <code>cashKrw</code>에서 차감하고 마커를 세운다(주문별 트랜잭션).</li>
+  <li><strong>적립</strong> — <code>lastAccrualDate !== tradeDate</code>일 때만 <code>cashKrw += dailyAmountKrw</code>하고 같은 트랜잭션에서 <code>lastAccrualDate = tradeDate</code>로 갱신한다. 이후 단계가 보류되어도 재적립되지 않는다(10장 참조).</li>
+  <li><strong>peak 갱신</strong> — base 종목의 <em>전일</em> 종가 <code>prevClose</code>가 <code>peakPrice</code>보다 크면 <code>peakPrice</code>/<code>peakDate</code>를 갱신. 전일 종가를 못 구하면 <code>blocked: "no_prev_close"</code>로 보류.</li>
+  <li><strong>종목 선택</strong> — <code>drawdown = prevClose / peakPrice - 1</code>. <code>drawdown ≤ -thresholdPct/100</code>이면 <code>leverSymbol</code>, 아니면 <code>baseSymbol</code>.</li>
+  <li><strong>주문 계산</strong> — 선택 종목 현재가 <code>p</code>, 환율 <code>fx</code>에 대해 지정가 <code>limit = round2(p × (1 + premiumPct/100))</code>, 수량 <code>qty = floor(cashKrw / fx / limit)</code>. <code>qty &lt; 1</code>이면 주문 없이 종료(적립만 됨).</li>
+  <li><strong>중복 방지</strong> — 해당 계좌·거래일에 이미 주문 행이 있으면 신규 생성을 건너뛰고 <code>lastRunDate</code>만 갱신한다.</li>
+  <li><strong>기록 / 제출</strong> — dryRun이거나 kill switch가 켜져 있으면 <code>status: "simulated"</code>로 기록만. LIVE면 <code>getBuyingPower(accountSeq,"USD")</code>로 잔고를 먼저 확인하고(부족 시 <code>blocked</code> + note) <code>createOrder</code> 제출 후 <code>status: "submitted"</code>, 실패 시 <code>failed</code> + error 기록.</li>
+  <li><code>lastRunDate = tradeDate</code>, <code>note = null</code>로 마무리.</li>
+</ol>
+
+<h2>7. 파일 구성</h2>
+<table>
+  <thead><tr><th>파일</th><th>역할</th><th>테스트</th></tr></thead>
+  <tbody>
+    <tr><td><code>src/lib/dca/peak.ts</code></td><td><code>updatePeak</code>, <code>drawdownPct</code>, <code>pickSymbol</code> — 순수 함수</td><td><code>peak.test.ts</code></td></tr>
+    <tr><td><code>src/lib/dca/sizing.ts</code></td><td><code>planBuy({cashKrw, fxRate, price, premiumPct})</code> → 주문 or null</td><td><code>sizing.test.ts</code></td></tr>
+    <tr><td><code>src/lib/dca/state.ts</code></td><td><code>applyFills</code>, <code>accrue</code> — 자금 상태 전이 순수 함수</td><td><code>state.test.ts</code></td></tr>
+    <tr><td><code>src/lib/dca/run-dca.ts</code></td><td>오케스트레이터. db·deps 주입, 위 8단계</td><td><code>run-dca.test.ts</code></td></tr>
+    <tr><td><code>src/lib/dca/toss-deps.ts</code></td><td>토스 어댑터(일봉·전일종가·현재가·환율·체결조회·매수가능금액·주문제출) + <code>isDcaKilled</code></td><td><code>toss-deps.test.ts</code>(순수부만)</td></tr>
+    <tr><td><code>worker/dca-loop.ts</code></td><td>15분 폴 · <code>usRegularTradeDate()</code> · active 계좌 순회</td><td>—</td></tr>
+    <tr><td><code>worker/index.ts</code></td><td><code>dcaLoop()</code> 기동 추가</td><td>—</td></tr>
+    <tr><td><code>src/actions/dca.ts</code></td><td><code>listDcaAccounts</code> / <code>createDcaAccount</code> / <code>updateDcaSettings</code> / <code>setDcaStatus</code> / <code>runDcaNow</code> / <code>getDcaOrders</code> / <code>seedPeakFromCandles</code></td><td>—</td></tr>
+    <tr><td><code>src/app/stocks/dca/page.tsx</code></td><td>서버 컴포넌트 진입점 (<code>force-dynamic</code>)</td><td>—</td></tr>
+    <tr><td><code>src/app/stocks/dca/DcaManager.tsx</code></td><td>클라이언트 UI (VrManager 구조 준용)</td><td>—</td></tr>
+    <tr><td><code>src/components/layout/AppMenu.tsx</code></td><td>SERVICE 배열 VR 다음에 항목 추가</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<h2>8. 인터페이스</h2>
+<pre><code>// src/lib/dca/peak.ts
+export function updatePeak(peak: number, prevClose: number): number;
+export function drawdownPct(prevClose: number, peak: number): number;   // 음수 %
+export function pickSymbol(args: {
+  prevClose: number; peak: number; thresholdPct: number;
+  baseSymbol: string; leverSymbol: string;
+}): { symbol: string; leveraged: boolean; drawdownPct: number };
+
+// src/lib/dca/sizing.ts
+export interface DcaBuyPlan { price: number; quantity: number; estUsd: number; estKrw: number }
+export function planBuy(args: {
+  cashKrw: number; fxRate: number; price: number; premiumPct: number;
+}): DcaBuyPlan | null;   // 1주 미만이면 null
+
+// src/lib/dca/state.ts  — 자금 상태 전이 (순수 함수, infinite-buy/sync.ts applyFills와 같은 관행)
+export interface DcaFillEvent { filledQty: number | null; filledPrice: number | null; fxRate: number }
+export function applyFills(cashKrw: number, fills: DcaFillEvent[]): number;   // 차감 후 잔액(원, 정수)
+export function accrue(args: {
+  cashKrw: number; lastAccrualDate: string | null; tradeDate: string; dailyAmountKrw: number;
+}): { cashKrw: number; accrued: boolean };
+export function deriveHoldings(
+  fills: Array&lt;{ symbol: string; filledQty: number | null }&gt;,
+): Record&lt;string, number&gt;;
+
+// src/lib/dca/run-dca.ts
+export interface DcaRunDeps {
+  getDefaultAccountSeq(): Promise&lt;number&gt;;
+  getDailyCandle(symbol: string, date: string): Promise&lt;DryCandle | null&gt;;
+  getPrevTradeClose(symbol: string, before: string): Promise&lt;{ date: string; close: number } | null&gt;;
+  getCurrentPrice(symbol: string): Promise&lt;number&gt;;
+  getUsdKrw(): Promise&lt;number&gt;;
+  getBuyingPowerUsd(accountSeq: number): Promise&lt;number&gt;;
+  getClosedOrders(accountSeq: number, symbol: string, from: string): Promise&lt;TossOrder[]&gt;;
+  submitOrder(accountSeq: number, o: {...}, symbol: string): Promise&lt;{ tossOrderId: string }&gt;;
+}
+export interface DcaRunResult { placed: number; simulated: number; symbol: string | null; blocked: string | null }
+export function runDca(db, deps, accountId, tradeDate, killed): Promise&lt;DcaRunResult&gt;;</code></pre>
+
+<h2>9. 화면</h2>
+<p>경로 <code>/stocks/dca</code>. VR 화면과 동일한 카드 레이아웃을 쓴다.</p>
+<ul>
+  <li><strong>계좌 카드 헤더</strong>: 이름 · <code>QQQ→QLD</code> 페어 · 배지(적립액 / 임계 −10% / dryRun 여부 / status) · note 경고 배지</li>
+  <li><strong>현황</strong>: 현재 낙폭(%)과 오늘 선택 종목 배지, <code>peakPrice</code>(+날짜), 이월 잔액(원), QQQ·QLD 보유수량과 평가액(USD·원), 마지막 실행일</li>
+  <li><strong>오늘 주문 미리보기</strong>: 지정가·수량·예상 금액. 1주 미만이면 "적립만 — 앞으로 N거래일 후 1주 가능" 안내</li>
+  <li><strong>주문 이력</strong>: 거래일·종목·지정가·수량·상태·체결가·낙폭</li>
+  <li><strong>조작</strong>: 계좌 생성 / 설정 수정 / 일시정지·재개 / 지금 실행</li>
+</ul>
+<p>메뉴 항목: <code>{ key: "dca", name: "QQQ·QLD 적립식", description: "QQQ 낙폭 10% 이상이면 QLD, 아니면 QQQ 매일 적립", path: "/stocks/dca", icon: CalendarClock }</code></p>
+
+<h2>10. 오류 처리</h2>
+<table>
+  <thead><tr><th>상황</th><th>처리</th></tr></thead>
+  <tbody>
+    <tr><td>전일 종가 조회 실패</td><td><code>blocked: "no_prev_close"</code> · note 기록 · <code>lastRunDate</code> 미갱신 → 다음 폴 재시도</td></tr>
+    <tr><td>환율/현재가 조회 실패</td><td>동일하게 blocked · <code>lastRunDate</code> 미갱신. 적립은 <code>lastAccrualDate</code>로 이미 확정돼 재시도 시 중복되지 않는다</td></tr>
+    <tr><td>USD 예수금 부족(LIVE)</td><td><code>blocked: "insufficient_buying_power"</code> · note로 부족 금액 표시 · 주문 미제출</td></tr>
+    <tr><td>주문 제출 실패</td><td>해당 주문 행 <code>status: "failed"</code> + error 저장. 잔액은 차감되지 않음</td></tr>
+    <tr><td>체결 동기화 실패</td><td>blocked. 상태 갱신 없이 다음 폴 재시도</td></tr>
+    <tr><td>kill switch <code>DCA_DISABLED=1</code></td><td>LIVE 계좌도 <code>simulated</code>로만 기록</td></tr>
+  </tbody>
+</table>
+<blockquote><strong>적립 멱등성 주의.</strong> 3단계 적립을 <code>lastRunDate</code>로만 막으면, 4~8단계에서 blocked가 나 <code>lastRunDate</code>를 갱신하지 않았을 때 같은 거래일에 적립이 두 번 이상 들어간다. 따라서 적립 여부는 <code>lastRunDate</code>와 분리된 <code>lastAccrualDate</code>로 관리하고, 적립 성공 즉시 같은 트랜잭션에서 갱신한다(5장 모델에 반영됨).</blockquote>
+
+<h2>11. 테스트 계획</h2>
+<ul>
+  <li><code>peak.test.ts</code> — 신고가 갱신 / 미갱신, 낙폭 계산 부호, 임계 경계값(정확히 −10%일 때 레버리지 선택), 임계 15% 설정</li>
+  <li><code>sizing.test.ts</code> — 1주 미만이면 null, 프리미엄 반영 지정가, 잔액이 정확히 1주 경계일 때, 환율/가격 0·NaN 방어</li>
+  <li><code>state.test.ts</code> — <code>accrue</code>: 같은 거래일 재호출 시 <code>accrued: false</code>로 중복 적립 없음 / 날짜가 바뀌면 가산. <code>applyFills</code>: 체결 금액 × 주문 환율만큼 차감, <code>filledQty</code>/<code>filledPrice</code>가 null인 미체결은 무시, 여러 건 누적</li>
+  <li><code>run-dca.ts</code>는 순수 함수를 조립하는 얇은 오케스트레이터로 유지하고 <strong>fake db 테스트를 만들지 않는다</strong> — 기존 <code>run-vr.ts</code>/<code>run-v4.ts</code>와 동일한 관행. 대신 <code>scripts/dca-smoke.ts</code>로 dryRun 계좌를 만들어 2회 연속 실행해 적립·주문이 중복되지 않는지 실DB에서 확인하고 계좌를 정리한다</li>
+  <li>검증 명령: <code>yarn workspace company-map test</code> (전체 통과) · 변경 파일만 <code>npx eslint &lt;files&gt;</code></li>
+</ul>
+
+<h2>12. 가정과 한계</h2>
+<ul>
+  <li><strong>배당 재투자 미반영</strong> — 백테스트는 수정주가를 썼지만 실운용은 현금 배당이 계좌에 쌓인다. QQQ 배당수익률 ~0.5% 수준의 괴리.</li>
+  <li><strong>기존 보유분은 교체하지 않는다</strong> — 신규 적립금의 매수 종목만 바뀐다. 백테스트 조건과 동일.</li>
+  <li><strong>peak 시딩의 한계</strong> — 토스 200봉(약 10개월) 내 최고 종가만 확인 가능. 진짜 사상 최고가가 그 밖에 있으면 초기 낙폭이 과소평가되어 QLD 구간을 놓친다. 생성 폼에서 수동 입력으로 보정한다.</li>
+  <li><strong>종가 vs 수정주가</strong> — peak과 낙폭 모두 토스 원종가 기준. 백테스트의 수정주가 기준과 미세하게 다르다.</li>
+  <li><strong>환율 근사</strong> — 체결 차감액을 주문 시점 환율로 환산한다. 실제 원화 체결 원가와 소폭 차이.</li>
+  <li><strong>보유 정합성 대조 없음</strong> — 같은 토스 계좌에서 다른 경로로 QQQ/QLD를 매매하면 화면의 보유수량(체결 이력 파생)이 실보유와 어긋난다. 주문 계산은 잔액만 쓰므로 주문 안전성에는 영향이 없다.</li>
+  <li><strong>적립 누락 보정 없음</strong> — 워커가 꺼져 있던 거래일에는 적립이 일어나지 않고, 지난 거래일을 소급 적립하는 로직도 없다. 설정 폼에서 <code>cashKrw</code>를 직접 수정해 보정한다.</li>
+  <li><strong>LIVE는 매수만</strong> — 매도 경로가 없으므로 손절·익절은 수동이다.</li>
+</ul>
+
+<h2>13. 검증 기준 (성공 조건)</h2>
+<ol>
+  <li><code>yarn workspace company-map test</code> 전체 통과, 신규 테스트 파일 3개 포함</li>
+  <li>변경 파일 <code>npx eslint</code> 에러 0</li>
+  <li>dev 서버에서 <code>/stocks/dca</code> 진입 → dryRun 계좌 생성 → "지금 실행" → 낙폭·선택 종목·이월 잔액이 화면에 표시되고, 1주 미만이면 주문 없이 적립만 증가</li>
+  <li>같은 거래일에 "지금 실행"을 두 번 눌러도 적립·주문이 중복되지 않음</li>
+  <li>AppMenu에서 밸류리밸런싱 VR 바로 아래에 새 항목이 보이고 링크가 동작</li>
+</ol>
+</body>
+</html>
