@@ -44,8 +44,8 @@
     <tr><td>토스 일봉 조회 상한</td><td><code>getDailyCandles(symbol, count)</code>는 <strong>count 200까지만</strong> 성공. 300 이상은 "요청이 올바르지 않습니다" 거부</td><td>최고가를 매번 재계산할 수 없음 → DB에 running peak 저장</td></tr>
     <tr><td>QQQ 시세 (2026-08-27)</td><td>현재가 715.87 / 200봉 최고종가 746.16(2026-06-02) → 낙폭 −4.06%</td><td>시딩 직후 현재는 QQQ 매수 구간</td></tr>
     <tr><td>환율</td><td><code>getExchangeRate("USD","KRW")</code> = 1379.1</td><td>5만원 ≈ $36.26</td></tr>
-    <tr><td>1주 단가</td><td>QQQ ≈ $716(약 20거래일치) · QLD ≈ $90(약 3거래일치)</td><td>대부분의 거래일은 적립만 되고 체결이 없음 → 잔액 이월이 핵심 상태</td></tr>
-    <tr><td>LOC 체결 판정</td><td><code>judgeDryFill</code>이 <code>tif: "CLS"</code> BUY를 이미 지원 (종가 ≤ 지정가면 종가 체결)</td><td>dryRun 판정 로직 그대로 재사용</td></tr>
+    <tr><td>1주 단가</td><td>QQQ ≈ $716(약 20거래일치) · QLD ≈ $90(약 3거래일치)</td><td>당시엔 대부분의 거래일에 체결이 없어 잔액 이월이 핵심 상태였음 → 이후 <strong>금액 기반 전환의 계기</strong>가 됨(4.1절). 지금은 거래일마다 잔액 전액이 투입되고 센트 단위 절삭분만 이월된다</td></tr>
+    <tr><td>토스 주문 명세의 배타성</td><td><code>orderAmount</code>(소수점 매수)는 <code>orderType: "MARKET"</code> 전용이고, <code>timeInForce: "CLS"</code>(종가매수)는 <code>orderType: "LIMIT"</code>만 지원 — 두 조건을 동시에 만족하는 주문 형태가 없음</td><td>LOC 종가매수와 소수점(금액 기반) 매수는 공존할 수 없음 → 정수 수량 제약을 없애려면 LOC를 포기해야 했음(4.1절 최종 결정)</td></tr>
   </tbody>
 </table>
 
@@ -110,7 +110,7 @@ model DcaOrder {
   tossOrderId   String?  @map("toss_order_id")
   stateApplied  Boolean? @map("state_applied")          // cashKrw 반영 여부(멱등 마커)
   dryRun        Boolean  @map("dry_run")
-  status        String                                  // simulated | simulated_filled | expired | submitting | submitted | filled | submit_unknown
+  status        String                                  // simulated_filled | expired | submitting | submitted | filled | submit_unknown
                                                          //   submitting: 제출 직전에 만든 뮤텍스 행 / submit_unknown: 제출 결과 미확인(수동 확인 필요)
   error         String?
   createdAt     DateTime @default(now()) @map("created_at")
