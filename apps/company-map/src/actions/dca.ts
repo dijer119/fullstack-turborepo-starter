@@ -194,7 +194,7 @@ export async function createDcaAccount(
   if (!(input.premiumPct >= 0) || input.premiumPct >= 100) {
     return { ok: false, error: "LOC 프리미엄%는 0~100 사이여야 합니다" };
   }
-  if (input.initialCashKrw < 0) return { ok: false, error: "초기 잔액은 음수 불가" };
+  if (!(input.initialCashKrw >= 0)) return { ok: false, error: "초기 잔액은 음수 불가" };
 
   const today = todayIso();
   let peakPrice = input.peakPrice;
@@ -244,6 +244,8 @@ export async function updateDcaSettings(
     cashKrw?: number;
     peakPrice?: number;
     dryRun?: boolean;
+    /** dryRun: false로 전환할 때만 확인용 — DB에는 저장하지 않는다 */
+    confirmLive?: boolean;
   },
 ): Promise<{ ok: boolean; error?: string }> {
   if (patch.thresholdPct !== undefined && (!(patch.thresholdPct > 0) || patch.thresholdPct >= 100)) {
@@ -255,13 +257,20 @@ export async function updateDcaSettings(
   if (patch.premiumPct !== undefined && (!(patch.premiumPct >= 0) || patch.premiumPct >= 100)) {
     return { ok: false, error: "LOC 프리미엄%는 0~100 사이여야 합니다" };
   }
-  if (patch.cashKrw !== undefined && patch.cashKrw < 0) {
+  if (patch.cashKrw !== undefined && !(patch.cashKrw >= 0)) {
     return { ok: false, error: "이월 잔액은 음수 불가" };
   }
   if (patch.peakPrice !== undefined && !(patch.peakPrice > 0)) {
     return { ok: false, error: "최고가는 0보다 커야 합니다" };
   }
-  await db.dcaAccount.update({ where: { id }, data: patch });
+  const { confirmLive, ...data } = patch;
+  if (data.dryRun === false) {
+    const acc = await db.dcaAccount.findUniqueOrThrow({ where: { id } });
+    if (acc.dryRun && !confirmLive) {
+      return { ok: false, error: "실거래(LIVE) 전환은 명시적 확인이 필요합니다" };
+    }
+  }
+  await db.dcaAccount.update({ where: { id }, data });
   revalidatePath(PAGE);
   return { ok: true };
 }

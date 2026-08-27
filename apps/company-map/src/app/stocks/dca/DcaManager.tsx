@@ -307,6 +307,7 @@ function SettingsForm({
                 cashKrw: Number(cashKrw),
                 peakPrice: Number(peakPrice),
                 dryRun,
+                confirmLive: true,
               });
               router.refresh();
               onDone(r.ok ? "설정을 저장했습니다" : r.error);
