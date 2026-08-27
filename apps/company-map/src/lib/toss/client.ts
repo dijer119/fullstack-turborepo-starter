@@ -439,15 +439,35 @@ export async function getSellableQuantity(
 export type OrderSide = "BUY" | "SELL";
 export type OrderType = "LIMIT" | "MARKET";
 
-export interface CreateOrderInput {
+// 주문 요청 공통 필드. clientOrderId는 멱등성 키(최대 36자, 영숫자·-·_) — 동일 값으로
+// 재요청하면 이전 주문 결과를 그대로 재반환한다(10분간 유효).
+interface CreateOrderCommon {
   symbol: string;
   side: OrderSide;
-  orderType: OrderType;
-  quantity: string; // 수량(문자열). 미국주식은 소수 가능
-  price?: string; // LIMIT 시 필수
-  timeInForce?: "DAY" | "CLS";
+  clientOrderId?: string;
   confirmHighValueOrder?: boolean; // 1억원 이상 주문 확인
 }
+
+// 수량 기반 주문(기존 형태). LIMIT/MARKET 모두 가능. 수량은 기본 양의 정수만 허용되고,
+// 소수 수량은 미국주식 시장가 매도(orderType=MARKET + side=SELL)에서만 허용된다
+// (그 외 소수 수량은 400 invalid-request). 소수점 매수는 AmountOrderInput(orderAmount)을 쓸 것.
+export interface QuantityOrderInput extends CreateOrderCommon {
+  orderType: OrderType;
+  quantity: string; // 수량(문자열)
+  price?: string; // LIMIT 시 필수
+  timeInForce?: "DAY" | "CLS"; // CLS는 미국주식 + LIMIT 조합만 지원
+}
+
+// 금액 기반 주문(신규, 소수 수량 매수용). MARKET 전용이며 체결 수량은 체결 시점 시장가로
+// 정해진다. 명세가 두 형태를 oneOf로 나누므로 이 분기엔 quantity/price/timeInForce가
+// 아예 존재하지 않는다 — createOrder에서도 절대 섞어 보내지 말 것.
+export interface AmountOrderInput extends CreateOrderCommon {
+  orderType: "MARKET";
+  orderAmount: string; // 주문 금액(문자열, 달러 소수 가능). 지정 금액만큼 시장가 체결
+}
+
+// orderAmount 필드 존재 여부로 두 형태를 판별한다.
+export type CreateOrderInput = QuantityOrderInput | AmountOrderInput;
 
 export interface CreateOrderResult {
   orderId: string;
@@ -455,18 +475,31 @@ export interface CreateOrderResult {
 }
 
 // 주문 생성(매수/매도). 실제 체결되는 동작. 에러 시 TossApiError throw.
+// 금액 기반(orderAmount)·수량 기반(quantity)은 API 명세상 oneOf라 본문을 분기 조립한다.
 export async function createOrder(
   accountSeq: number,
   input: CreateOrderInput,
 ): Promise<CreateOrderResult> {
-  const body: Record<string, unknown> = {
-    symbol: input.symbol,
-    side: input.side,
-    orderType: input.orderType,
-    quantity: input.quantity,
-    timeInForce: input.timeInForce ?? "DAY",
-  };
-  if (input.orderType === "LIMIT") body.price = input.price;
+  let body: Record<string, unknown>;
+  if ("orderAmount" in input) {
+    // quantity/price/timeInForce는 넣지 않는다 — 넣으면 다른 oneOf 분기로 오인돼 거절될 수 있음.
+    body = {
+      symbol: input.symbol,
+      side: input.side,
+      orderType: input.orderType,
+      orderAmount: input.orderAmount,
+    };
+  } else {
+    body = {
+      symbol: input.symbol,
+      side: input.side,
+      orderType: input.orderType,
+      quantity: input.quantity,
+      timeInForce: input.timeInForce ?? "DAY",
+    };
+    if (input.orderType === "LIMIT") body.price = input.price;
+  }
+  if (input.clientOrderId) body.clientOrderId = input.clientOrderId;
   if (input.confirmHighValueOrder) body.confirmHighValueOrder = true;
 
   const json = await tossFetch<{ result: CreateOrderResult }>("/api/v1/orders", {
