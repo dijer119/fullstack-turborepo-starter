@@ -130,7 +130,10 @@ async function applyPendingFills(db: PrismaClient, accountId: string): Promise<v
     pending.map((o) => ({ filledQty: o.filledQty, filledPrice: o.filledPrice, fxRate: o.fxRate })),
   );
   await db.$transaction([
-    db.dcaAccount.update({ where: { id: accountId }, data: { cashKrw: nextCash } }),
+    db.dcaAccount.update({
+      where: { id: accountId },
+      data: { cashKrw: { decrement: acc.cashKrw - nextCash } },
+    }),
     ...pending.map((o) =>
       db.dcaOrder.update({ where: { id: o.id }, data: { stateApplied: true } }),
     ),
@@ -156,6 +159,11 @@ export async function runDca(
   let acc = await db.dcaAccount.findUniqueOrThrow({ where: { id: accountId } });
   if (acc.status !== "active") return { ...none, blocked: "not_active" };
   if (acc.lastRunDate === tradeDate) return { ...none, blocked: "already_ran" };
+  // killed면 아무것도 하지 않고 즉시 반환 — settleDryOrders/settleLiveOrders는 계좌의
+  // dryRun으로 정산 대상을 가르므로, 여기서 시뮬레이션 행을 만들면 LIVE 계좌에서는
+  // 어느 정산 경로에도 걸리지 않는 고아 행이 된다. lastRunDate를 건드리지 않으므로
+  // 킬 스위치가 풀리면 다음 폴에서 그대로 재시도된다.
+  if (killed) return { ...none, blocked: "disabled" };
 
   const block = async (reason: string, accrued: boolean): Promise<DcaRunResult> => {
     await db.dcaAccount.update({ where: { id: accountId }, data: { note: reason } });
@@ -188,7 +196,7 @@ export async function runDca(
   if (a.accrued) {
     acc = await db.dcaAccount.update({
       where: { id: accountId },
-      data: { cashKrw: a.cashKrw, lastAccrualDate: tradeDate },
+      data: { cashKrw: { increment: a.cashKrw - acc.cashKrw }, lastAccrualDate: tradeDate },
     });
   }
 
@@ -269,16 +277,27 @@ export async function runDca(
     drawdownPct: pick.drawdownPct,
   };
 
-  // ⑦ 기록·제출. killed면 LIVE 계좌도 시뮬레이션으로 기록한다 —
-  //    dryRun: true로 남겨야 settleDryOrders가 나중에 판정해 상태가 고아로 남지 않는다.
-  const simulate = acc.dryRun || killed;
+  // 재확인 — 위 alreadyToday 체크 이후 시세·환율 조회(네트워크 왕복) 동안 동시 실행이
+  // 끼어들 여지가 있다. 같은 로직을 주문 기록 직전에 한 번 더 태워 창을 수백 ms에서
+  // 수 μs로 좁힌다.
+  const alreadyTodayRecheck = await db.dcaOrder.count({ where: { accountId, tradeDate } });
+  if (alreadyTodayRecheck > 0) {
+    await db.dcaAccount.update({
+      where: { id: accountId },
+      data: { lastRunDate: tradeDate, note: null },
+    });
+    return picked;
+  }
+
+  // ⑦ 기록·제출. killed는 위에서 이미 걸러졌으므로 여기서는 계좌의 dryRun만 본다.
+  const simulate = acc.dryRun;
   if (simulate) {
     await db.dcaOrder.create({
       data: {
         ...orderData,
         dryRun: true,
         status: "simulated",
-        error: killed && !acc.dryRun ? "DCA_DISABLED — 실주문 대신 시뮬레이션" : null,
+        error: null,
       },
     });
     await db.dcaAccount.update({
