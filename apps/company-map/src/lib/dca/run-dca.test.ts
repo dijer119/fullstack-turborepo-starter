@@ -1,8 +1,9 @@
-// runDca 오케스트레이터 — 손으로 만든 인메모리 fake db로 "정산 → 잔액 차감" 사이클을 검증한다.
-// scripts/dca-smoke.ts는 두 실행이 같은 거래일이라 settleDryOrders(tradeDate: { lt })에
-// 구조적으로 닿지 못하므로, cashKrw가 줄어드는 유일한 경로는 여기서만 실행된다.
-// LIVE 경로(submitting/submit_unknown)는 dryRun: false를 세우지 않는다는 이번 작업의
-// 금지 조건 때문에 테스트하지 않는다.
+// runDca 오케스트레이터 — 손으로 만든 인메모리 fake db로 "정산 → 잔액 차감" 사이클과
+// LIVE 제출 경로를 검증한다. scripts/dca-smoke.ts는 두 실행이 같은 거래일이라
+// settleDryOrders(tradeDate: { lt })에 구조적으로 닿지 못하므로, cashKrw가 줄어드는 유일한
+// 경로는 여기서만 실행된다.
+// LIVE 케이스의 dryRun: false는 이 프로세스 안의 평범한 객체 리터럴이다 — 실DB에 LIVE 계좌를
+// 만들지 않고, deps는 전부 스텁이라 토스 클라이언트·createOrder에 닿지 않는다.
 import { beforeEach, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@prisma-clients/company-map";
 import { runDca, type DcaRunDeps } from "./run-dca";
@@ -55,9 +56,9 @@ const ORDER_DEFAULTS: Row = {
   error: null,
 };
 
-function makeFakeDb(account: Row) {
+function makeFakeDb(account: Row, seedOrders: Row[] = []) {
   const accounts: Row[] = [account];
-  const orders: Row[] = [];
+  const orders: Row[] = seedOrders.map((o, i) => ({ ...ORDER_DEFAULTS, ...o, id: o.id ?? `s${i}` }));
   let seq = 0;
 
   const find = (id: unknown) => {
@@ -344,5 +345,191 @@ describe("runDca — 가드", () => {
     expect(r.blocked).toBe("not_active");
     expect(fake.account.cashKrw).toBe(800_000);
     expect(fake.orders).toHaveLength(0);
+  });
+});
+
+/** 이전 거래일에 남아 있던 주문 행 시드용 (필드는 스키마와 같은 이름). */
+function makeOrderRow(over: Row = {}): Row {
+  return {
+    accountId: "acc1",
+    tradeDate: DAY_D,
+    symbol: "QQQ",
+    side: "BUY",
+    kind: "loc_buy",
+    orderType: "LIMIT",
+    tif: "CLS",
+    price: LIMIT,
+    quantity: 1,
+    amountKrw: 735_000,
+    fxRate: FX,
+    drawdownPct: -5,
+    ...over,
+  };
+}
+
+// LIVE 경로. 계좌의 dryRun: false는 이 프로세스 안의 객체 리터럴일 뿐이고, submitOrder를
+// 포함한 모든 deps가 스텁이라 실제 브로커로 나가는 호출은 없다.
+describe("runDca — LIVE 제출 경로", () => {
+  it("주문 행을 제출 '전에' 만들고(뮤텍스), 같은 행을 submitted + tossOrderId로 갱신한다", async () => {
+    const fake = makeFakeDb(makeAccount({ dryRun: false }));
+    let atSubmit: Row[] | null = null;
+    let submitArgs: unknown[] | null = null;
+    const deps = makeDeps({
+      getDefaultAccountSeq: async () => 42,
+      getBuyingPowerUsd: async () => 1_000,
+      submitOrder: async (accountSeq, o, symbol) => {
+        // Fix 6(a)의 핵심 — 이 시점에 행이 이미 있어야 한다.
+        atSubmit = fake.orders.map((r) => ({ ...r }));
+        submitArgs = [accountSeq, o, symbol];
+        return { tossOrderId: "T-1" };
+      },
+    });
+
+    const r = await runDca(fake.db, deps, "acc1", DAY_D, false);
+
+    // 제출 시점 스냅샷: 행 1개, submitting, tossOrderId 없음
+    expect(atSubmit).toHaveLength(1);
+    expect(atSubmit![0]).toMatchObject({
+      status: "submitting",
+      dryRun: false,
+      tossOrderId: null,
+      tradeDate: DAY_D,
+      price: LIMIT,
+      quantity: 1,
+    });
+    expect(submitArgs).toEqual([42, { price: LIMIT, quantity: 1 }, "QQQ"]);
+
+    // 제출 후: 같은 행이 갱신되고 두 번째 행은 생기지 않는다
+    expect(fake.orders).toHaveLength(1);
+    expect(fake.orders[0].id).toBe(atSubmit![0].id);
+    expect(fake.orders[0]).toMatchObject({
+      status: "submitted",
+      tossOrderId: "T-1",
+      dryRun: false,
+    });
+    expect(r).toMatchObject({ placed: 1, simulated: 0, symbol: "QQQ", blocked: null });
+    expect(fake.account.lastRunDate).toBe(DAY_D);
+    expect(fake.account.note).toBeNull();
+    expect(fake.account.cashKrw).toBe(850_000); // 적립만 — 체결 전이라 차감 없음
+  });
+
+  it("submitOrder가 throw하면 failed가 아니라 submit_unknown + 확인 요청 note", async () => {
+    const fake = makeFakeDb(makeAccount({ dryRun: false }));
+    const deps = makeDeps({
+      getDefaultAccountSeq: async () => 42,
+      getBuyingPowerUsd: async () => 1_000,
+      submitOrder: async () => {
+        throw new Error("The operation was aborted due to timeout");
+      },
+    });
+
+    const r = await runDca(fake.db, deps, "acc1", DAY_D, false);
+
+    expect(fake.orders).toHaveLength(1);
+    expect(fake.orders[0]).toMatchObject({
+      status: "submit_unknown",
+      error: "The operation was aborted due to timeout",
+      tossOrderId: null,
+      dryRun: false,
+    });
+    expect(fake.account.note).toBe(
+      "주문 제출 결과 미확인 — 토스 앱에서 체결 여부를 직접 확인하세요: The operation was aborted due to timeout",
+    );
+    // 재시도가 진짜 이중 매수를 만들므로 거래일은 소진시킨다
+    expect(fake.account.lastRunDate).toBe(DAY_D);
+    // 정산된 게 없으므로 잔액은 적립분만 (차감 없음)
+    expect(fake.account.cashKrw).toBe(850_000);
+    expect(r).toMatchObject({ placed: 0, simulated: 0, blocked: null });
+  });
+
+  it("예수금이 부족하면 주문 행조차 만들지 않고 보류 — 같은 거래일 재시도 가능", async () => {
+    const fake = makeFakeDb(makeAccount({ dryRun: false }));
+    // submitOrder는 makeDeps 기본값(호출되면 throw) 그대로 둔다.
+    const deps = makeDeps({
+      getDefaultAccountSeq: async () => 42,
+      getBuyingPowerUsd: async () => 100, // 필요 $525
+    });
+
+    const r = await runDca(fake.db, deps, "acc1", DAY_D, false);
+
+    expect(r.blocked).toBe("USD 예수금 부족: 필요 $525.00 / 보유 $100.00");
+    expect(fake.orders).toHaveLength(0);
+    expect(fake.account.lastRunDate).toBeNull(); // 다음 폴에서 재시도
+    expect(fake.account.note).toBe(r.blocked);
+    expect(fake.account.cashKrw).toBe(850_000); // 적립은 유지(lastAccrualDate 멱등)
+  });
+
+  it("예수금이 NaN이면 fail-closed — 제출하지 않고 '확인 불가'로 막는다", async () => {
+    const fake = makeFakeDb(makeAccount({ dryRun: false }));
+    const deps = makeDeps({
+      getDefaultAccountSeq: async () => 42,
+      getBuyingPowerUsd: async () => Number.NaN, // 응답 필드 누락·개편 상황
+    });
+
+    const r = await runDca(fake.db, deps, "acc1", DAY_D, false);
+
+    expect(r.blocked).toBe("USD 예수금 부족: 필요 $525.00 / 보유 확인 불가");
+    expect(fake.orders).toHaveLength(0);
+    expect(fake.account.lastRunDate).toBeNull();
+  });
+});
+
+// Fix 4 — 정산 대상은 계좌 모드가 아니라 주문 행의 dryRun으로 갈린다. 두 정산을 항상 돌리지
+// 않으면 모드를 토글한 계좌의 기존 행이 어느 정산도 받지 못해 영구히 얼어붙는다.
+describe("runDca — 모드 토글 후에도 남은 행이 정산된다", () => {
+  it("LIVE 계좌에 남은 dryRun 시뮬레이션 행도 일봉으로 정산·차감된다", async () => {
+    const fake = makeFakeDb(makeAccount({ dryRun: false }), [
+      makeOrderRow({ id: "leftover", dryRun: true, status: "simulated" }),
+    ]);
+    // submitOrder·getBuyingPowerUsd는 기본 스텁(호출되면 throw) 그대로 — 차감 후 잔액이
+    // 1주 미만이라 주문 단계에 가지 않는다는 것까지 같이 증명된다.
+    const deps = makeDeps({
+      getDailyCandle: async (symbol, date) =>
+        symbol === "QQQ" && date === DAY_D ? { close: 510, high: 515 } : null,
+      getPrevTradeClose: async () => ({ date: DAY_D, close: 510 }),
+      getCurrentPrice: async () => 510,
+    });
+
+    const r = await runDca(fake.db, deps, "acc1", DAY_D1, false);
+
+    expect(fake.orders[0]).toMatchObject({
+      status: "simulated_filled",
+      filledQty: 1,
+      filledPrice: 510,
+      stateApplied: true,
+    });
+    // 800,000 − 510×1×1400 + 50,000 = 136,000 → 1주(≈ $535.5) 미만이라 주문 없음
+    expect(fake.account.cashKrw).toBe(136_000);
+    expect(fake.orders).toHaveLength(1);
+    expect(r).toMatchObject({ placed: 0, simulated: 0, accrued: true, blocked: null });
+    expect(fake.account.lastRunDate).toBe(DAY_D1);
+  });
+
+  it("dryRun 계좌에 남은 LIVE submitted 행도 토스 CLOSED 대조로 정산·차감된다", async () => {
+    const fake = makeFakeDb(makeAccount({ dryRun: true }), [
+      makeOrderRow({ id: "leftover", dryRun: false, status: "submitted", tossOrderId: "T-9" }),
+    ]);
+    const deps = makeDeps({
+      getDefaultAccountSeq: async () => 42,
+      getClosedOrders: async () => [
+        { orderId: "T-9", filledQuantity: 1, averageFilledPrice: 500 },
+      ],
+      getDailyCandle: async () => null,
+      getPrevTradeClose: async () => ({ date: DAY_D, close: 510 }),
+      getCurrentPrice: async () => 510,
+    });
+
+    const r = await runDca(fake.db, deps, "acc1", DAY_D1, false);
+
+    expect(fake.orders[0]).toMatchObject({
+      status: "filled",
+      filledQty: 1,
+      filledPrice: 500,
+      stateApplied: true,
+    });
+    // 800,000 − 500×1×1400 + 50,000 = 150,000 → 1주 미만이라 주문 없음
+    expect(fake.account.cashKrw).toBe(150_000);
+    expect(fake.orders).toHaveLength(1);
+    expect(r).toMatchObject({ simulated: 0, accrued: true, blocked: null });
   });
 });
