@@ -9,6 +9,7 @@ import {
   getOrders,
   getPrices,
 } from "@/lib/toss/client";
+import type { DcaRunDeps } from "./run-dca";
 
 /** 토스 일봉 조회 상한. peak 시딩 범위(약 10개월)를 결정한다. */
 export const PEAK_SEED_COUNT = 200;
@@ -34,7 +35,7 @@ export function assertSubmittable(o: { price: number; quantity: number }): void 
   }
 }
 
-export function tossDcaDeps() {
+export function tossDcaDeps(): DcaRunDeps {
   return {
     getDefaultAccountSeq,
 
