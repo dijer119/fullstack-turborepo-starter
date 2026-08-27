@@ -327,22 +327,33 @@ function SettingsForm({
   );
 }
 
+type CreateFormState = {
+  name: string;
+  baseSymbol: string;
+  leverSymbol: string;
+  thresholdPct: string;
+  dailyAmountKrw: string;
+  premiumPct: string;
+  peakPrice: string;
+  initialCashKrw: string;
+};
+
 function CreateForm({ onDone }: { onDone: (message?: string) => void }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [form, setForm] = useState<CreateDcaInput>({
+  const [form, setForm] = useState<CreateFormState>({
     name: "",
     baseSymbol: "QQQ",
     leverSymbol: "QLD",
-    thresholdPct: 10,
-    dailyAmountKrw: 50000,
-    premiumPct: 5,
-    peakPrice: null,
-    initialCashKrw: 0,
+    thresholdPct: "10",
+    dailyAmountKrw: "50000",
+    premiumPct: "5",
+    peakPrice: "",
+    initialCashKrw: "0",
   });
   const [seedInfo, setSeedInfo] = useState<string | null>(null);
 
-  const set = <K extends keyof CreateDcaInput>(k: K, v: CreateDcaInput[K]) =>
+  const set = <K extends keyof CreateFormState>(k: K, v: CreateFormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   return (
@@ -362,26 +373,26 @@ function CreateForm({ onDone }: { onDone: (message?: string) => void }) {
         </label>
         <label>
           하락 임계 %
-          <input className={inputCls} value={form.thresholdPct} onChange={(e) => set("thresholdPct", Number(e.target.value))} />
+          <input className={inputCls} value={form.thresholdPct} onChange={(e) => set("thresholdPct", e.target.value)} />
         </label>
         <label>
           거래일당 적립액 (원)
-          <input className={inputCls} value={form.dailyAmountKrw} onChange={(e) => set("dailyAmountKrw", Number(e.target.value))} />
+          <input className={inputCls} value={form.dailyAmountKrw} onChange={(e) => set("dailyAmountKrw", e.target.value)} />
         </label>
         <label>
           LOC 프리미엄 %
-          <input className={inputCls} value={form.premiumPct} onChange={(e) => set("premiumPct", Number(e.target.value))} />
+          <input className={inputCls} value={form.premiumPct} onChange={(e) => set("premiumPct", e.target.value)} />
         </label>
         <label>
           초기 이월 잔액 (원)
-          <input className={inputCls} value={form.initialCashKrw} onChange={(e) => set("initialCashKrw", Number(e.target.value))} />
+          <input className={inputCls} value={form.initialCashKrw} onChange={(e) => set("initialCashKrw", e.target.value)} />
         </label>
         <label>
           최고 종가 (비우면 자동)
           <input
             className={inputCls}
-            value={form.peakPrice ?? ""}
-            onChange={(e) => set("peakPrice", e.target.value === "" ? null : Number(e.target.value))}
+            value={form.peakPrice}
+            onChange={(e) => set("peakPrice", e.target.value)}
           />
         </label>
       </div>
@@ -414,7 +425,17 @@ function CreateForm({ onDone }: { onDone: (message?: string) => void }) {
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              const r = await createDcaAccount(form);
+              const input: CreateDcaInput = {
+                name: form.name,
+                baseSymbol: form.baseSymbol,
+                leverSymbol: form.leverSymbol,
+                thresholdPct: Number(form.thresholdPct),
+                dailyAmountKrw: Number(form.dailyAmountKrw),
+                premiumPct: Number(form.premiumPct),
+                peakPrice: form.peakPrice === "" ? null : Number(form.peakPrice),
+                initialCashKrw: Number(form.initialCashKrw),
+              };
+              const r = await createDcaAccount(input);
               router.refresh();
               onDone(r.ok ? "계좌를 생성했습니다 (dryRun)" : r.error);
             })
