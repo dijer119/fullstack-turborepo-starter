@@ -22,8 +22,16 @@ async function main() {
   if (!seed) throw new Error("QQQ 일봉을 받지 못했습니다");
   console.log(`[smoke] peak 시딩: ${seed.price} (${seed.date}), 일봉 ${candles.length}건`);
 
-  const windowOpen = await deps.isAmountOrderWindowOpen();
-  console.log(`[smoke] 금액 기반 주문 접수 창: ${windowOpen ? "열림" : "닫힘(적립만 예상)"}`);
+  // 조회 실패는 "닫힘"이 아니라 별개 상태다(run-dca는 이 경우 block으로 재시도를 남긴다).
+  let windowOpen: boolean | null = null;
+  try {
+    windowOpen = await deps.isAmountOrderWindowOpen();
+  } catch (e) {
+    console.log(`[smoke] 금액 기반 주문 접수 창: 확인 실패 — ${e instanceof Error ? e.message : e}`);
+  }
+  if (windowOpen !== null) {
+    console.log(`[smoke] 금액 기반 주문 접수 창: ${windowOpen ? "열림" : "닫힘(적립만 예상)"}`);
+  }
 
   const acc = await db.dcaAccount.create({
     data: {
@@ -52,8 +60,11 @@ async function main() {
           `수량≈${o.filledQty ?? o.quantity} 체결가=${o.filledPrice ?? "-"} 반영=${o.stateApplied}`,
       );
     }
-    if (windowOpen && r1.simulated !== 1) {
-      console.log("[smoke] ⚠️ 창이 열려 있는데 1회차 주문이 생기지 않았습니다 (blocked 사유 확인)");
+    if (windowOpen === true && r1.simulated !== 1) {
+      console.log(
+        `[smoke] ⚠️ 창이 열려 있는데 1회차 주문이 생기지 않았습니다 ` +
+          `(blocked=${r1.blocked} noOrderReason=${r1.noOrderReason})`,
+      );
     }
 
     // lastRunDate 가드를 우회해 "지금 실행" 재호출 상황을 재현한다.

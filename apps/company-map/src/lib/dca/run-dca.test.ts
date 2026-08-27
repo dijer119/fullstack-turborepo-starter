@@ -185,6 +185,7 @@ describe("runDca — dryRun 즉시 체결·차감 사이클", () => {
       drawdownPct: DRAWDOWN,
       accrued: true,
       blocked: null,
+      noOrderReason: null, // 주문이 났으므로 사유 없음
     });
     expect(fake.orders).toHaveLength(1);
     expect(fake.orders[0]).toMatchObject({
@@ -218,7 +219,13 @@ describe("runDca — dryRun 즉시 체결·차감 사이클", () => {
     fake.account.lastRunDate = null; // "지금 실행"이 lastRunDate 가드를 우회하는 상황
     const r2 = await runDca(fake.db, makeDeps(), "acc1", DAY_D, false);
 
-    expect(r2).toMatchObject({ accrued: false, simulated: 0, placed: 0, blocked: null });
+    expect(r2).toMatchObject({
+      accrued: false,
+      simulated: 0,
+      placed: 0,
+      blocked: null,
+      noOrderReason: "already_ordered",
+    });
     expect(fake.orders).toHaveLength(1);
     expect(fake.account.cashKrw).toBe(D_CASH_AFTER);
     expect(fake.account.lastRunDate).toBe(DAY_D);
@@ -270,6 +277,8 @@ describe("runDca — 가드", () => {
       symbol: "QQQ",
       accrued: true,
       blocked: null,
+      // 잔액 1센트 미만과 API 표면에서 구분된다
+      noOrderReason: "window_closed",
     });
     expect(fake.orders).toHaveLength(0);
     expect(fake.account.cashKrw).toBe(DAILY); // 적립은 반영, 차감은 없음
@@ -281,12 +290,42 @@ describe("runDca — 가드", () => {
     );
   });
 
+  it("주문 창 '확인 실패'는 '닫힘'과 달리 거래일을 소진하지 않는다", async () => {
+    const fake = makeFakeDb(makeAccount());
+    const deps = makeDeps({
+      isAmountOrderWindowOpen: async () => {
+        throw new Error("The operation was aborted due to timeout");
+      },
+    });
+
+    const r = await runDca(fake.db, deps, "acc1", DAY_D, false);
+
+    expect(r).toMatchObject({
+      blocked: "주문 접수 창 확인 실패 — 재시도 대기: The operation was aborted due to timeout",
+      accrued: true,
+      simulated: 0,
+      placed: 0,
+      noOrderReason: null, // 정상 종료가 아니라 보류다
+    });
+    expect(fake.orders).toHaveLength(0); // 모르면 주문하지 않는다(fail-closed)
+    expect(fake.account.cashKrw).toBe(DAILY); // 적립은 유지
+    // 핵심 — 소진시키면 조회 실패 한 번이 그날 매수를 통째로 날린다
+    expect(fake.account.lastRunDate).toBeNull();
+    expect(fake.account.note).toBe(r.blocked);
+  });
+
   it("환산액이 1센트 미만이면 주문 없이 적립만 하고 lastRunDate를 넘긴다", async () => {
     // 10원 / 1379.1 = $0.0072 → 절삭하면 $0.00
     const fake = makeFakeDb(makeAccount({ dailyAmountKrw: 10 }));
     const r = await runDca(fake.db, makeDeps(), "acc1", DAY_D, false);
 
-    expect(r).toMatchObject({ simulated: 0, placed: 0, accrued: true, blocked: null });
+    expect(r).toMatchObject({
+      simulated: 0,
+      placed: 0,
+      accrued: true,
+      blocked: null,
+      noOrderReason: "below_min_amount",
+    });
     expect(fake.account.cashKrw).toBe(10);
     expect(fake.account.lastRunDate).toBe(DAY_D);
     expect(fake.account.note).toBeNull();
@@ -325,7 +364,7 @@ describe("runDca — 가드", () => {
 
     const r = await runDca(fake.db, makeDeps(), "acc1", DAY_D, false);
 
-    expect(r).toMatchObject({ simulated: 0, blocked: null });
+    expect(r).toMatchObject({ simulated: 0, blocked: null, noOrderReason: "already_ordered" });
     expect(fake.orders).toHaveLength(1);
     expect(fake.account.lastRunDate).toBe(DAY_D);
     expect(fake.account.note).toBe("주문 제출 결과 미확인 — 토스 앱에서 확인");
@@ -342,10 +381,16 @@ describe("runDca — 가드", () => {
 });
 
 describe("makeClientOrderId", () => {
-  it("계좌 앞 8자 + 하이픈 없는 거래일로 만든다", () => {
+  it("하이픈 걷어낸 계좌 앞 16자 + 하이픈 없는 거래일로 만든다", () => {
     expect(makeClientOrderId("a1b2c3d4-e5f6-7890-abcd-ef1234567890", "2026-08-28")).toBe(
-      "dca-a1b2c3d4-20260828",
+      "dca-a1b2c3d4e5f67890-20260828",
     );
+  });
+
+  it("앞 8자가 같은 두 계좌도 서로 다른 키를 받는다 (충돌 시 남의 주문이 돌아온다)", () => {
+    const a = makeClientOrderId("a1b2c3d4-0000-0000-0000-000000000001", "2026-08-28");
+    const b = makeClientOrderId("a1b2c3d4-9999-9999-9999-999999999999", "2026-08-28");
+    expect(a).not.toBe(b);
   });
 
   it("같은 계좌·같은 거래일이면 항상 같은 값 (토스 10분 멱등성 창의 전제)", () => {
@@ -358,6 +403,7 @@ describe("makeClientOrderId", () => {
 
   it("토스 제약(36자 이하, 영숫자·하이픈·언더스코어)을 만족한다", () => {
     const id = makeClientOrderId("a1b2c3d4-e5f6-7890-abcd-ef1234567890", "2026-08-28");
+    expect(id).toHaveLength(29);
     expect(id.length).toBeLessThanOrEqual(36);
     expect(id).toMatch(/^[A-Za-z0-9\-_]+$/);
   });
@@ -419,7 +465,13 @@ describe("runDca — LIVE 제출 경로", () => {
       dryRun: false,
       stateApplied: null, // LIVE는 정산 뒤에 차감한다
     });
-    expect(r).toMatchObject({ placed: 1, simulated: 0, symbol: "QQQ", blocked: null });
+    expect(r).toMatchObject({
+      placed: 1,
+      simulated: 0,
+      symbol: "QQQ",
+      blocked: null,
+      noOrderReason: null,
+    });
     expect(fake.account.lastRunDate).toBe(DAY_D);
     expect(fake.account.note).toBeNull();
     expect(fake.account.cashKrw).toBe(DAILY); // 적립만 — 체결 확인 전이라 차감 없음
@@ -453,7 +505,12 @@ describe("runDca — LIVE 제출 경로", () => {
     expect(fake.account.lastRunDate).toBe(DAY_D);
     // 정산된 게 없으므로 잔액은 적립분만 (차감 없음)
     expect(fake.account.cashKrw).toBe(DAILY);
-    expect(r).toMatchObject({ placed: 0, simulated: 0, blocked: null });
+    expect(r).toMatchObject({
+      placed: 0,
+      simulated: 0,
+      blocked: null,
+      noOrderReason: "submit_unknown",
+    });
   });
 
   it("예수금이 부족하면 주문 행조차 만들지 않고 보류 — 같은 거래일 재시도 가능", async () => {
@@ -539,6 +596,155 @@ describe("runDca — 정산은 계좌 모드·주문 창과 무관하게 돈다"
     expect(fake.orders).toHaveLength(1); // 창이 닫혀 새 주문은 없다
     expect(r).toMatchObject({ placed: 0, simulated: 0, accrued: true, blocked: null });
     expect(fake.account.lastRunDate).toBe(DAY_D1);
+  });
+
+  it("같은 tossOrderId를 문 두 행은 한 번만 차감된다 (clientOrderId 멱등이 합친 중복 제출)", async () => {
+    // 뮤텍스를 놓친 동시 제출: 두 행이 같은 clientOrderId로 나가 토스가 같은 주문(T-1)을 돌려줬다.
+    const fake = makeFakeDb(makeAccount({ dryRun: false, cashKrw: 100_000 }), [
+      makeOrderRow({ id: "dup-a", dryRun: false, status: "submitted", tossOrderId: "T-1" }),
+      makeOrderRow({ id: "dup-b", dryRun: false, status: "submitted", tossOrderId: "T-1" }),
+    ]);
+    const deps = makeDeps({
+      isAmountOrderWindowOpen: async () => false,
+      getDefaultAccountSeq: async () => 42,
+      getClosedOrders: async () => [
+        { orderId: "T-1", filledQuantity: 0.05, averageFilledPrice: 700 },
+      ],
+    });
+
+    await runDca(fake.db, deps, "acc1", DAY_D1, false);
+
+    // 먼저 온 행이 체결을 가져가고
+    expect(fake.orders[0]).toMatchObject({
+      id: "dup-a",
+      status: "filled",
+      filledQty: 0.05,
+      filledPrice: 700,
+      stateApplied: true,
+    });
+    // 두 번째 행은 차감 없이 닫힌다 — filled로 두면 같은 매수가 두 번 차감된다
+    expect(fake.orders[1]).toMatchObject({
+      id: "dup-b",
+      status: "expired",
+      filledQty: null,
+      filledPrice: null,
+      stateApplied: null,
+    });
+    expect(fake.orders[1].error).toContain("중복 제출");
+    // 차감은 정확히 1회분: round(100,000 − 700 × 0.05 × 1379.1) = 51,732, 그 뒤 적립 50,000
+    expect(fake.account.cashKrw).toBe(101_732);
+  });
+
+  it("앞선 폴에서 이미 정산된 주문번호는 다음 폴의 다른 행에 내주지 않는다", async () => {
+    // 두 행이 서로 다른 폴에 걸쳐 정산되는 경우 — in-pass 집합만으로는 못 막는다.
+    const fake = makeFakeDb(makeAccount({ dryRun: false, cashKrw: 100_000 }), [
+      makeOrderRow({
+        id: "settled",
+        dryRun: false,
+        status: "filled",
+        tossOrderId: "T-1",
+        filledQty: 0.05,
+        filledPrice: 700,
+        filledAt: DAY_D,
+        stateApplied: true,
+      }),
+      makeOrderRow({ id: "late", dryRun: false, status: "submitted", tossOrderId: "T-1" }),
+    ]);
+    const deps = makeDeps({
+      isAmountOrderWindowOpen: async () => false,
+      getDefaultAccountSeq: async () => 42,
+      getClosedOrders: async () => [
+        { orderId: "T-1", filledQuantity: 0.05, averageFilledPrice: 700 },
+      ],
+    });
+
+    await runDca(fake.db, deps, "acc1", DAY_D1, false);
+
+    expect(fake.orders[1]).toMatchObject({ id: "late", status: "expired", stateApplied: null });
+    expect(fake.account.cashKrw).toBe(150_000); // 적립만 — 재차감 없음
+  });
+
+  it("체결가가 없는 행은 stateApplied를 세우지 않고 보류로 남긴다", async () => {
+    // applyFills가 건너뛰는 행에 마커만 찍히면 차감 없이 '반영 완료'로 굳어 영구히 어긋난다.
+    const fake = makeFakeDb(makeAccount({ dryRun: false, cashKrw: 100_000 }), [
+      makeOrderRow({
+        id: "no-price",
+        dryRun: false,
+        status: "filled",
+        tossOrderId: "T-7",
+        filledQty: 0.05,
+        filledPrice: null,
+        stateApplied: null,
+      }),
+    ]);
+    const deps = makeDeps({
+      isAmountOrderWindowOpen: async () => false,
+      getDefaultAccountSeq: async () => 42,
+    });
+
+    await runDca(fake.db, deps, "acc1", DAY_D1, false);
+
+    expect(fake.orders[0]).toMatchObject({ status: "filled", stateApplied: null });
+    expect(fake.account.cashKrw).toBe(150_000); // 적립만, 차감 없음
+  });
+
+  it("정상 행과 섞여 있어도 건너뛴 행만 보류로 남는다 (마커가 함께 찍히면 안 된다)", async () => {
+    // 단일 행이면 applicable이 비어 조기 반환에 가려진다 — 섞인 경우가 진짜 회귀 지점이다.
+    const fake = makeFakeDb(makeAccount({ dryRun: false, cashKrw: 100_000 }), [
+      makeOrderRow({
+        id: "good",
+        dryRun: false,
+        status: "filled",
+        tossOrderId: "T-10",
+        filledQty: 0.05,
+        filledPrice: 700,
+        stateApplied: null,
+      }),
+      makeOrderRow({
+        id: "no-price",
+        dryRun: false,
+        status: "filled",
+        tossOrderId: "T-11",
+        filledQty: 0.05,
+        filledPrice: null,
+        stateApplied: null,
+      }),
+    ]);
+    const deps = makeDeps({
+      isAmountOrderWindowOpen: async () => false,
+      getDefaultAccountSeq: async () => 42,
+    });
+
+    await runDca(fake.db, deps, "acc1", DAY_D1, false);
+
+    expect(fake.orders[0]).toMatchObject({ id: "good", stateApplied: true });
+    expect(fake.orders[1]).toMatchObject({ id: "no-price", stateApplied: null });
+    // 차감은 정상 행 1건분만: round(100,000 − 700 × 0.05 × 1379.1) = 51,732, 그 뒤 적립
+    expect(fake.account.cashKrw).toBe(101_732);
+  });
+
+  it("환율이 비정상인 행도 보류로 남긴다", async () => {
+    const fake = makeFakeDb(makeAccount({ dryRun: false, cashKrw: 100_000 }), [
+      makeOrderRow({
+        id: "bad-fx",
+        dryRun: false,
+        status: "filled",
+        tossOrderId: "T-8",
+        filledQty: 0.05,
+        filledPrice: 700,
+        fxRate: 0,
+        stateApplied: null,
+      }),
+    ]);
+    const deps = makeDeps({
+      isAmountOrderWindowOpen: async () => false,
+      getDefaultAccountSeq: async () => 42,
+    });
+
+    await runDca(fake.db, deps, "acc1", DAY_D1, false);
+
+    expect(fake.orders[0]).toMatchObject({ stateApplied: null });
+    expect(fake.account.cashKrw).toBe(150_000);
   });
 
   it("CLOSED에 체결이 없으면 expired로 닫고 차감하지 않는다", async () => {
