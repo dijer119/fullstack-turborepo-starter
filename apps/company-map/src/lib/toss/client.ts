@@ -470,7 +470,9 @@ export interface AmountOrderInput extends CreateOrderCommon {
   timeInForce?: never;
 }
 
-// orderAmount 필드 존재 여부로 두 형태를 판별한다.
+// orderAmount 값의 존재 여부로 두 형태를 판별한다(`in` 연산자는 { orderAmount: undefined }도
+// true라 수량 기반 주문이 금액 기반으로 조립될 수 있다 — 수량 분기의 `orderAmount?: never`가
+// 그 형태를 허용한다).
 export type CreateOrderInput = QuantityOrderInput | AmountOrderInput;
 
 export interface CreateOrderResult {
@@ -485,7 +487,7 @@ export async function createOrder(
   input: CreateOrderInput,
 ): Promise<CreateOrderResult> {
   let body: Record<string, unknown>;
-  if ("orderAmount" in input) {
+  if (input.orderAmount !== undefined) {
     // quantity/price/timeInForce는 넣지 않는다 — 넣으면 다른 oneOf 분기로 오인돼 거절될 수 있음.
     body = {
       symbol: input.symbol,

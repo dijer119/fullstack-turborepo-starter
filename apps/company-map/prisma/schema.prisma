@@ -565,7 +565,9 @@ model VrCycleLog {
 }
 
 // QQQ·QLD 적립식: base 종목이 직전 최고가 대비 thresholdPct 이상 하락한 거래일에는
-// leverSymbol을, 그 외에는 baseSymbol을 매 거래일 dailyAmountKrw만큼 LOC 매수한다.
+// leverSymbol을, 그 외에는 baseSymbol을 매 거래일 dailyAmountKrw만큼 매수한다.
+// 매수는 토스 금액 기반 시장가 주문(orderType=MARKET + orderAmount)이라 소수 수량이 나온다
+// (LOC 종가매수는 소수점 매수와 명세상 공존할 수 없어 폐기됐다).
 model DcaAccount {
   id              String   @id @default(uuid())
   name            String // 표시용 이름
@@ -613,9 +615,10 @@ model DcaOrder {
   tossOrderId   String?  @map("toss_order_id")
   stateApplied  Boolean? @map("state_applied") // cashKrw 반영 여부(멱등 마커)
   dryRun        Boolean  @map("dry_run")
-  status        String // simulated_filled | expired | submitting | submitted | filled | submit_unknown
+  status        String // simulated_filled | expired | submitting | submitted | filled | rejected | submit_unknown
   //   expired는 금액 기반 dryRun에서는 발생하지 않지만 LIVE 경로에는 남음
   //   submitting: 제출 직전에 만든 뮤텍스 행 / submit_unknown: 제출 결과 미확인(수동 확인 필요)
+  //   rejected: 브로커가 HTTP 400/422로 확실히 거절 — 주문 미생성, 잔액 영향 없음(확인 불필요)
   error         String?
   createdAt     DateTime @default(now()) @map("created_at")
 

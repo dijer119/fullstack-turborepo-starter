@@ -294,6 +294,8 @@ function noOrderMessage(reason: DcaNoOrderReason): string {
       return "잔액 환산액이 1센트 미만이라 적립만 반영됐습니다";
     case "already_ordered":
       return "오늘 이미 주문이 접수돼 추가 주문 없이 종료했습니다";
+    case "rejected":
+      return "브로커가 주문을 거절했습니다 — 주문은 생성되지 않았고 잔액도 그대로입니다 (사유는 주문 이력 참조)";
     case "submit_unknown":
       return "주문을 제출했지만 결과가 확인되지 않았습니다 — 토스 앱에서 체결 여부를 직접 확인하세요";
   }

@@ -216,7 +216,8 @@ function OrderHistory({ orders }: { orders: OrderRow[] }) {
             <th className="px-2 py-1 text-left">종목</th>
             <th className="px-2 py-1 text-right">낙폭</th>
             <th className="px-2 py-1 text-right">주문금액</th>
-            <th className="px-2 py-1 text-right">수량</th>
+            <th className="px-2 py-1 text-right">예상수량</th>
+            <th className="px-2 py-1 text-right">체결수량</th>
             <th className="px-2 py-1 text-left">상태</th>
             <th className="px-2 py-1 text-right">체결가</th>
             <th className="px-2 py-1 text-right">환율</th>
@@ -230,6 +231,9 @@ function OrderHistory({ orders }: { orders: OrderRow[] }) {
               <td className="px-2 py-1 text-right">{o.drawdownPct}%</td>
               <td className="px-2 py-1 text-right">${fmt(o.amountUsd)}</td>
               <td className="px-2 py-1 text-right">{fmt(o.quantity, 4)}</td>
+              {/* 시장가라 예상수량(제출 직전 시세로 계산)과 실제 체결수량이 다르다.
+                  체결가 열과 함께 토스 앱 대조에 쓰는 값은 이쪽이다. */}
+              <td className="px-2 py-1 text-right">{fmt(o.filledQty, 4)}</td>
               <td className="px-2 py-1">
                 {o.status}
                 {o.error && <span className="ml-1 text-red-600 dark:text-red-400">({o.error})</span>}
