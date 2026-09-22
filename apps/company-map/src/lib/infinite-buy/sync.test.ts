@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyFills, sortFills, derivePositionFromFills, crossCheckHolding, type FillEvent } from "./sync";
+import { applyFills, sortFills, derivePositionFromFills, crossCheckHolding, type FillEvent , boughtAmountFromOrders } from "./sync";
 
 const f = (o: Partial<FillEvent>): FillEvent => ({
   side: "BUY", kind: "loc_star_half", quantity: 2, filledQty: 2, filledPrice: 50, tradeDate: "2026-07-13",
@@ -103,5 +103,47 @@ describe("crossCheckHolding", () => {
       f({ side: "SELL", kind: "sell_loc_star", quantity: 2, filledQty: 2, filledPrice: 0 }),
     ];
     expect(crossCheckHolding(fills, 4)).toEqual({ ok: true, expected: 4 });
+  });
+});
+
+describe("boughtAmountFromOrders", () => {
+  const row = (o: Partial<Parameters<typeof boughtAmountFromOrders>[0][number]>) => ({
+    side: "BUY", status: "filled", tradeDate: "2026-08-10", round: 1,
+    filledQty: 1, filledPrice: 100, ...o,
+  });
+
+  it("매수 체결액만 합산한다", () => {
+    expect(boughtAmountFromOrders([
+      row({ filledQty: 2, filledPrice: 70 }),
+      row({ side: "SELL", filledQty: 5, filledPrice: 80 }),
+    ])).toBeCloseTo(140, 6);
+  });
+
+  it("체결되지 않은 주문은 제외한다", () => {
+    expect(boughtAmountFromOrders([
+      row({ status: "submitted", filledQty: null, filledPrice: null }),
+      row({ filledQty: 1, filledPrice: 50 }),
+    ])).toBeCloseTo(50, 6);
+  });
+
+  it("마지막 리셋(round 0) 이후의 매수만 센다", () => {
+    expect(boughtAmountFromOrders([
+      row({ tradeDate: "2026-07-08", round: 0, filledQty: 1, filledPrice: 999 }), // 이전 사이클
+      row({ tradeDate: "2026-07-20", round: 5, filledQty: 1, filledPrice: 999 }), // 이전 사이클
+      row({ tradeDate: "2026-08-05", round: 0, filledQty: 2, filledPrice: 76 }),  // 현 사이클 시작
+      row({ tradeDate: "2026-08-06", round: 1, filledQty: 1, filledPrice: 72 }),
+    ])).toBeCloseTo(224, 6);
+  });
+
+  it("리셋 기록이 없으면 전체를 센다", () => {
+    expect(boughtAmountFromOrders([
+      row({ tradeDate: "2026-08-06", round: 3, filledQty: 1, filledPrice: 60 }),
+    ])).toBeCloseTo(60, 6);
+  });
+
+  it("dryRun 모의 체결(simulated_filled)도 포함한다", () => {
+    expect(boughtAmountFromOrders([
+      row({ status: "simulated_filled", filledQty: 2, filledPrice: 30 }),
+    ])).toBeCloseTo(60, 6);
   });
 });

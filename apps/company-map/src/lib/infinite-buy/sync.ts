@@ -172,3 +172,31 @@ export async function applyPendingFillsV4(
     return { t, cash, applied: pending.length };
   });
 }
+
+export interface BoughtOrderRow {
+  side: string;
+  status: string;
+  tradeDate: string;
+  round: number;
+  filledQty: number | null;
+  filledPrice: number | null;
+}
+
+/**
+ * 현 사이클의 누적 매수 체결액(USD). v2.2의 T = 이 값 ÷ 1회 매수액.
+ * 사이클이 리셋돼도 주문 이력은 같은 cycleId에 남으므로, 마지막 round 0 거래일부터만 센다.
+ */
+export function boughtAmountFromOrders(rows: BoughtOrderRow[]): number {
+  const startDate = rows
+    .filter((r) => r.round === 0)
+    .reduce<string | null>((max, r) => (max == null || r.tradeDate > max ? r.tradeDate : max), null);
+
+  return rows
+    .filter(
+      (r) =>
+        r.side === "BUY" &&
+        FILLED_STATUSES.includes(r.status) &&
+        (startDate == null || r.tradeDate >= startDate),
+    )
+    .reduce((sum, r) => sum + (r.filledQty ?? 0) * (r.filledPrice ?? 0), 0);
+}

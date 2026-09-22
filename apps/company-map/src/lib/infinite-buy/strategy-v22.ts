@@ -1,7 +1,8 @@
 // 라오어 무한매수법 V2.2 일일 주문 계산. 순수 함수(토스 의존 없음).
 // v1(strategy.ts)과 별개 코어. 2023년부터 오피셜.
-// 핵심: 매수 큰수·매도 1/4 LOC를 하나의 변동식 (10 − T/2)% 로 통일. T = round(회차).
+// 핵심: 매수 큰수·매도 1/4 LOC를 하나의 변동식 (10 − T/2)% 로 통일.
 //   전반전 T<20 → (10−T/2)>0 (평단 위) / 후반전 T≥20 → ≤0 (평단 이하).
+// T = 누적 매수 체결액 ÷ 1회 매수액 (원전 정의). round(실행 횟수)가 아님.
 // 쿼터모드/쿼터손절은 제외(사용자 결정). 손절/소진 처리는 v1과 동일.
 import type { CycleState } from "./strategy";
 
@@ -30,16 +31,19 @@ const varPrice = (avg: number, T: number): number => avg * (1 + (10 - T / 2) / 1
 
 export function computeDailyOrdersV22(s: CycleState): V22Plan {
   const daily = s.principalUsd / s.splits;
-  const T = s.round;
+  // V2.2 원전: T = 누적 매수액 ÷ 1회 매수액. 실행 횟수가 아니라 실제로 집행한 금액이 진행도다.
+  // (날짜로 세면 LOC 미체결·floor 절삭만큼 T가 앞서가 매수·매도 기준선이 함께 끌려 내려간다.)
+  // boughtAmount 미지정이면 종전처럼 round를 T로 본다.
+  const T = s.boughtAmount != null ? s.boughtAmount / daily : s.round;
   const secondHalf = T >= s.splits / 2;
   const orders: V22Order[] = [];
   let nextRound = s.round;
   let resetAfter = false;
 
-  if (s.round >= 1 && s.round < s.splits && s.holdingQty <= 0) {
+  if (T > 0 && T < s.splits && s.holdingQty <= 0) {
     // 사이클 중간 전량 매도(익절 체결 등)로 보유 0 → 리셋해 다음 세션에 1회차부터 재시작.
     resetAfter = true;
-  } else if (s.round < s.splits) {
+  } else if (T < s.splits) {
     // ── 매수 (전부 LOC) ──
     if (s.round === 0) {
       const qty = Math.floor(daily / s.currentPrice);

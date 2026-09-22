@@ -5,6 +5,7 @@ import type { PrismaClient } from "@prisma-clients/company-map";
 import type { RunDeps, RunPersistence, HoldingSnapshot, OrderLog } from "./run";
 import type { V4RunDeps } from "./run-v4";
 import type { IntendedOrder } from "./strategy";
+import { syncFillsFromToss, boughtAmountFromOrders } from "./sync";
 
 // 실주문 직전 방어 가드: 비정상 주문(수량/가격)이 실제 브로커로 가지 않도록 throw.
 // run.ts가 throw를 잡아 status:"failed"로 로깅하므로 잘못된 주문은 제출되지 않는다.
@@ -18,9 +19,17 @@ export function assertSubmittable(o: IntendedOrder): void {
 }
 
 // 토스 클라이언트 → RunDeps. profitLoss.rate는 소수(0.05=5%)라 *100 하여 %로 변환.
-export function tossRunDeps(): RunDeps {
+export function tossRunDeps(db: PrismaClient): RunDeps {
   return {
     getDefaultAccountSeq,
+    // v2.2의 T는 체결액에서 나오므로 실행 전에 토스 체결을 이력에 반영한다.
+    async syncFills(cycleId) {
+      await syncFillsFromToss(db, cycleId, {
+        getDefaultAccountSeq,
+        getClosedOrders: (accountSeq, symbol, from) =>
+          getOrders(accountSeq, { status: "CLOSED", symbol, from }),
+      });
+    },
     async getHoldingForSymbol(accountSeq, symbol): Promise<HoldingSnapshot | null> {
       const overview = await getHoldings(accountSeq);
       const item = overview.items.find((i) => i.symbol === symbol);
@@ -70,13 +79,20 @@ export function prismaPersistence(db: PrismaClient): RunPersistence {
     async updateCycle(id, data) {
       await db.infiniteBuyCycle.update({ where: { id }, data });
     },
+    async getBoughtAmount(cycleId) {
+      const rows = await db.infiniteBuyOrder.findMany({
+        where: { cycleId },
+        select: { side: true, status: true, tradeDate: true, round: true, filledQty: true, filledPrice: true },
+      });
+      return boughtAmountFromOrders(rows);
+    },
   };
 }
 
 // 토스 클라이언트 → V4RunDeps. 기존 RunDeps에 체결 조회·일봉 1건 조회를 얹는다.
-export function tossV4Deps(): V4RunDeps {
+export function tossV4Deps(db: PrismaClient): V4RunDeps {
   return {
-    ...tossRunDeps(),
+    ...tossRunDeps(db),
     getClosedOrders(accountSeq, symbol, from) {
       return getOrders(accountSeq, { status: "CLOSED", symbol, from });
     },

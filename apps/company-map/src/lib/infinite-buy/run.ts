@@ -28,6 +28,9 @@ export interface RunDeps {
   getCurrentPrice(symbol: string): Promise<number>;
   getBuyingPowerUsd(accountSeq: number): Promise<number>;
   submitOrder(accountSeq: number, o: IntendedOrder, symbol: string): Promise<{ tossOrderId: string }>;
+  /** 토스 체결을 주문 이력에 반영한다. v2.2의 T는 체결액에서 나오므로 실행 전 필수.
+   *  실패 시 throw — 낡은 체결로 T를 잘못 잡느니 그날 실행을 미루고 다음 폴에서 재시도한다. */
+  syncFills(cycleId: string): Promise<void>;
 }
 
 export interface OrderLog {
@@ -50,6 +53,8 @@ export interface OrderLog {
 export interface RunPersistence {
   logOrder(o: OrderLog): Promise<void>;
   updateCycle(id: string, data: { round?: number; lastRunDate?: string; status?: string }): Promise<void>;
+  /** 현 사이클(마지막 리셋 이후) 누적 매수 체결액(USD). */
+  getBoughtAmount(cycleId: string): Promise<number>;
 }
 
 export interface RunResult {
@@ -66,6 +71,14 @@ export async function runCycle(
   tradeDate: string,
   killed: boolean,
 ): Promise<RunResult> {
+  // v2.2는 T = 누적 매수 체결액 ÷ 1회 매수액 이므로, 계산 전에 전날 체결을 반영한다.
+  // dryRun은 모의 체결을 기록하지 않아 체결액이 늘 0이다(=T 0 고정). 종전대로 round를 T로 쓴다.
+  let boughtAmount: number | undefined;
+  if (cycle.version === "v2.2" && !cycle.dryRun) {
+    await deps.syncFills(cycle.id);
+    boughtAmount = await persist.getBoughtAmount(cycle.id);
+  }
+
   const accountSeq = cycle.accountSeq ?? (await deps.getDefaultAccountSeq());
   const holding = await deps.getHoldingForSymbol(accountSeq, cycle.symbol);
   const currentPrice = holding?.currentPrice ?? (await deps.getCurrentPrice(cycle.symbol));
@@ -81,6 +94,7 @@ export async function runCycle(
     currentPrice,
     holdingQty: holding?.quantity ?? 0,
     pnlPct: holding?.pnlPct ?? null,
+    boughtAmount,
   };
 
   const rawPlan =

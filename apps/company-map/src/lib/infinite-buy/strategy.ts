@@ -10,6 +10,8 @@ export interface CycleState {
   currentPrice: number;
   holdingQty: number;
   pnlPct: number | null; // %
+  /** 현 사이클 누적 매수 체결액(USD). v2.2의 T 산출에 쓰인다(미지정이면 round로 대체). */
+  boughtAmount?: number;
 }
 
 export type OrderKind =

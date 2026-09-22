@@ -355,7 +355,7 @@ export async function runCycleNow(id: string): Promise<{ ok: boolean; reason?: s
   if (c.status !== "active") return { ok: false, reason: "active 사이클만 실행 가능 (재개 후 시도)" };
   if (c.version === "v4.0") {
     const tradeDate = new Date().toISOString().slice(0, 10);
-    const r = await runV4(db, tossV4Deps(), c.id, tradeDate, isKilled());
+    const r = await runV4(db, tossV4Deps(db), c.id, tradeDate, isKilled());
     revalidatePath("/stocks/infinite-buy");
     return r.blocked ? { ok: false, reason: r.blocked } : { ok: true };
   }
@@ -365,7 +365,7 @@ export async function runCycleNow(id: string): Promise<{ ok: boolean; reason?: s
     lossCut: c.lossCut, round: c.round, dryRun: c.dryRun, version: c.version as "v1" | "v2.2",
   };
   const tradeDate = new Date().toISOString().slice(0, 10);
-  await runCycle(prismaPersistence(db), tossRunDeps(), config, tradeDate, isKilled());
+  await runCycle(prismaPersistence(db), tossRunDeps(db), config, tradeDate, isKilled());
   revalidatePath("/stocks/infinite-buy");
   return { ok: true };
 }

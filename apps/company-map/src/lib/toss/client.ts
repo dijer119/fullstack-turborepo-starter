@@ -23,6 +23,8 @@ const ipv4Agent = new Agent({
   },
 });
 
+import { collectAcrossWindows } from "./date-windows";
+
 const BASE_URL = "https://openapi.tossinvest.com";
 
 export class TossNotConfiguredError extends Error {
@@ -551,9 +553,12 @@ function num(v: string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export async function getOrders(
+type OrderQuery = { status: "OPEN" | "CLOSED"; symbol?: string; from?: string; to?: string; limit?: number };
+
+/** 단일 조회. 서버가 `from` 기준 약 30일까지만 돌려주므로 직접 쓰지 말고 getOrders를 쓸 것. */
+async function fetchOrdersWindow(
   accountSeq: number,
-  opts: { status: "OPEN" | "CLOSED"; symbol?: string; from?: string; to?: string; limit?: number },
+  opts: OrderQuery,
 ): Promise<TossOrder[]> {
   const qs = new URLSearchParams({ status: opts.status });
   if (opts.symbol) qs.set("symbol", opts.symbol);
@@ -576,4 +581,18 @@ export async function getOrders(
     tax: num(o.execution?.tax),
     filledAt: o.execution?.filledAt ?? null,
   }));
+}
+
+/**
+ * `from`~`to` 전 구간의 주문을 돌려준다.
+ * 서버는 한 번에 약 30일치만 주므로 윈도우로 나눠 조회하고 orderId로 합친다.
+ * (이 처리가 없으면 오래된 사이클에서 최근 체결이 통째로 누락된다.)
+ */
+export async function getOrders(accountSeq: number, opts: OrderQuery): Promise<TossOrder[]> {
+  let first = true;
+  return collectAcrossWindows(opts.from, opts.to, async (from, to) => {
+    if (!first) await new Promise((r) => setTimeout(r, 200)); // 연속 호출 간 최소 간격
+    first = false;
+    return fetchOrdersWindow(accountSeq, { ...opts, from, to });
+  });
 }

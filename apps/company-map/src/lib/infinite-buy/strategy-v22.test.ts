@@ -113,3 +113,43 @@ describe("computeDailyOrdersV22 소진 후 (v1과 동일)", () => {
     expect(p.resetAfter).toBe(true);
   });
 });
+
+// ── T = 누적 매수 체결액 ÷ 1회 매수액 (V2.2 원전 정의) ──
+// 실행 횟수(round)가 아니라 실제로 집행한 금액으로 진행도를 잰다.
+describe("computeDailyOrdersV22 — 체결 기반 T", () => {
+  const base = {
+    round: 30, splits: 40, principalUsd: 8000,
+    profitTarget: 10, bigBuyPremium: 12, lossCut: 10,
+    avgPrice: 70.91458, currentPrice: 72.64, holdingQty: 12, pnlPct: 2.4,
+  };
+
+  it("round가 아니라 boughtAmount로 T를 정한다", () => {
+    // 누적 매수 $3,153.44 ÷ 1회 $200 = T 15.77 → 전반전(T<20)
+    const plan = computeDailyOrdersV22({ ...base, boughtAmount: 3153.44 });
+    const buys = plan.orders.filter((o) => o.side === "BUY").map((o) => o.kind);
+    expect(buys).toEqual(["loc_avg", "loc_var"]); // 전반전 = 0.5회치 2건
+  });
+
+  it("변동식 (10−T/2)%에 체결 기반 T를 쓴다", () => {
+    const plan = computeDailyOrdersV22({ ...base, boughtAmount: 3153.44 });
+    // (10 − 15.7672/2) = +2.1164% → 70.91458 × 1.021164 = 72.42
+    const locSell = plan.orders.find((o) => o.kind === "sell_loc_var");
+    expect(locSell?.price).toBeCloseTo(72.42, 2);
+  });
+
+  it("round가 splits를 넘어도 원금이 남았으면 매수를 계속한다", () => {
+    const plan = computeDailyOrdersV22({ ...base, round: 45, boughtAmount: 3153.44 });
+    expect(plan.orders.some((o) => o.side === "BUY")).toBe(true);
+  });
+
+  it("체결액이 원금에 도달하면 매수를 멈춘다", () => {
+    const plan = computeDailyOrdersV22({ ...base, round: 5, boughtAmount: 8000 });
+    expect(plan.orders.some((o) => o.side === "BUY")).toBe(false);
+  });
+
+  it("boughtAmount가 없으면 기존처럼 round를 T로 쓴다", () => {
+    const plan = computeDailyOrdersV22({ ...base, round: 30 });
+    const buys = plan.orders.filter((o) => o.side === "BUY").map((o) => o.kind);
+    expect(buys).toEqual(["loc_var"]); // 후반전 = 전액 1건
+  });
+});
