@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>TQQQ 무한매수 — T 정의 괴리 도해</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2.4rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; font-size: 0.94em; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  figure { margin: 1.4rem 0; padding: 0; }
+  figure svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  figcaption { font-size: 0.88em; color: #4a5568; margin-top: 0.5rem; text-align: center; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bad { color: #c53030; font-weight: 600; }
+  .good { color: #2f855a; font-weight: 600; }
+  .lead { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.9rem 1.1rem; }
+</style>
+</head>
+<body>
+
+<h1>TQQQ 무한매수 — 회차 <code>T</code> 정의 괴리 도해</h1>
+<p><strong style="color:#2f855a">● 수정 완료 (2026-09-19)</strong> · 사이클 <code>3010f15c</code> (TQQQ, v2.2, LIVE) · 검증 구간 08-05 ~ 09-18 (31거래일 · 109건)</p>
+
+<div class="lead">
+무한매수법 V2.2는 매수가와 매도가를 <strong>단 하나의 식</strong>으로 정합니다 — <code>평단 × (1 + (10 − T/2)%)</code>.
+그래서 <strong><code>T</code>가 틀리면 사고파는 가격이 통째로 틀립니다.</strong>
+원전은 <code>T</code>를 <em>쓴 돈</em>으로 세고, 현재 구현은 <em>지나간 날</em>로 셉니다. 지금 그 차이가 14.2회차이고, 그 결과 <strong>매수한 44주 중 32주가 이미 팔려나갔습니다.</strong>
+<hr style="border:none;border-top:1px solid #cbd5e0;margin:0.8rem 0">
+<strong class="good">2026-09-19 수정 완료</strong> — T를 원전 정의(누적 매수 체결액 ÷ 1회 매수액)로 교체하고,
+체결 동기화를 v2.2 실행 경로에 넣고, 그 전제가 되는 토스 주문조회의 30일 제한을 해결했습니다. 상세는 <a href="#fix">11장</a>.
+</div>
+
+<h2>1. 같은 종가, 정반대 결과 — 2026-09-17 실제 데이터</h2>
+
+<figure>
+<svg viewBox="0 0 760 400" role="img" aria-label="9월 17일 종가 71.38달러에서 현재 구현은 5주를 매도했고, 원전 T였다면 매도 대신 매수가 체결됐다">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <polygon points="0,0 10,5 0,10" fill="currentColor"/>
+    </marker>
+    <marker id="arR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <polygon points="0,0 10,5 0,10" fill="#c53030"/>
+    </marker>
+    <marker id="arG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <polygon points="0,0 10,5 0,10" fill="#2f855a"/>
+    </marker>
+  </defs>
+
+  <text x="8" y="62" font-size="11" fill="currentColor">$78.01</text>
+  <text x="8" y="168" font-size="11" fill="currentColor">$72.41</text>
+  <text x="8" y="187" font-size="11" fill="#2c5282" font-weight="600">$71.38</text>
+  <text x="8" y="205" font-size="11" fill="currentColor">$70.91</text>
+  <text x="8" y="256" font-size="11" fill="currentColor">$67.72</text>
+
+  <line x1="62" y1="191.7" x2="730" y2="191.7" stroke="currentColor" stroke-width="1.5"/>
+  <text x="608" y="205" font-size="11" fill="currentColor">평단 $70.91 (기준)</text>
+
+  <line x1="62" y1="182.9" x2="730" y2="182.9" stroke="#2c5282" stroke-width="2" stroke-dasharray="7 4"/>
+  <text x="596" y="178" font-size="11.5" fill="#2c5282" font-weight="600">9/17 종가 $71.38</text>
+
+  <line x1="62" y1="58.6" x2="730" y2="58.6" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3" opacity="0.5"/>
+  <text x="300" y="54" font-size="11" fill="currentColor" opacity="0.75">3/4 지정가 매도 = 평단+10% — 양쪽 모두 미도달</text>
+
+  <rect x="80" y="100" width="280" height="270" fill="none" stroke="#2f855a" stroke-width="1.5" rx="5"/>
+  <text x="220" y="122" font-size="13" text-anchor="middle" fill="#2f855a" font-weight="700">원전 규칙  T = 15.8</text>
+  <text x="220" y="139" font-size="11" text-anchor="middle" fill="#2f855a">(10 − T/2) = +2.1%</text>
+
+  <line x1="100" y1="163.6" x2="340" y2="163.6" stroke="#2f855a" stroke-width="2.5"/>
+  <text x="220" y="158" font-size="11.5" text-anchor="middle" fill="#2f855a" font-weight="600">LOC $72.41</text>
+
+  <line x1="150" y1="178" x2="150" y2="172" stroke="#2f855a" stroke-width="1.6" marker-end="url(#arG)"/>
+  <text x="120" y="238" font-size="11" fill="#2f855a">종가가 지정가 아래</text>
+  <text x="120" y="254" font-size="12" fill="#2f855a" font-weight="700">→ 2주 매수 체결</text>
+  <text x="120" y="272" font-size="11" fill="currentColor">매도는 미체결 — 물량 유지</text>
+
+  <text x="220" y="352" font-size="12" text-anchor="middle" fill="#2f855a" font-weight="600">물타기 진행 · 보유 유지</text>
+
+  <rect x="420" y="100" width="280" height="270" fill="none" stroke="#c53030" stroke-width="1.5" rx="5"/>
+  <text x="560" y="122" font-size="13" text-anchor="middle" fill="#c53030" font-weight="700">현재 구현  T = 29</text>
+  <text x="560" y="139" font-size="11" text-anchor="middle" fill="#c53030">(10 − T/2) = −4.5%</text>
+
+  <line x1="440" y1="251.5" x2="680" y2="251.5" stroke="#c53030" stroke-width="2.5"/>
+  <text x="560" y="267" font-size="11.5" text-anchor="middle" fill="#c53030" font-weight="600">LOC $67.72</text>
+
+  <line x1="490" y1="245" x2="490" y2="190" stroke="#c53030" stroke-width="1.6" marker-end="url(#arR)"/>
+  <text x="500" y="222" font-size="11" fill="#c53030">종가가 지정가보다 한참 위</text>
+  <text x="500" y="238" font-size="12" fill="#c53030" font-weight="700">→ 5주 매도 체결</text>
+
+  <text x="560" y="300" font-size="11" text-anchor="middle" fill="currentColor">매수 LOC도 같은 $67.72라</text>
+  <text x="560" y="316" font-size="11" text-anchor="middle" fill="currentColor">종가가 위 → 매수 미체결</text>
+
+  <text x="560" y="352" font-size="12" text-anchor="middle" fill="#c53030" font-weight="600">물량 소진 · 물타기 차단</text>
+</svg>
+<figcaption>2026-09-17 실제 기록. 같은 종가 $71.38에서 현재 구현은 <strong>5주를 팔았고</strong>, 원전 T였다면 지정가가 종가 위에 있어 <strong>2주를 샀을</strong> 자리였다. LOC는 매수·매도가 같은 가격선을 공유하므로, 그 선이 종가의 어느 쪽에 놓이느냐가 방향을 통째로 뒤집는다.</figcaption>
+</figure>
+
+<h2>2. 두 정의는 어디서 갈라졌나</h2>
+
+<figure>
+<svg viewBox="0 0 760 310" role="img" aria-label="날짜로 센 T는 30까지 직선으로 오르지만 금액으로 센 T는 15.8에 머물러 괴리가 계속 벌어진다">
+  <!-- 축 -->
+  <line x1="60" y1="250" x2="730" y2="250" stroke="currentColor" stroke-width="1"/>
+  <line x1="60" y1="250" x2="60" y2="30" stroke="currentColor" stroke-width="1"/>
+  <text x="30" y="254" font-size="11" fill="currentColor">0</text>
+  <text x="24" y="144" font-size="11" fill="currentColor">20</text>
+  <text x="24" y="34" font-size="11" fill="currentColor">40</text>
+  <text x="14" y="20" font-size="11" fill="currentColor" font-weight="600">T</text>
+
+  <!-- 후반전 경계 -->
+  <line x1="60" y1="140" x2="730" y2="140" stroke="#d69e2e" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="64" y="134" font-size="11" fill="#b7791f" font-weight="600">T=20 — 변동식이 0%를 지나 음수로 (후반전)</text>
+
+  <!-- 괴리 영역 -->
+  <path d="M60.0,250.0 L82.3,244.5 L104.7,239.0 L127.0,233.5 L149.3,228.0 L171.7,222.5 L194.0,217.0 L216.3,211.5 L238.7,206.0 L261.0,200.5 L283.3,195.0 L305.7,189.5 L328.0,184.0 L350.3,178.5 L372.7,173.0 L395.0,167.5 L417.3,162.0 L439.7,156.5 L462.0,151.0 L484.3,145.5 L506.7,140.0 L529.0,134.5 L551.3,129.0 L573.7,123.5 L596.0,118.0 L618.3,112.5 L640.7,107.0 L663.0,101.5 L685.3,96.0 L707.7,90.5 L730.0,85.0 L730.0,163.3 L707.7,163.3 L685.3,163.3 L663.0,167.0 L640.7,170.7 L618.3,174.5 L596.0,174.5 L573.7,178.4 L551.3,178.4 L529.0,178.4 L506.7,178.4 L484.3,182.3 L462.0,186.1 L439.7,190.1 L417.3,194.1 L395.0,196.0 L372.7,199.9 L350.3,203.8 L328.0,207.6 L305.7,211.5 L283.3,215.4 L261.0,219.4 L238.7,223.3 L216.3,225.4 L194.0,227.6 L171.7,229.7 L149.3,231.7 L127.0,235.8 L104.7,239.8 L82.3,241.9 L60.0,245.8 Z"
+        fill="#c53030" opacity="0.13"/>
+
+  <!-- 코드 T -->
+  <polyline points="60.0,250.0 82.3,244.5 104.7,239.0 127.0,233.5 149.3,228.0 171.7,222.5 194.0,217.0 216.3,211.5 238.7,206.0 261.0,200.5 283.3,195.0 305.7,189.5 328.0,184.0 350.3,178.5 372.7,173.0 395.0,167.5 417.3,162.0 439.7,156.5 462.0,151.0 484.3,145.5 506.7,140.0 529.0,134.5 551.3,129.0 573.7,123.5 596.0,118.0 618.3,112.5 640.7,107.0 663.0,101.5 685.3,96.0 707.7,90.5 730.0,85.0"
+            fill="none" stroke="#c53030" stroke-width="2.5"/>
+  <!-- 원전 T -->
+  <polyline points="60.0,245.8 82.3,241.9 104.7,239.8 127.0,235.8 149.3,231.7 171.7,229.7 194.0,227.6 216.3,225.4 238.7,223.3 261.0,219.4 283.3,215.4 305.7,211.5 328.0,207.6 350.3,203.8 372.7,199.9 395.0,196.0 417.3,194.1 439.7,190.1 462.0,186.1 484.3,182.3 506.7,178.4 529.0,178.4 551.3,178.4 573.7,178.4 596.0,174.5 618.3,174.5 640.7,170.7 663.0,167.0 685.3,163.3 707.7,163.3 730.0,163.3"
+            fill="none" stroke="#2f855a" stroke-width="2.5"/>
+
+  <!-- 매도 체결 마커 -->
+  <circle cx="529.0" cy="134.5" r="4" fill="#c53030"/>
+  <circle cx="551.3" cy="129.0" r="4" fill="#c53030"/>
+  <circle cx="573.7" cy="123.5" r="4" fill="#c53030"/>
+  <circle cx="618.3" cy="112.5" r="4" fill="#c53030"/>
+  <circle cx="707.7" cy="90.5" r="4" fill="#c53030"/>
+  <text x="529" y="72" font-size="11" fill="#c53030" font-weight="600">● 매도 체결 (토스 확인)</text>
+  <text x="529" y="58" font-size="11" fill="#c53030">9/04 이후 6회 · 32주</text>
+
+  <!-- 라벨 -->
+  <text x="734" y="82" font-size="11.5" fill="#c53030" font-weight="700">30</text>
+  <text x="734" y="167" font-size="11.5" fill="#2f855a" font-weight="700">15.8</text>
+  <text x="150" y="212" font-size="11.5" fill="#c53030" font-weight="600">날짜로 센 T (현재 구현)</text>
+  <text x="330" y="232" font-size="11.5" fill="#2f855a" font-weight="600">금액으로 센 T (원전)</text>
+
+  <!-- x 눈금 -->
+  <text x="60" y="268" font-size="10.5" text-anchor="middle" fill="currentColor">8/05</text>
+  <text x="283" y="268" font-size="10.5" text-anchor="middle" fill="currentColor">8/19</text>
+  <text x="507" y="268" font-size="10.5" text-anchor="middle" fill="currentColor">9/03</text>
+  <text x="730" y="268" font-size="10.5" text-anchor="middle" fill="currentColor">9/18</text>
+  <text x="507" y="286" font-size="10.5" text-anchor="middle" fill="#b7791f">코드 T가 20 돌파</text>
+  <text x="560" y="300" font-size="10.5" text-anchor="middle" fill="#b7791f">→ 이튿날부터 손실 매도 시작</text>
+</svg>
+<figcaption>붉은 선은 실행 횟수, 초록 선은 실제로 쓴 돈. 9/03에 붉은 선이 T=20을 넘자 변동식이 음수로 꺾였고, 바로 다음 거래일인 9/04부터 매도가 연달아 체결되기 시작했다. 초록 선은 그 시점 13.0으로 아직 전반전 한복판이었다.</figcaption>
+</figure>
+
+<h2>3. 변동식 위에서 두 T가 가리키는 지점</h2>
+
+<figure>
+<svg viewBox="0 0 760 260" role="img" aria-label="변동식 10 빼기 T 나누기 2 퍼센트 직선 위에서 원전 T는 플러스 2.1퍼센트, 현재 구현 T는 마이너스 5.5퍼센트를 가리킨다">
+  <!-- 이익/손실 배경 -->
+  <rect x="60" y="40" width="670" height="80" fill="#2f855a" opacity="0.07"/>
+  <rect x="60" y="120" width="670" height="80" fill="#c53030" opacity="0.07"/>
+  <text x="716" y="58" font-size="11" text-anchor="end" fill="#2f855a" font-weight="600">평단 위 — 이익 실현 구간</text>
+  <text x="716" y="192" font-size="11" text-anchor="end" fill="#c53030" font-weight="600">평단 아래 — 손실 실현 구간</text>
+
+  <!-- 축 -->
+  <line x1="60" y1="120" x2="730" y2="120" stroke="currentColor" stroke-width="1.5"/>
+  <line x1="60" y1="40" x2="60" y2="200" stroke="currentColor" stroke-width="1"/>
+  <text x="20" y="44" font-size="11" fill="currentColor">+10%</text>
+  <text x="30" y="124" font-size="11" fill="currentColor">0%</text>
+  <text x="20" y="204" font-size="11" fill="currentColor">−10%</text>
+
+  <!-- 변동식 직선: T=0 → +10%(y=40), T=40 → −10%(y=200) -->
+  <line x1="60" y1="40" x2="730" y2="200" stroke="currentColor" stroke-width="2.5"/>
+  <text x="300" y="100" font-size="12" fill="currentColor" font-weight="600">평단 대비 % = (10 − T/2)</text>
+
+  <!-- 원전 T=15.8 → x = 60+670*15.8/40 = 324.7 ; y = 40+160*15.8/40 = 103.2 -->
+  <line x1="324.7" y1="103.2" x2="324.7" y2="228" stroke="#2f855a" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <circle cx="324.7" cy="103.2" r="6" fill="#2f855a"/>
+  <text x="324.7" y="244" font-size="11.5" text-anchor="middle" fill="#2f855a" font-weight="700">원전 T=15.8</text>
+  <text x="332" y="96" font-size="11.5" fill="#2f855a" font-weight="600">+2.1%</text>
+
+  <!-- 코드 T=31 → x = 60+670*31/40 = 579.3 ; y = 40+160*31/40 = 164 -->
+  <line x1="579.3" y1="164" x2="579.3" y2="228" stroke="#c53030" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <circle cx="579.3" cy="164" r="6" fill="#c53030"/>
+  <text x="579.3" y="244" font-size="11.5" text-anchor="middle" fill="#c53030" font-weight="700">현재 구현 T=31</text>
+  <text x="587" y="158" font-size="11.5" fill="#c53030" font-weight="600">−5.5%</text>
+
+  <!-- 괴리 화살표 -->
+  <line x1="334" y1="222" x2="570" y2="222" stroke="#c53030" stroke-width="1.5" marker-end="url(#ar2)"/>
+  <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><polygon points="0,0 10,5 0,10" fill="#c53030"/></marker></defs>
+  <text x="452" y="217" font-size="11" text-anchor="middle" fill="#c53030" font-weight="600">14.2회차 앞질러 감 = 7.6%p 만큼 낮은 가격</text>
+
+  <!-- T 눈금 -->
+  <text x="60" y="140" font-size="10.5" text-anchor="middle" fill="currentColor">T=0</text>
+  <text x="395" y="140" font-size="10.5" text-anchor="middle" fill="currentColor">20</text>
+  <text x="730" y="140" font-size="10.5" text-anchor="middle" fill="currentColor">40</text>
+</svg>
+<figcaption>같은 직선 위의 두 점. 원전 기준으로는 아직 이익 구간에서 1/4씩 털어야 할 자리인데, 현재 구현은 이미 손실 구간 한복판을 가리키고 있다.</figcaption>
+</figure>
+
+<h2>4. 실제 체결 대조 — 토스 동기화 결과</h2>
+
+<p><strong>2026-09-19 토스 체결 동기화를 실행해 확정한 데이터입니다.</strong>
+(<code>getOrders</code>는 <code>limit</code> 기본 100건에 페이징이 없어 기간을 4회로 나눠 조회해야 전 구간이 들어옵니다 —
+UI 동기화 버튼 한 번으로는 7월분에서 100건이 차 최근 체결이 누락됩니다.)</p>
+
+<table>
+  <tr><th>거래일</th><th class="num">종가</th><th class="num">평단</th><th>현재 구현</th><th class="num">손익</th><th>원전 T였다면</th></tr>
+  <tr><td>09-04</td><td class="num">$72.37</td><td class="num">72.36</td><td>$71.99 → <span class="bad">9주 매도</span></td><td class="num">+$0.13</td><td>$74.88 → 미체결</td></tr>
+  <tr><td>09-08</td><td class="num">$72.16</td><td class="num">72.36</td><td>$71.63 → <span class="bad">6주 매도</span></td><td class="num bad">−$1.18</td><td>$74.88 → 미체결</td></tr>
+  <tr><td>09-09</td><td class="num">$71.55</td><td class="num">72.36</td><td>$71.27 → <span class="bad">5주 매도</span></td><td class="num bad">−$4.03</td><td>$74.88 → 미체결</td></tr>
+  <tr><td>09-11</td><td class="num">$70.98</td><td class="num">72.01</td><td>$70.21 → <span class="bad">4주 매도</span></td><td class="num bad">−$4.11</td><td>$74.27 → 미체결</td></tr>
+  <tr><td>09-17</td><td class="num">$71.38</td><td class="num">70.91</td><td>$67.72 → <span class="bad">5주 매도</span></td><td class="num">+$2.33</td><td>$72.41 → <span class="good">2주 매수</span></td></tr>
+  <tr><td>09-18</td><td class="num">$72.64</td><td class="num">70.91</td><td>$67.37 → <span class="bad">3주 매도</span></td><td class="num">+$5.18</td><td>$72.41 → 3주 매도 (동일)</td></tr>
+  <tr><th colspan="3">합계</th><th class="bad">32주 매도</th><th class="num bad">−$1.69</th><th class="good">3주 매도</th></tr>
+</table>
+
+<blockquote>
+<strong>피해는 &quot;손실&quot;이 아니라 &quot;물량 소진&quot;입니다.</strong>
+LOC 매도는 지정가가 아니라 <em>종가로</em> 체결되므로 실현손익 자체는 −$1.69로 미미합니다.
+문제는 <strong>팔 이유가 없을 때 팔았다</strong>는 것 — 원전 T였다면 6번 중 1번만 체결돼 3주가 나갔을 자리에서 실제로는 <strong>32주가 나갔습니다</strong>.
+</blockquote>
+
+<table>
+  <tr><th></th><th class="num">현재 구현</th><th class="num">원전 T였다면</th></tr>
+  <tr><td>매도된 물량</td><td class="num bad">32주</td><td class="num good">3주</td></tr>
+  <tr><td>남은 보유</td><td class="num bad">12주</td><td class="num good">41주</td></tr>
+  <tr><td>실현손익</td><td class="num">−$1.69</td><td class="num">+$5.18</td></tr>
+</table>
+
+<p>원금의 39%만 쓴 시점에 <strong>매수한 44주 중 32주(73%)를 털어냈습니다.</strong>
+무한매수법은 하락 구간에 물량을 쌓아 반등에서 익절하는 전략인데,
+정작 9/17~9/18에 주가가 $67.9 → $72.6으로 <strong>+7% 반등했을 때 남은 물량이 12주뿐</strong>이었습니다.
+같은 기간 매수는 5회 중 5회 미체결이라 물타기도 멈춰 있었습니다.</p>
+
+<h2>5. 왜 금액 T는 제자리인가 — 두 겹의 누수</h2>
+
+<figure>
+<svg viewBox="0 0 760 210" role="img" aria-label="1회 배정 200달러 중 floor 절삭으로 144달러만 주문되고, 미체결일까지 겹쳐 실제 집행은 회차당 126달러로 떨어진다">
+  <!-- 배정 -->
+  <rect x="60" y="40" width="300" height="34" fill="currentColor" opacity="0.15" stroke="currentColor"/>
+  <text x="70" y="62" font-size="12" fill="currentColor" font-weight="600">1회 배정 $200</text>
+  <text x="370" y="62" font-size="11" fill="currentColor">= 원금 $8,000 ÷ 40분할</text>
+
+  <!-- 절삭 후 -->
+  <rect x="60" y="92" width="216" height="34" fill="#d69e2e" opacity="0.28" stroke="#b7791f"/>
+  <rect x="276" y="92" width="84" height="34" fill="none" stroke="#b7791f" stroke-dasharray="4 3"/>
+  <text x="70" y="114" font-size="12" fill="currentColor" font-weight="600">실제 주문 $144</text>
+  <text x="318" y="114" font-size="11" text-anchor="middle" fill="#b7791f" font-weight="600">$56 버림</text>
+  <text x="370" y="114" font-size="11" fill="currentColor">floor($200 ÷ $72) = 2주 — 나머지는 이월 없이 소멸</text>
+
+  <!-- 체결 후 -->
+  <rect x="60" y="144" width="189" height="34" fill="#c53030" opacity="0.28" stroke="#c53030"/>
+  <rect x="249" y="144" width="111" height="34" fill="none" stroke="#c53030" stroke-dasharray="4 3"/>
+  <text x="70" y="166" font-size="12" fill="currentColor" font-weight="600">실제 집행 $126</text>
+  <text x="305" y="166" font-size="11" text-anchor="middle" fill="#c53030" font-weight="600">미체결분</text>
+  <text x="370" y="166" font-size="11" fill="currentColor">31거래일 중 매수 체결 25일 (5일 전량 미체결)</text>
+  <text x="370" y="182" font-size="11" fill="#c53030" font-weight="600">→ 회차당 설계치의 63%만 집행 = T가 뒤처지는 이유</text>
+</svg>
+<figcaption>날짜는 하루에 1회차씩 꼬박꼬박 소진되는데, 금액은 회차당 63%만 나간다. 이 격차가 그대로 누적된 것이 14.2회차의 괴리다.</figcaption>
+</figure>
+
+<h2>6. 자기강화 루프</h2>
+
+<figure>
+<svg viewBox="0 0 760 300" role="img" aria-label="T가 앞서가면 매수 LOC가 종가 아래로 내려가 미체결되고, 매수가 안 되니 금액 T는 더 뒤처져 괴리가 다시 커지는 순환 구조">
+  <defs>
+    <marker id="loopAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <polygon points="0,0 10,5 0,10" fill="#c53030"/>
+    </marker>
+  </defs>
+
+  <rect x="286" y="20" width="190" height="46" rx="5" fill="none" stroke="#c53030" stroke-width="1.6"/>
+  <text x="381" y="40" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">날짜 T가 금액 T를</text>
+  <text x="381" y="56" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">앞질러 감</text>
+
+  <rect x="556" y="118" width="190" height="46" rx="5" fill="none" stroke="#c53030" stroke-width="1.6"/>
+  <text x="651" y="138" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">(10−T/2)% 가</text>
+  <text x="651" y="154" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">과도하게 내려감</text>
+
+  <rect x="426" y="226" width="200" height="46" rx="5" fill="none" stroke="#c53030" stroke-width="1.6"/>
+  <text x="526" y="246" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">매수 LOC가 종가 아래</text>
+  <text x="526" y="262" font-size="12" text-anchor="middle" fill="#c53030" font-weight="600">→ 매수 미체결</text>
+
+  <rect x="136" y="226" width="200" height="46" rx="5" fill="none" stroke="#c53030" stroke-width="1.6"/>
+  <text x="236" y="246" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">누적매수액 정체</text>
+  <text x="236" y="262" font-size="12" text-anchor="middle" fill="#c53030" font-weight="600">→ 금액 T 제자리</text>
+
+  <rect x="14" y="118" width="190" height="46" rx="5" fill="none" stroke="#c53030" stroke-width="1.6"/>
+  <text x="109" y="138" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">날짜 T는 그래도</text>
+  <text x="109" y="154" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">매일 +1</text>
+
+  <!-- 순환 화살표 -->
+  <path d="M476,50 Q580,70 640,112" fill="none" stroke="#c53030" stroke-width="1.6" marker-end="url(#loopAr)"/>
+  <path d="M651,166 Q640,210 600,232" fill="none" stroke="#c53030" stroke-width="1.6" marker-end="url(#loopAr)"/>
+  <path d="M426,252 Q380,252 342,251" fill="none" stroke="#c53030" stroke-width="1.6" marker-end="url(#loopAr)"/>
+  <path d="M180,226 Q130,200 112,170" fill="none" stroke="#c53030" stroke-width="1.6" marker-end="url(#loopAr)"/>
+  <path d="M120,114 Q180,66 280,46" fill="none" stroke="#c53030" stroke-width="1.6" marker-end="url(#loopAr)"/>
+
+  <!-- 루프 밖 결과 -->
+  <line x1="651" y1="166" x2="700" y2="214" stroke="#c53030" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#loopAr)"/>
+  <text x="706" y="232" font-size="11.5" text-anchor="end" fill="#c53030" font-weight="700">매도 LOC도 함께 하강</text>
+  <text x="706" y="248" font-size="11.5" text-anchor="end" fill="#c53030">→ 팔 이유 없을 때도 체결</text>
+  <text x="706" y="264" font-size="11.5" text-anchor="end" fill="#c53030">→ 보유 36주 → 12주</text>
+
+  <text x="381" y="152" font-size="12.5" text-anchor="middle" fill="#c53030" font-weight="700">되먹임 고리</text>
+  <text x="381" y="170" font-size="11" text-anchor="middle" fill="currentColor">한 번 벌어지면 스스로 넓어진다</text>
+</svg>
+<figcaption>매수가 막힐수록 금액 T는 더 제자리에 머물고, 그만큼 괴리가 커져 다음 날 매수 가격은 더 아래로 내려간다. 9/04 이후 매수 5회 중 5회 미체결이 이 고리가 실제로 돌고 있다는 증거다.</figcaption>
+</figure>
+
+<h2>7. 결과 — 보유 물량</h2>
+
+<figure>
+<svg viewBox="0 0 760 260" role="img" aria-label="보유 수량이 9월 4일 36주까지 쌓였다가 손실 매도로 15주까지 줄어든 막대 그래프">
+  <line x1="60" y1="220" x2="730" y2="220" stroke="currentColor" stroke-width="1"/>
+  <line x1="60" y1="220" x2="60" y2="40" stroke="currentColor" stroke-width="1"/>
+  <text x="34" y="224" font-size="11" fill="currentColor">0</text>
+  <text x="28" y="134" font-size="11" fill="currentColor">20</text>
+  <text x="28" y="44" font-size="11" fill="currentColor">40</text>
+  <text x="14" y="30" font-size="11" fill="currentColor" font-weight="600">주</text>
+
+  <g fill="#2f855a" opacity="0.75">
+    <rect x="76.3" y="211.0" width="14" height="9.0"/><rect x="98.7" y="202.0" width="14" height="18.0"/>
+    <rect x="121.0" y="197.5" width="14" height="22.5"/><rect x="143.3" y="188.5" width="14" height="31.5"/>
+    <rect x="165.7" y="179.5" width="14" height="40.5"/><rect x="188.0" y="175.0" width="14" height="45.0"/>
+    <rect x="210.3" y="170.5" width="14" height="49.5"/><rect x="232.7" y="166.0" width="14" height="54.0"/>
+    <rect x="255.0" y="161.5" width="14" height="58.5"/><rect x="277.3" y="152.5" width="14" height="67.5"/>
+    <rect x="299.7" y="143.5" width="14" height="76.5"/><rect x="322.0" y="134.5" width="14" height="85.5"/>
+    <rect x="344.3" y="125.5" width="14" height="94.5"/><rect x="366.7" y="116.5" width="14" height="103.5"/>
+    <rect x="389.0" y="107.5" width="14" height="112.5"/><rect x="411.3" y="98.5" width="14" height="121.5"/>
+    <rect x="433.7" y="94.0" width="14" height="126.0"/><rect x="456.0" y="85.0" width="14" height="135.0"/>
+    <rect x="478.3" y="76.0" width="14" height="144.0"/><rect x="500.7" y="67.0" width="14" height="153.0"/>
+    <rect x="523.0" y="58.0" width="14" height="162.0"/>
+  </g>
+  <g fill="#c53030" opacity="0.8">
+    <rect x="545.3" y="98.5" width="14" height="121.5"/><rect x="567.7" y="125.5" width="14" height="94.5"/>
+    <rect x="590.0" y="148.0" width="14" height="72.0"/><rect x="612.3" y="139.0" width="14" height="81.0"/>
+    <rect x="634.7" y="157.0" width="14" height="63.0"/><rect x="657.0" y="148.0" width="14" height="72.0"/>
+    <rect x="679.3" y="139.0" width="14" height="81.0"/><rect x="701.7" y="130.0" width="14" height="90.0"/>
+    <rect x="724.0" y="152.5" width="14" height="67.5"/>
+  </g>
+
+  <line x1="537" y1="40" x2="537" y2="228" stroke="#b7791f" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <text x="533" y="36" font-size="11" text-anchor="end" fill="#b7791f" font-weight="600">9/03 T=20 돌파</text>
+
+  <text x="530" y="52" font-size="12" fill="#2f855a" font-weight="700">최대 36주</text>
+  <text x="742" y="152" font-size="11.5" fill="#c53030" font-weight="700">15주</text>
+  <text x="690" y="196" font-size="11.5" fill="#c53030" font-weight="700">→ 9/18 3주 매도 후 12주</text>
+
+  <text x="290" y="244" font-size="11" text-anchor="middle" fill="#2f855a" font-weight="600">8월 — 매도 체결 0건, 물량 축적</text>
+  <text x="640" y="244" font-size="11" text-anchor="middle" fill="#c53030" font-weight="600">9월 — 매도 6회 32주, −67%</text>
+</svg>
+<figcaption>한 달 동안 36주까지 쌓은 물량이 보름 만에 12주로 줄었다(막대는 각 거래일 <em>주문 시점</em> 보유이며, 9/18 매도 3주가 반영된 현재 보유는 12주다). 8월에는 매도 주문이 매일 나갔지만 가격이 평단 위였던 덕에 한 건도 체결되지 않았다.</figcaption>
+</figure>
+
+<h2>8. 숫자 요약</h2>
+<table>
+  <tr><th>항목</th><th class="num">값</th></tr>
+  <tr><td>코드 회차 (날짜 기준)</td><td class="num">30 / 40</td></tr>
+  <tr><td>원전 T (누적매수액 ÷ 1회매수액)</td><td class="num good">15.8 / 40</td></tr>
+  <tr><td>괴리</td><td class="num bad">14.2회차</td></tr>
+  <tr><td>누적 매수 체결액</td><td class="num">$3,153 (원금의 39.4%)</td></tr>
+  <tr><td>매수 체결일 / 전체 거래일</td><td class="num">25일 / 31일</td></tr>
+  <tr><td>회차당 실제 집행액</td><td class="num">$126 (설계치 $200의 63%)</td></tr>
+  <tr><td>보유 수량</td><td class="num bad">36주 → 12주 (−67%)</td></tr>
+  <tr><td>매도된 물량 (원전 T였다면)</td><td class="num bad">32주 (3주)</td></tr>
+  <tr><td>누적 실현손익</td><td class="num">−$1.69 (6건 중 3건 손실·3건 이익)</td></tr>
+  <tr><td>남은 회차</td><td class="num bad">10거래일 후 T=40 → 매수 영구 중단</td></tr>
+</table>
+
+<h3>코드 규칙 자체의 준수 여부는 별개로 완벽</h3>
+<p>109건 전부 재현 검증했고 가격 공식·수량 <code>floor</code>·트랜치 분할·전후반 전환·회차 연속성·거래일당 1회 모두 <span class="good">위반 0건</span>입니다.
+구현은 정확히 설계대로 돌고 있으며, 문제는 <strong>설계가 채택한 <code>T</code>의 정의</strong>에 있습니다.
+운영 쪽으로는 <strong>9/02 거래일 하나가 통째로 누락</strong>(워커 미가동)됐고 9/03은 마감 48분 전에 겨우 실행됐습니다.</p>
+
+<h2>9. <code>T = 15.8</code>의 근거와 검증</h2>
+
+<p>이 문서의 모든 주장이 누적 매수 체결액 <strong>$3,153.44</strong> 하나에 걸려 있습니다.
+그런데 <strong>DB에는 체결 데이터가 없습니다</strong> — v2.2 실행 경로는 <code>syncFillsFromToss</code>를 호출하지 않아
+109건 전부 <code>status=submitted</code>, <code>filled_qty</code>는 비어 있습니다. 그래서 역산했고, 그 역산을 외부 데이터로 검증했습니다.</p>
+
+<figure>
+<svg viewBox="0 0 760 250" role="img" aria-label="토스 실측 평단과 보유수량으로 체결 종가를 역산하고, 그 값을 실제 시장 종가와 대조해 일치를 확인하는 검증 경로">
+  <defs>
+    <marker id="vAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <polygon points="0,0 10,5 0,10" fill="currentColor"/>
+    </marker>
+    <marker id="vArG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <polygon points="0,0 10,5 0,10" fill="#2f855a"/>
+    </marker>
+  </defs>
+
+  <rect x="14" y="52" width="176" height="86" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+  <text x="102" y="42" font-size="11.5" text-anchor="middle" fill="currentColor" font-weight="700">토스 실측값 (DB 기록)</text>
+  <text x="102" y="76" font-size="11.5" text-anchor="middle" fill="currentColor">평단 <tspan font-family="monospace">avg_cost</tspan></text>
+  <text x="102" y="98" font-size="11.5" text-anchor="middle" fill="currentColor">보유수량 N</text>
+  <text x="102" y="120" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.7">(매도 트랜치 합 = N)</text>
+
+  <line x1="196" y1="95" x2="256" y2="95" stroke="currentColor" stroke-width="1.6" marker-end="url(#vAr)"/>
+
+  <rect x="262" y="40" width="210" height="110" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+  <text x="367" y="30" font-size="11.5" text-anchor="middle" fill="currentColor" font-weight="700">역산</text>
+  <text x="367" y="64" font-size="10.5" text-anchor="middle" fill="currentColor">평단은 매수로만 변함</text>
+  <text x="367" y="86" font-size="11" text-anchor="middle" font-family="monospace" fill="currentColor">A′(N+b) = N·A + b·X</text>
+  <text x="367" y="108" font-size="10.5" text-anchor="middle" fill="currentColor">→ 체결가 X, 체결량 b</text>
+  <text x="367" y="130" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.7">31일 전부 유일해 (모순 0)</text>
+
+  <line x1="478" y1="95" x2="538" y2="95" stroke="#2f855a" stroke-width="1.6" marker-end="url(#vArG)"/>
+  <text x="508" y="88" font-size="10" text-anchor="middle" fill="#2f855a">대조</text>
+
+  <rect x="544" y="52" width="202" height="86" rx="5" fill="none" stroke="#2f855a" stroke-width="1.6"/>
+  <text x="645" y="42" font-size="11.5" text-anchor="middle" fill="#2f855a" font-weight="700">실제 시장 종가</text>
+  <text x="645" y="76" font-size="11.5" text-anchor="middle" fill="#2f855a">Yahoo Finance 일봉</text>
+  <text x="645" y="100" font-size="12.5" text-anchor="middle" fill="#2f855a" font-weight="700">24일 오차 0.000%</text>
+  <text x="645" y="122" font-size="10" text-anchor="middle" fill="currentColor" opacity="0.7">소수점 둘째 자리까지 일치</text>
+
+  <text x="380" y="186" font-size="11.5" text-anchor="middle" fill="currentColor">LOC는 <strong>종가로만</strong> 체결되므로, 체결 수량이나 날짜를 하나라도 잘못 짚었다면</text>
+  <text x="380" y="204" font-size="11.5" text-anchor="middle" fill="currentColor">역산된 X가 실제 종가와 일치할 수 없습니다. 24일 연속 일치는 우연이 아닙니다.</text>
+  <text x="380" y="230" font-size="11" text-anchor="middle" fill="#b7791f">예외 1일 — 8/05는 시장가(MARKET) 주문이라 종가가 아닌 장중가에 체결 (아래 참조)</text>
+</svg>
+<figcaption>입력은 토스가 준 실측값, 출력은 시장 데이터와 대조. 중간 과정이 틀렸을 여지를 양쪽에서 좁혔다.</figcaption>
+</figure>
+
+<h3>검증 ① 역산 종가 vs 실제 종가</h3>
+<table>
+  <tr><th>거래일</th><th class="num">역산 체결가</th><th class="num">실제 종가</th><th class="num">오차</th></tr>
+  <tr><td>08-06 ~ 09-16 (LOC 체결 24일)</td><td class="num" colspan="2">전 일자 동일</td><td class="num good">0.000%</td></tr>
+  <tr><td>08-05 (<code>first_market</code>, 시장가)</td><td class="num">$76.22</td><td class="num">$72.84</td><td class="num">+4.65%</td></tr>
+</table>
+<p>8/05만 어긋나는 것이 오히려 검증입니다 — 그날은 유일한 <strong>MARKET 주문</strong>이라 종가가 아닌 장중가에 체결됩니다.
+실제 그날 장중 범위는 <strong>$72.74 ~ $76.33</strong>으로 역산값 $76.22가 그 안에 있고, 시가 $75.61에 가깝습니다.
+주문이 기록된 시각이 KST 22:49, 즉 <strong>미국 장 개장 19분 후</strong>라는 사실과도 정확히 맞물립니다.</p>
+
+<h3>검증 ② 내부 검산 — 원가 보존</h3>
+<pre><code>누적 매수 체결액        $3,153.44
+− 매도된 29주의 원가    $2,089.72   (각 매도 시점 평단 × 수량)
+                        ─────────
+= 차감 결과             $1,063.72
+현재 보유 원가          $1,063.72   (15주 × 평단 $70.91458)
+오차                    $0.0000</code></pre>
+<p>매수·매도 재구성이 서로 독립적으로 맞아떨어져야만 성립하는 항등식입니다.</p>
+
+<h3>검증 ③ 토스 체결 동기화로 확정 (2026-09-19 실행)</h3>
+<p>위 두 검증은 역산이었고, 실제 체결 데이터로 확정했습니다. 결과가 <strong>1센트까지 일치</strong>합니다.</p>
+<table>
+  <tr><th></th><th class="num">역산 (추정)</th><th class="num">토스 실제 체결</th><th class="num">차이</th></tr>
+  <tr><td>누적 매수 체결액</td><td class="num">$3,153.44</td><td class="num good">$3,153.44</td><td class="num good">$0.00</td></tr>
+  <tr><td>매수 체결 수량</td><td class="num">44주</td><td class="num good">44주</td><td class="num good">0</td></tr>
+  <tr><td><strong>T = 누적매수액 ÷ $200</strong></td><td class="num">15.77</td><td class="num good"><strong>15.77</strong></td><td class="num good">—</td></tr>
+</table>
+<p>매수 체결가도 8/05($76.225, 시장가) 포함 전 일자가 일치했습니다. <strong><code>T = 15.8</code>은 확정된 값입니다.</strong></p>
+
+<h3>같은 동기화로 드러난 제 오류</h3>
+<p>매도는 평단을 바꾸지 않아 역산이 불가능했고, 제가 체결가를 <em>지정가</em>로 가정했습니다.
+실제 LOC 매도는 <strong>종가로</strong> 체결되므로 지정가보다 유리합니다. 이 때문에 초판의 두 수치가 틀렸습니다.</p>
+<table>
+  <tr><th>항목</th><th class="num">초판 (잘못됨)</th><th class="num">실제</th></tr>
+  <tr><td>실현손익</td><td class="num">−$36.24</td><td class="num">−$1.69</td></tr>
+  <tr><td>매도 체결</td><td class="num">29주 · 전부 손실</td><td class="num">32주 · 3건 손실, 3건 이익</td></tr>
+</table>
+<p><code>T</code> 계산은 <strong>매수액만</strong> 쓰므로 이 오류의 영향을 받지 않습니다.
+다만 진단의 무게중심은 바뀝니다 — 피해는 &quot;손실 매도&quot;가 아니라 <strong>&quot;팔 이유가 없을 때 판 물량 소진&quot;</strong>입니다.</p>
+
+<h2>10. 원전 근거</h2>
+<blockquote>
+<p><strong>T = 누적 매수액 ÷ 1회 매수액 (진행률 = T/40)</strong><br>
+변동식 값 = (10 − T/2)% … 검증점: T=0 → +10%, T=10 → +5%, T=20 → 0%(평단), T=40 → −10%</p>
+<p style="margin-bottom:0">쿼터손절 모드: <strong>T 39.1~40.0</strong> 구간 …</p>
+</blockquote>
+<p style="font-size:0.9em;color:#4a5568">출처: <code>docs/superpowers/specs/2026-07-07-infinite-buy-v2.2-reference.html</code></p>
+<p><code>T 39.1</code>처럼 <strong>소수점 값이 규칙에 등장한다는 것</strong>이 T가 날짜 카운트가 아니라는 결정적 증거입니다.
+v4.0 스펙의 갱신 규칙 <code>매수 +1 / +0.5, 쿼터매도 ×0.75, 지정가매도 ×0.25</code>도 같은 이야기를 합니다 —
+전반전 매수는 0.5회치 주문 2건이라, 둘 다 체결되면 +1, 하나만 체결되면 +0.5입니다.</p>
+
+<h2 id="fix">11. 적용한 수정 (2026-09-19)</h2>
+
+<h3>① 토스 주문조회가 30일에서 잘리던 문제</h3>
+<p>처음에는 <code>limit</code> 기본값 100이 원인이라 봤지만, 실측하니 달랐습니다.
+<code>limit</code>은 서버 상한이 100이고(300 이상은 <code>400</code>), <strong>그와 별개로 <code>from</code> 기준 약 30일 범위만</strong> 돌려줍니다.</p>
+<pre><code>from=2026-07-07 → 67건, 범위 07-08 ~ 08-06
+from=2026-08-05 → 82건, 범위 08-05 ~ 09-04</code></pre>
+<p>그래서 커서 페이징이 아니라 <strong>기간 윈도우 분할</strong>로 고쳤습니다.
+<code>splitDateWindows</code>·<code>collectAcrossWindows</code>(순수 함수)를 만들고 <code>getOrders</code>가 28일 단위로 순회하며
+<code>orderId</code>로 중복을 제거합니다. <strong>실측 67건 → 171건.</strong>
+호출부 세 곳이 모두 <code>to</code> 없이 "from 이후 전체"를 기대하고 있었으므로 DCA 경로(<code>dca/toss-deps.ts</code>)의 같은 결함도 함께 해결됩니다.</p>
+
+<h3>② v2.2 실행 경로에 체결 동기화 추가</h3>
+<p><code>runCycle</code>이 계산 전에 <code>deps.syncFills(cycleId)</code>를 호출합니다.
+동기화 실패는 <strong>throw</strong>시켰습니다 — 낡은 체결로 T를 잘못 잡느니 그날 실행을 미루고 다음 폴(15분)에 재시도하는 편이 안전하고,
+DCA에서 이미 쓰는 원칙(조회 실패와 창 닫힘을 구분)과 같습니다.</p>
+
+<h3>③ T를 원전 정의로 교체</h3>
+<pre><code>// V2.2 원전: T = 누적 매수액 ÷ 1회 매수액
+const T = s.boughtAmount != null ? s.boughtAmount / daily : s.round;</code></pre>
+<p>변동식뿐 아니라 <strong>전·후반 판정과 원금 소진 판정도</strong> T 기준으로 바꿨습니다 —
+소진은 "40일이 지났는가"가 아니라 "돈을 다 썼는가"이기 때문입니다.
+<code>boughtAmountFromOrders</code>는 사이클이 리셋돼도 주문 이력이 같은 <code>cycleId</code>에 남으므로
+<strong>마지막 <code>round 0</code> 거래일 이후만</strong> 집계합니다.</p>
+
+<h3>회귀 하나를 함께 막았습니다</h3>
+<p>v2.2 <code>dryRun</code>은 모의 체결을 기록하지 않아(<code>judgeDryFill</code>은 v4.0·VR 전용) 체결액이 항상 0입니다.
+그대로 두면 dryRun의 T가 0에 고정되므로, <strong>dryRun은 종전대로 <code>round</code>를 T로 쓰도록</strong> 하고 테스트 2개로 고정했습니다.</p>
+
+<h2>12. 무엇이 달라지는가</h2>
+
+<figure>
+<svg viewBox="0 0 760 430" role="img" aria-label="종가 구간별로 수정 전은 평단 아래에서도 매도했지만 수정 후에는 평단 근처에서 매수로 바뀐다">
+  <defs>
+    <marker id="fxAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <polygon points="0,0 10,5 0,10" fill="currentColor"/>
+    </marker>
+  </defs>
+
+  <text x="196" y="28" font-size="13" text-anchor="middle" fill="#c53030" font-weight="700">수정 전 — T=31</text>
+  <text x="196" y="45" font-size="11" text-anchor="middle" fill="#c53030">기준선 하나 $67.01 (평단 −5.5%)</text>
+  <text x="576" y="28" font-size="13" text-anchor="middle" fill="#2f855a" font-weight="700">수정 후 — T=15.77</text>
+  <text x="576" y="45" font-size="11" text-anchor="middle" fill="#2f855a">$72.42 / $70.91 (평단 +2.1% / 평단)</text>
+
+  <!-- 구간 밴드 -->
+  <rect x="60" y="60" width="640" height="59" fill="currentColor" opacity="0.04"/>
+  <rect x="60" y="119" width="640" height="57" fill="#c53030" opacity="0.08"/>
+  <rect x="60" y="176" width="640" height="146" fill="#c53030" opacity="0.12"/>
+  <rect x="60" y="322" width="640" height="46" fill="currentColor" opacity="0.04"/>
+
+  <!-- 가격 기준선 -->
+  <line x1="60" y1="119.25" x2="700" y2="119.25" stroke="#2f855a" stroke-width="2"/>
+  <text x="706" y="116" font-size="11" fill="#2f855a" font-weight="600">$72.42</text>
+  <line x1="60" y1="175.9" x2="700" y2="175.9" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <text x="706" y="180" font-size="11" fill="currentColor" font-weight="600">$70.91</text>
+  <text x="706" y="193" font-size="10" fill="currentColor" opacity="0.7">= 평단</text>
+  <line x1="60" y1="322.1" x2="700" y2="322.1" stroke="#c53030" stroke-width="2"/>
+  <text x="706" y="326" font-size="11" fill="#c53030" font-weight="600">$67.01</text>
+
+  <!-- 구분선 -->
+  <line x1="380" y1="60" x2="380" y2="368" stroke="currentColor" stroke-width="1" opacity="0.35"/>
+
+  <!-- 구간별 결과 -->
+  <text x="196" y="86" font-size="11.5" text-anchor="middle" fill="currentColor">매도 3주</text>
+  <text x="576" y="86" font-size="11.5" text-anchor="middle" fill="currentColor">매도 3주</text>
+  <text x="380" y="103" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.8">종가 ≥ $72.42 — 양쪽 같음 (이익 실현)</text>
+
+  <text x="196" y="145" font-size="11.5" text-anchor="middle" fill="#c53030" font-weight="600">매도 3주</text>
+  <text x="196" y="160" font-size="10.5" text-anchor="middle" fill="#c53030">평단 아래로 털어냄</text>
+  <text x="576" y="145" font-size="11.5" text-anchor="middle" fill="#2f855a" font-weight="600">매수 1주</text>
+  <text x="576" y="160" font-size="10.5" text-anchor="middle" fill="#2f855a">물타기</text>
+
+  <text x="196" y="232" font-size="11.5" text-anchor="middle" fill="#c53030" font-weight="600">매도 3주</text>
+  <text x="196" y="248" font-size="10.5" text-anchor="middle" fill="#c53030">평단 밑에서 손실 확정</text>
+  <text x="576" y="232" font-size="11.5" text-anchor="middle" fill="#2f855a" font-weight="600">매수 2주</text>
+  <text x="576" y="248" font-size="10.5" text-anchor="middle" fill="#2f855a">평단 LOC + 변동 LOC 둘 다</text>
+  <text x="380" y="292" font-size="11" text-anchor="middle" fill="#c53030" font-weight="700">← 9월 내내 주가가 머문 구간. 정반대로 동작했다 →</text>
+
+  <text x="196" y="348" font-size="11.5" text-anchor="middle" fill="currentColor">매수 2주</text>
+  <text x="576" y="348" font-size="11.5" text-anchor="middle" fill="currentColor">매수 2주</text>
+  <text x="380" y="364" font-size="10.5" text-anchor="middle" fill="currentColor" opacity="0.8">종가 &lt; $67.01 — 양쪽 같음 (물타기)</text>
+
+  <text x="380" y="396" font-size="11.5" text-anchor="middle" fill="currentColor">세로축은 그날 <strong>종가</strong>. LOC는 종가가 기준선의 어느 쪽에 놓이느냐로 매수·매도가 갈린다.</text>
+  <text x="380" y="414" font-size="11.5" text-anchor="middle" fill="currentColor">기준선이 평단 밑으로 내려가 있으면, 평단 근처 횡보가 전부 매도로 처리된다.</text>
+</svg>
+<figcaption>평단 $70.91, 보유 12주 기준 실제 계산 결과. 양 끝 구간은 동작이 같고, <strong>평단을 낀 가운데 두 구간에서 정반대</strong>가 된다 — 9월 내내 주가가 바로 그 구간에 있었다.</figcaption>
+</figure>
+
+<table>
+  <tr><th></th><th>수정 전 (T=31)</th><th>수정 후 (T=15.77)</th></tr>
+  <tr><td rowspan="2">매수</td><td><code>loc_var</code> 2주 @$67.01</td><td><code>loc_avg</code> 1주 @$70.91</td></tr>
+  <tr><td class="num">—</td><td><code>loc_var</code> 1주 @$72.42</td></tr>
+  <tr><td rowspan="2">매도</td><td><code>sell_loc_var</code> 3주 @$67.01</td><td><code>sell_loc_var</code> 3주 @$72.42</td></tr>
+  <tr><td><code>sell_lim_10</code> 9주 @$78.01</td><td><code>sell_lim_10</code> 9주 @$78.01</td></tr>
+</table>
+
+<h2>13. 검증</h2>
+<table>
+  <tr><th>항목</th><th>결과</th></tr>
+  <tr><td>전체 테스트</td><td class="good">407개 통과 (기존 392 + 신규 15)</td></tr>
+  <tr><td>타입체크 (<code>tsc --noEmit</code>)</td><td class="good">통과</td></tr>
+  <tr><td>lint (변경 파일 스코프)</td><td class="good">통과</td></tr>
+  <tr><td>실 API — <code>getOrders</code></td><td class="good">67건 → 171건</td></tr>
+  <tr><td>실 사이클 — T 산출</td><td class="good">$3,153.44 ÷ $200 = 15.77</td></tr>
+  <tr><td>워커</td><td class="good">재시작 완료 (tsx는 HMR이 없어 필수)</td></tr>
+</table>
+
+<h3>변경 파일</h3>
+<pre><code>신규  src/lib/toss/date-windows.ts            윈도우 분할·순회 (순수 함수)
+      src/lib/toss/date-windows.test.ts       테스트 10개
+수정  src/lib/toss/client.ts                  getOrders → 윈도우 순회
+      src/lib/infinite-buy/strategy.ts        CycleState.boughtAmount 추가
+      src/lib/infinite-buy/strategy-v22.ts    T·전후반·소진 판정을 체결액 기준으로
+      src/lib/infinite-buy/run.ts             실행 전 syncFills + boughtAmount 전달
+      src/lib/infinite-buy/sync.ts            boughtAmountFromOrders
+      src/lib/infinite-buy/toss-adapter.ts    syncFills·getBoughtAmount 구현
+      src/actions/infinite-buy.ts             tossRunDeps(db) 시그니처
+      worker/infinite-buy-loop.ts             동일</code></pre>
+
+<h2>14. 남은 것</h2>
+<ul>
+  <li><strong>v2.2 dryRun의 모의 체결</strong> — 현재 dryRun은 <code>round</code> fallback이라 LIVE와 동작이 다릅니다.
+  <code>judgeDryFill</code>을 v2.2 경로에도 태우면 해소되지만 일봉 조회 의존이 추가됩니다.</li>
+  <li><strong>매수·매도 LOC 동일가</strong> — v2.2는 두 주문이 같은 변동식을 쓰므로 종가가 정확히 그 값이면 동시 발동이 가능합니다.
+  v4.0은 <code>매수점 = 별지점 − $0.01</code>로 분리해 두었지만, V2.2 원문에는 분리 규칙이 없어 손대지 않았습니다.</li>
+  <li><strong>소진모드 원문</strong> — V4.0 전환 로드맵의 3단계. 여전히 미확보입니다.</li>
+</ul>
+
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>TQQQ 무한매수 원금 미집행 진단 (2026-09-08)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bad { color: #c53030; font-weight: 600; }
+  .ok { color: #2f855a; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>TQQQ 무한매수 — 원금 8,000달러 중 3분의 1만 집행된 이유</h1>
+<p>진단일 2026-09-08 · 대상 사이클 <code>3010f15c</code> (TQQQ, v2.2, LIVE, round 22/40)</p>
+
+<h2>1. 관찰 확인 — 맞습니다</h2>
+
+<table>
+  <tr><th>항목</th><th class="num">값</th><th>산출 근거</th></tr>
+  <tr><td>설정 원금</td><td class="num">$8,000</td><td><code>infinite_buy_cycles.principal</code></td></tr>
+  <tr><td>회차 소진</td><td class="num">22 / 40 (55%)</td><td><code>round=22</code></td></tr>
+  <tr><td>현 사이클 매수 <strong>주문</strong> 총액</td><td class="num">약 $3,320</td><td>8/05~9/04, 41건 · 44주 (시장가 2주는 $80 가정)</td></tr>
+  <tr><td>실제 보유 추정</td><td class="num">36주 × $72.35 = <span class="bad">$2,605</span></td><td>9/04 매도주문 27+9주, 평단 = 79.59 ÷ 1.1</td></tr>
+  <tr><td><strong>원금 집행률</strong></td><td class="num"><span class="bad">32.6%</span></td><td>2,605 ÷ 8,000</td></tr>
+</table>
+
+<blockquote>
+회차는 55% 썼는데 돈은 33%만 나갔습니다. 회차 진행 속도와 자금 집행 속도가 어긋나 있습니다.
+</blockquote>
+
+<h2>2. 원인 ① — floor 절삭. 매 회차 $55씩 <em>주문조차 되지 않음</em></h2>
+
+<p><code>strategy-v22.ts</code>의 1회 매수금은 <code>daily = principal / splits = 8000 / 40 = $200</code> 고정입니다.
+이걸 두 트랜치로 쪼갠 뒤 <strong>주식 수량을 <code>Math.floor</code>로 내림</strong>합니다.</p>
+
+<pre><code>const qAvg = Math.floor(half / s.avgPrice);      // half = $100
+const qVar = Math.floor(half / bigPrice);
+</code></pre>
+
+<table>
+  <tr><th>구간</th><th>트랜치</th><th class="num">배정 예산</th><th class="num">단가</th><th class="num">실제 주문</th><th class="num">미집행</th></tr>
+  <tr><td rowspan="2">전반전 (T&lt;20)</td><td>loc_avg</td><td class="num">$100</td><td class="num">$72.58</td><td class="num">1주 = $72.58</td><td class="num">$27.42</td></tr>
+  <tr><td>loc_var</td><td class="num">$100</td><td class="num">$72.94</td><td class="num">1주 = $72.94</td><td class="num">$27.06</td></tr>
+  <tr><td>후반전 (T≥20)</td><td>loc_var 단일</td><td class="num">$200</td><td class="num">$71.99</td><td class="num">2주 = $143.98</td><td class="num">$56.02</td></tr>
+</table>
+
+<p>즉 <strong>설계상 $200 중 최대 $144(72%)만 주문되고 나머지 $56은 그냥 버려집니다.</strong>
+잔여 예산을 다음 회차로 넘기는 이월(carry-over) 로직이 없어서, 이 손실이 매 거래일 반복됩니다.
+주문 이력의 수량이 22회차 내내 전부 <code>1주</code>(9/03부터 2주)인 게 정확히 이 현상입니다.</p>
+
+<h3>40회차를 다 채워도 도달 가능한 상한</h3>
+<pre><code>22회차까지 실제 주문   $3,320
+남은 18회차 × $144  ≈  $2,592
+──────────────────────────────
+40회차 소진 시점 합계  ≈ $5,912  →  원금의 <strong>74%</strong>
+</code></pre>
+<p><span class="bad">원금의 약 26%($2,100)는 사이클이 끝날 때까지 구조적으로 사용되지 않습니다.</span>
+TQQQ 주가가 오를수록 1주 단가가 커져 이 비율은 더 악화됩니다.</p>
+
+<h2>3. 원인 ② — LOC 미체결 8주</h2>
+<p>주문 44주 vs 보유 36주. LOC(종가 지정가) 매수는 종가가 지정가 이하일 때만 체결되므로,
+8월 중순 반등 구간에서 <code>loc_avg</code>(평단가 매수)가 여러 번 미체결된 것으로 보입니다.
+이건 전략상 정상 동작이지만, <strong>회차(T)는 체결 여부와 무관하게 매 실행마다 +1</strong> 되기 때문에
+(<code>run.ts</code>: <code>nextRound = s.round + 1</code>) 미체결분만큼 원금이 남은 채 회차만 소진됩니다.</p>
+
+<h2>4. 수치의 신뢰도에 관한 단서</h2>
+<blockquote>
+현 사이클의 주문은 <strong>전부 <code>status=submitted</code></strong>이고 <code>filled_qty</code>가 비어 있습니다.
+v2.2 실행 경로는 체결 동기화를 자동 호출하지 않기 때문입니다(<code>syncFillsFromToss</code>는 v4.0과 UI 버튼 전용).
+위의 "보유 36주 · 평단 $72.35"는 <strong>9/04 매도 주문 수량에서 역산한 값</strong>이라 실제 토스 잔고와 일치할 가능성이 높지만,
+확정하려면 화면의 <strong>"토스 체결 동기화"</strong> 버튼을 누르거나 토스 앱에서 직접 확인하세요.
+</blockquote>
+
+<h2>5. 개선 옵션</h2>
+
+<table>
+  <tr><th>안</th><th>내용</th><th>효과</th><th>비용 / 리스크</th></tr>
+  <tr>
+    <td><strong>A. 잔금 기반 회차금액</strong><br>(권장)</td>
+    <td><code>daily = (principal − 보유×평단) / (splits − round)</code><br>v4.0의 <code>perBuy = cash/(분할−T)</code> 방식을 v2.2에 이식.
+    보유·평단은 토스 스냅샷에 이미 있어 <strong>새 상태 필드 불필요</strong>.</td>
+    <td>절삭·미체결로 남은 돈이 남은 회차에 자동 재분배 → 40회차에 원금 100% 소진.
+    현 시점 적용 시 회차금액 $200 → <strong>$299</strong>(잔금 5,395 ÷ 18회차), 주문 2주 → 4주.</td>
+    <td><code>strategy-v22.ts</code> 수정 + 테스트. <span class="bad">진행 중 사이클에 적용하면 매수액이 즉시 2배</span>가 되므로 새 사이클부터 적용할지 결정 필요.</td>
+  </tr>
+  <tr>
+    <td>B. v4.0 전환</td>
+    <td>이미 구현된 v4.0은 잔금·연속 T를 추적해 이 문제가 없음.</td>
+    <td>근본 해결 + 별% 규칙까지 최신화.</td>
+    <td><span class="bad">현재 v4.0은 LIVE 미지원</span>(<code>infinite-buy.ts:275</code> — dryRun 검증 전용). 실전 투입하려면 별도 작업 필요.</td>
+  </tr>
+  <tr>
+    <td>C. 설정만 조정</td>
+    <td><code>splits</code>를 40 → 20 등으로 축소.</td>
+    <td>회차당 금액이 커져 절삭 <em>비율</em>만 하락(27% → 14%). 코드 수정 0.</td>
+    <td>40분할이라는 무한매수법 규칙 자체가 바뀜. 근본 해결 아님.</td>
+  </tr>
+  <tr>
+    <td>D. 유지</td>
+    <td>현 상태 그대로.</td>
+    <td>—</td>
+    <td>원금의 26%가 계속 유휴. 사이클마다 반복.</td>
+  </tr>
+</table>
+
+<h2>6. 참고 — 이 진단에 쓴 쿼리</h2>
+<pre><code>sqlite3 apps/company-map/data/company-map.db \
+  "select trade_date, round, side, kind, price, quantity, status
+     from infinite_buy_orders
+    where cycle_id='3010f15c-24de-4d3e-b1ee-2f5f22d11ca7'
+    order by trade_date desc;"
+</code></pre>
+
+</body>
+</html>
