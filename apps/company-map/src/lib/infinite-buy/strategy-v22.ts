@@ -40,7 +40,10 @@ export function computeDailyOrdersV22(s: CycleState): V22Plan {
   let nextRound = s.round;
   let resetAfter = false;
 
-  if (T > 0 && T < s.splits && s.holdingQty <= 0) {
+  // 리셋 판정만은 T가 아니라 round를 쓴다. T의 사이클 경계는 "round 0 주문의 거래일"인데
+  // 리셋 날에는 주문을 내지 않아 경계가 갱신되지 않는다 — T로 판정하면 직전 사이클 체결액이
+  // 남아 매번 이 분기에 걸려 first_market이 영영 나가지 않는다(리셋 무한 루프).
+  if (s.round >= 1 && T < s.splits && s.holdingQty <= 0) {
     // 사이클 중간 전량 매도(익절 체결 등)로 보유 0 → 리셋해 다음 세션에 1회차부터 재시작.
     resetAfter = true;
   } else if (T < s.splits) {

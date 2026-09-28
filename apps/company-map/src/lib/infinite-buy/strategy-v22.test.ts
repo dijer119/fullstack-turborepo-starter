@@ -153,3 +153,27 @@ describe("computeDailyOrdersV22 — 체결 기반 T", () => {
     expect(buys).toEqual(["loc_var"]); // 후반전 = 전액 1건
   });
 });
+
+// 리셋 직후 회귀: 사이클 경계(round 0 주문의 tradeDate)는 주문이 생겨야 갱신되는데
+// 리셋 날에는 주문을 내지 않는다. 그래서 round 0 상태에서도 boughtAmount에는
+// 직전 사이클 체결액이 남아 있다 — 이때 T로 리셋을 판정하면 영원히 리셋만 반복한다.
+describe("computeDailyOrdersV22 — 리셋 직후 재시작", () => {
+  const afterReset = {
+    round: 0, splits: 40, principalUsd: 8000,
+    profitTarget: 10, bigBuyPremium: 12, lossCut: 10,
+    avgPrice: null, currentPrice: 78.92, holdingQty: 0, pnlPct: null,
+    boughtAmount: 3153.44, // 직전 사이클 잔재
+  };
+
+  it("직전 사이클 체결액이 남아 있어도 first_market으로 재시작한다", () => {
+    const plan = computeDailyOrdersV22(afterReset);
+    expect(plan.orders.map((o) => o.kind)).toEqual(["first_market"]);
+    expect(plan.resetAfter).toBe(false);
+  });
+
+  it("사이클 중간(round>=1)에 보유가 0이 되면 리셋한다", () => {
+    const plan = computeDailyOrdersV22({ ...afterReset, round: 12, boughtAmount: 2400 });
+    expect(plan.orders).toHaveLength(0);
+    expect(plan.resetAfter).toBe(true);
+  });
+});
