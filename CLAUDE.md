@@ -488,3 +488,4 @@ nps build             # 재빌드
 - [docs/NETWORK_SETUP.md](docs/NETWORK_SETUP.md) - 디바이스 간 네트워크 액세스
 - [docs/MADDINGSTOCK_COMPLETE.md](docs/MADDINGSTOCK_COMPLETE.md) - 텔레그램 메시지 파싱 로직
 - [docs/MESSAGE_PARSING_GUIDE.md](docs/MESSAGE_PARSING_GUIDE.md) - 메시지 파싱 가이드
+- [docs/solutions/](docs/solutions/) - 과거에 해결한 문제의 기록(버그·운용 함정·패턴). 분류별 디렉토리 + YAML frontmatter(`module`, `tags`, `problem_type`). 문서화된 영역을 구현·디버깅할 때 참고
