@@ -23,6 +23,7 @@ import {
   Repeat,
   Scale,
   CalendarClock,
+  BadgePercent,
 } from "lucide-react";
 
 type Service = {
@@ -44,6 +45,14 @@ const SERVICES: Service[] = [
     description: "산업·기업 N:M 매핑 시각화",
     href: "http://localhost:3004/map",
     icon: MapIcon,
+    enabled: true,
+  },
+  {
+    key: "covered-call",
+    name: "커버드콜 ETF",
+    description: "국내 상장 커버드콜 ETF 배당·수익률 조회",
+    href: "http://localhost:3004/stocks/covered-call",
+    icon: BadgePercent,
     enabled: true,
   },
   {

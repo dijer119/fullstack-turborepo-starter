@@ -22,6 +22,18 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").slice(0, 200);
 }
 
+// 서버 값이 바뀌면(revalidate·AutoRefresh) 그쪽을 따르고, 그 사이에는 로컬 토글 값을 유지한다.
+// 무한 스크롤로 붙인 2페이지 이후 카드는 서버 재렌더의 영향을 받지 않으므로 로컬 상태가 필요하다.
+function useSyncedState<T>(serverValue: T) {
+  const [value, setValue] = useState(serverValue);
+  const [prevServerValue, setPrevServerValue] = useState(serverValue);
+  if (serverValue !== prevServerValue) {
+    setPrevServerValue(serverValue);
+    setValue(serverValue);
+  }
+  return [value, setValue] as const;
+}
+
 export function PostCard({
   post,
   tags,
@@ -29,24 +41,29 @@ export function PostCard({
   post: PostWithFeed;
   tags: string[];
 }) {
+  const [isRead, setIsRead] = useSyncedState(post.is_read);
+  const [isFavorite, setIsFavorite] = useSyncedState(post.is_favorite);
   const [modalOpen, setModalOpen] = useState(false);
   const [detail, setDetail] = useState<PostDetailResult | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
 
+  async function markRead() {
+    if (isRead) return;
+    setIsRead(true);
+    const { error } = await toggleRead(post.id, false);
+    if (error) setIsRead(false);
+  }
+
   async function handleClick() {
-    if (!post.is_read) {
-      await toggleRead(post.id, false);
-    }
+    await markRead();
   }
 
   async function handleOpenDetail(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     setModalOpen(true);
-    if (!post.is_read) {
-      void toggleRead(post.id, false);
-    }
+    void markRead();
     // 이미 받아둔 본문이 있으면 재요청하지 않음
     if (detail || detailLoading) return;
     setDetailLoading(true);
@@ -65,19 +82,23 @@ export function PostCard({
   async function handleFavorite(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    await toggleFavorite(post.id, post.is_favorite);
+    setIsFavorite(!isFavorite);
+    const { error } = await toggleFavorite(post.id, isFavorite);
+    if (error) setIsFavorite(isFavorite);
   }
 
   async function handleRead(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    await toggleRead(post.id, post.is_read);
+    setIsRead(!isRead);
+    const { error } = await toggleRead(post.id, isRead);
+    if (error) setIsRead(isRead);
   }
 
   return (
     <article
       className={`border border-gray-200 dark:border-gray-800 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors ${
-        post.is_read ? "opacity-60" : ""
+        isRead ? "opacity-60" : ""
       }`}
     >
       <a
@@ -136,16 +157,16 @@ export function PostCard({
         <button
           onClick={handleFavorite}
           className="text-lg hover:scale-110 transition-transform"
-          title={post.is_favorite ? "Remove from favorites" : "Add to favorites"}
+          title={isFavorite ? "Remove from favorites" : "Add to favorites"}
         >
-          {post.is_favorite ? "★" : "☆"}
+          {isFavorite ? "★" : "☆"}
         </button>
         <button
           onClick={handleRead}
           className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          title={post.is_read ? "Mark as unread" : "Mark as read"}
+          title={isRead ? "Mark as unread" : "Mark as read"}
         >
-          {post.is_read ? "Unread" : "Read"}
+          {isRead ? "Unread" : "Read"}
         </button>
       </div>
 

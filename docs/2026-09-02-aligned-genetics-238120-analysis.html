@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>얼라인드제네틱스(238120) 분석 — 2차 (DART 원본 재검증)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2.2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; font-size: 0.9em; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; font-size: 0.92em; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.35rem 0.55rem; }
+  .wrap { overflow-x: auto; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .bad { color: #c53030; font-weight: 600; }
+  .good { color: #2f855a; font-weight: 600; }
+  .neu { color: #b7791f; font-weight: 600; }
+  .r { text-align: right; }
+  .box { border: 1px solid #cbd5e0; border-radius: 6px; padding: 0.9rem 1.1rem; margin: 1rem 0; background: #f8fafc; }
+  .kill { border-left: 4px solid #c53030; background: #fff5f5; padding: 0.7rem 1rem; margin: 1rem 0; }
+  .fix { border-left: 4px solid #3182ce; background: #ebf8ff; padding: 0.7rem 1rem; margin: 1rem 0; }
+  .src { font-size: 0.85em; color: #4a5568; }
+</style>
+</head>
+<body>
+
+<h1>얼라인드제네틱스(238120) 분석 — 2차</h1>
+<p class="src">기준일 2026-09-02 · 주가 2,965원(2026-09-01 종가) · 발행주식 14,218,274주(2026-06-15 소각 후) · 시총 421.6억원<br>
+검증 원본: DART OpenAPI — 사업보고서 2025.12 · 반기보고서 2025.06/2026.06 · 분기보고서 2024~2025 · 주요사항보고서(유형자산양수·자기주식처분) · 주식소각결정 · 대량보유상황보고서(2025-04-04) · 손익구조변동(2024-01-24) / 네이버 금융 일별·월별 시세</p>
+
+<div class="box">
+<strong>한 줄 결론.</strong> 블로그의 숫자는 대체로 맞다. 프레임이 틀렸다. 이 회사는 "다각화로 성장하는 바이오 장비주"가 아니라
+<strong>① 장비 매출이 3년 연속 줄고 소모품 성장도 둔화된 정체 사업 + ② 시총의 절반이 부동산, 5분의 1이 비상장 벤처 지분인 자산 보유 회사 + ③ 인허가 신청 전 단계의 분자진단 옵션</strong>이다.
+정상화 이익 기준 PER은 약 17~22배로 <strong>이익 관점에선 싸지 않다.</strong> 현재가를 지탱하는 것은 PBR 1.08배라는 자산가치이며, 상승은 오직 genescale 마일스톤에 달려 있다.
+</div>
+
+<div class="fix">
+<strong>1차 분석 대비 수정 4건</strong> — 추가 원본을 확인해 다음을 고친다.<br>
+① 정상화 EPS <s>88원</s> → <strong>약 137~171원</strong>. 1차는 상반기×2로 연환산했는데 이 회사는 <strong>영업이익의 45~56%가 4분기</strong>에 나오는 계절성이 있어 절반 가까이 과소평가했다. 최근 4개 분기(TTM) 기준으로 다시 계산했다.<br>
+② 최대주주 지분 <s>19.12%</s> → <strong>특별관계자 포함 39.78%</strong>. 대량보유상황보고서 기준. 스트라타컨설팅(10.01%)은 기타특수관계자로 공시돼 있다.<br>
+③ 순금융자산 <s>85.55억</s> → <strong>순현금 11.9억 + 비상장 벤처 지분 73.66억</strong>. 당기손익-공정가치측정금융자산 73.66억은 전액 공정가치 서열 <strong>수준 3</strong>(투자조합·PEF·비상장주식)이라 현금 등가물로 볼 수 없다.<br>
+④ 법인세 '수익'의 성격: 1차는 전부 일회성으로 봤으나, 이 중 <strong>R&D 세액공제(연 5.7~6.6억)는 R&D를 지속하는 한 반복</strong>된다. 일회성인 것은 이연법인세자산 추가 인식분이다.
+</div>
+
+<h2>1. 블로그 수치 검증</h2>
+
+<div class="wrap"><table>
+<tr><th>항목</th><th>블로그</th><th>DART 원본</th><th>판정</th></tr>
+<tr><td>2025 매출 / 영업이익 / 순이익</td><td>160억 / 24억 / 29억</td><td>160.16 / 24.43 / 29.11억</td><td class="good">일치</td></tr>
+<tr><td>수출 비중</td><td>88.8% (142억)</td><td>142.14억 / 160.16억 = 88.8%</td><td class="good">일치</td></tr>
+<tr><td>장비 / 소모품 비중 (2025)</td><td>55.16% / 43.93%</td><td>88.19억 55.16% / 70.24억 43.93%</td><td class="good">일치</td></tr>
+<tr><td>장비 / 소모품 (2026 상반기)</td><td>41.3억 51.62% / 37.9억 47.46%</td><td>41.25억 / 37.93억</td><td class="good">일치</td></tr>
+<tr><td>분기 실적 5개 (2Q25~2Q26)</td><td>39/3/−1 … 44/6/17</td><td>39.23/2.60/−1.17 … 43.51/6.44/17.50</td><td class="good">일치</td></tr>
+<tr><td>부채비율</td><td>55.52%</td><td>206.33 ÷ 371.61 = 55.5%</td><td class="good">일치</td></tr>
+<tr><td>PER 19.11 / PBR 1.46 / EV·EBITDA 14.13</td><td>"2025년 기준"</td><td>2025-12-31 종가 <strong>3,870원</strong> 기준값 (3,870 ÷ EPS 202원 = 19.1)</td><td class="bad">본문 주가 2,965원과 불일치</td></tr>
+<tr><td>사명 변경</td><td>"구 로고스바이오시스템스"</td><td>2020-08-20 변경 — 최근 사건 아님</td><td class="neu">맥락 보정</td></tr>
+<tr><td>GeneScale 표기</td><td>GeneScale®</td><td>공시 표기는 소문자 <code>genescale™</code></td><td class="neu">실체는 존재</td></tr>
+</table></div>
+
+<p>현재가 2,965원으로 다시 계산하면 <strong>PER(2025) 14.5배 · PBR(2026.06) 1.08배 · BPS 2,757원</strong>이다. 블로그보다 23% 낮은 배수라 이 정정은 주가에 유리한 방향이지만, 한 문서 안에서 주가 시점을 섞어 쓴 것은 원본 확인 없이 조립됐다는 신호다.</p>
+
+<h2>2. 10분기 시계열 — 4분기 편중 계절성</h2>
+
+<p>블로그는 5개 분기만 보였다. 10개 분기를 펼치면 <strong>4분기에 이익이 몰리는 구조</strong>가 보이고, 이것이 반기 실적을 ×2로 연환산하면 안 되는 이유다.</p>
+
+<div class="wrap"><table>
+<tr><th>연결, 억원</th><th class="r">1Q24</th><th class="r">2Q24</th><th class="r">3Q24</th><th class="r">4Q24</th><th class="r">1Q25</th><th class="r">2Q25</th><th class="r">3Q25</th><th class="r">4Q25</th><th class="r">1Q26</th><th class="r">2Q26</th></tr>
+<tr><td>매출</td><td class="r">31.9</td><td class="r">32.6</td><td class="r">37.1</td><td class="r"><strong>56.1</strong></td><td class="r">39.2</td><td class="r">39.2</td><td class="r">38.9</td><td class="r"><strong>42.8</strong></td><td class="r">36.4</td><td class="r">43.5</td></tr>
+<tr><td>영업이익</td><td class="r">2.0</td><td class="r">2.6</td><td class="r">7.6</td><td class="r"><strong>15.6</strong></td><td class="r">5.3</td><td class="r">2.6</td><td class="r">5.5</td><td class="r"><strong>11.1</strong></td><td class="r">2.3</td><td class="r">6.4</td></tr>
+<tr><td>영업이익률</td><td class="r">6.3%</td><td class="r">7.9%</td><td class="r">20.5%</td><td class="r">27.8%</td><td class="r">13.5%</td><td class="r">6.6%</td><td class="r">14.0%</td><td class="r">25.9%</td><td class="r">6.3%</td><td class="r">14.8%</td></tr>
+<tr><td>매출총이익률</td><td class="r">71.2%</td><td class="r">71.9%</td><td class="r">74.5%</td><td class="r">67.2%</td><td class="r">65.2%</td><td class="r">69.3%</td><td class="r">75.2%</td><td class="r">70.7%</td><td class="r">73.8%</td><td class="r">74.5%</td></tr>
+<tr><td>법인세 (음수=수익)</td><td class="r">1.4</td><td class="r">1.8</td><td class="r">0.7</td><td class="r">0.2</td><td class="r">1.7</td><td class="r bad">−1.9</td><td class="r">0.7</td><td class="r bad">−3.0</td><td class="r bad">−1.2</td><td class="r bad">−4.4</td></tr>
+<tr><td>순이익</td><td class="r">6.3</td><td class="r">6.2</td><td class="r">5.1</td><td class="r">23.7</td><td class="r">5.5</td><td class="r">−1.2</td><td class="r">9.3</td><td class="r">15.4</td><td class="r">4.2</td><td class="r">17.5</td></tr>
+</table></div>
+
+<ul>
+<li>4분기 영업이익 비중: 2024년 <strong>56%</strong>(15.6/27.8), 2025년 <strong>45%</strong>(11.1/24.4). 연말 연구예산 집행 시즌 효과로 보인다.</li>
+<li>상반기끼리 비교하면 영업이익 7.9억(1H25) → 8.7억(1H26), <strong>+10%</strong>. 순이익 +396%와 격차가 크다 — 이 격차의 정체가 4장이다.</li>
+<li>최근 4개 분기(3Q25~2Q26) 합산: <strong>매출 161.6억 · 영업이익 25.3억 · OPM 15.6%</strong>. 이것이 정상화 계산의 출발점이다.</li>
+<li>법인세가 <strong>최근 4개 분기 중 3개 분기에서 '수익'</strong>이다. 이 항목이 순이익을 밀어올리는 구조가 1년 가까이 이어지고 있다.</li>
+</ul>
+
+<h2>3. 본업 해부 — 장비는 줄고 소모품 성장은 둔화</h2>
+
+<p>블로그는 "소모품 비중 상승 = 다각화 성공"으로 읽었다. 비중이 오른 이유의 절반은 <strong>분모(장비)가 줄어서</strong>다.</p>
+
+<div class="wrap"><table>
+<tr><th>억원</th><th class="r">2023</th><th class="r">2024</th><th class="r">2025</th><th class="r">1H25</th><th class="r">1H26</th><th class="r">1H YoY</th></tr>
+<tr><td>장비 (LUNA·X-CLARITY·CELENA)</td><td class="r">94.38</td><td class="r">89.40</td><td class="r">88.19</td><td class="r">42.45</td><td class="r">41.25</td><td class="r bad">−2.8%</td></tr>
+<tr><td>장비 YoY</td><td class="r">—</td><td class="r bad">−5.3%</td><td class="r bad">−1.4%</td><td></td><td></td><td></td></tr>
+<tr><td>소모품 외</td><td class="r">51.49</td><td class="r">67.43</td><td class="r">70.24</td><td class="r">34.96</td><td class="r">37.93</td><td class="r good">+8.5%</td></tr>
+<tr><td>소모품 YoY</td><td class="r">—</td><td class="r good">+31.0%</td><td class="r neu">+4.2%</td><td></td><td></td><td></td></tr>
+<tr><td>개발용역·임대 등</td><td class="r">6.27</td><td class="r">0.95</td><td class="r">1.45</td><td class="r">1.05</td><td class="r">0.74</td><td></td></tr>
+<tr><td><strong>합계</strong></td><td class="r">152.15</td><td class="r">157.78</td><td class="r">160.16</td><td class="r">78.46</td><td class="r">79.93</td><td class="r">+1.9%</td></tr>
+</table></div>
+
+<ul>
+<li><strong>장비 매출 3년 연속 감소</strong>(94.4 → 88.2억, −6.6%). 신규 설치 기반이 늘지 않고 있다는 뜻이다.</li>
+<li>소모품은 2024년 +31%로 뛴 뒤 <strong>2025년 +4.2%로 급감속</strong>, 2026 상반기 +8.5%로 소폭 회복. Razor &amp; Blades 모델은 면도기(장비) 보급이 멈추면 면도날(소모품) 성장도 결국 설치 기반의 갱신 수요에 수렴한다.</li>
+<li>3개년 매출 CAGR <strong>2.6%</strong>. 영업이익은 33.4 → 27.8 → 24.4억으로 <strong>−27%</strong>, OPM 21.9% → 15.3%. 2023년이 이익 정점이었다.</li>
+<li>2026 상반기 매출총이익률 74.2%(전년 67.2%)로 <strong>+7.0%p</strong> 개선됐지만 판관비가 44.7 → 50.1억(+11.9%)으로 늘어 영업이익 개선은 +0.8억에 그쳤다. 판관비 증가의 주범은 R&D(5장 참조)다.</li>
+</ul>
+
+<h3>해외 판매법인 — 미국 정체, 프랑스 급성장, 일본 적자 램프</h3>
+
+<div class="wrap"><table>
+<tr><th>종속기업 매출·순손익 (억원)</th><th class="r">2024</th><th class="r">2025</th><th class="r">1H25</th><th class="r">1H26</th><th class="r">1H YoY</th></tr>
+<tr><td>Logos Biosystems Inc. (미국)</td><td class="r">58.47 / +3.29</td><td class="r">52.48 / +0.78</td><td class="r">26.13 / −0.60</td><td class="r">26.45 / +2.80</td><td class="r neu">+1.2%</td></tr>
+<tr><td>Logos Biosystems SARL (프랑스)</td><td class="r">25.78 / −0.16</td><td class="r">30.48 / +0.06</td><td class="r">14.82 / +0.11</td><td class="r">19.77 / +1.72</td><td class="r good">+33.4%</td></tr>
+<tr><td>Logos Biosystems Japan (2025 신설)</td><td class="r">—</td><td class="r">0.99 / −2.70</td><td class="r">0 / −1.18</td><td class="r">3.30 / −1.13</td><td class="r">신규</td></tr>
+</table></div>
+
+<p>미국 법인 매출은 2024 → 2025 <strong>−10.2%</strong>였고 2026 상반기에도 제자리다. 블로그가 리스크로 짚은 "NIH 예산·R&D 축소"는 이미 미국 숫자에 반영돼 있다. 성장은 유럽이 끌고 있다.</p>
+
+<h2>4. 이익의 질 — 순이익은 4년 중 2년이 환율로 부풀려졌다</h2>
+
+<p>영업이익과 세전이익의 차이(비영업손익)를 연도별로 주석에서 분해했다.</p>
+
+<div class="wrap"><table>
+<tr><th>억원</th><th class="r">2023</th><th class="r">2024</th><th class="r">2025</th><th class="r">1H26</th></tr>
+<tr><td>영업이익 (A)</td><td class="r">33.37</td><td class="r">27.80</td><td class="r">24.43</td><td class="r">8.74</td></tr>
+<tr><td>순외환손익 (차익·환산 합산)</td><td class="r">n/a</td><td class="r bad">+14.56</td><td class="r">+0.92</td><td class="r bad">+6.29</td></tr>
+<tr><td>순금융자산 평가·처분손익 (벤처 포트폴리오)</td><td class="r">n/a</td><td class="r">−0.07</td><td class="r">−1.78</td><td class="r">+0.06</td></tr>
+<tr><td>순이자손익</td><td class="r">n/a</td><td class="r">+2.37</td><td class="r">+2.25</td><td class="r neu">−0.74</td></tr>
+<tr><td>기타</td><td class="r">n/a</td><td class="r">+0.78</td><td class="r">+0.69</td><td class="r">+1.76</td></tr>
+<tr><td>비영업손익 합계 (B)</td><td class="r">+0.87</td><td class="r">+17.62</td><td class="r">+2.07</td><td class="r">+7.37</td></tr>
+<tr><td>세전이익 (A+B)</td><td class="r">34.24</td><td class="r">45.42</td><td class="r">26.50</td><td class="r">16.11</td></tr>
+<tr><td>법인세 (음수=수익)</td><td class="r">1.88</td><td class="r">4.14</td><td class="r bad">−2.62</td><td class="r bad">−5.57</td></tr>
+<tr><td><strong>당기순이익</strong></td><td class="r"><strong>32.36</strong></td><td class="r"><strong>41.28</strong></td><td class="r"><strong>29.11</strong></td><td class="r"><strong>21.67</strong></td></tr>
+<tr><td>영업활동현금흐름</td><td class="r">n/a</td><td class="r">30.65</td><td class="r">36.05</td><td class="r bad">4.53</td></tr>
+</table></div>
+
+<ul>
+<li><strong>2024년</strong> 순이익 41.3억(사상 최대)은 원화 약세로 <strong>순외환이익 14.6억</strong>이 들어간 결과다. 영업이익은 오히려 전년보다 줄었다.</li>
+<li><strong>2025년</strong>은 환율이 중립이라 깨끗하다. 순이익 29.1억이 이 회사의 '맨얼굴'에 가깝다.</li>
+<li><strong>2026 상반기</strong>는 다시 환율이다. 순이익 증가분 17.3억 중 <strong>외환 스윙이 11.7억(67%)</strong>, 법인세 수익 확대가 5.3억(31%), 영업이익 개선은 0.8억(5%). 특히 외화환산이익 4.92억은 <strong>미실현·비현금</strong>이다.</li>
+<li>순이자가 2026년부터 <strong>마이너스로 전환</strong>했다 — 120억 신규 차입(6장) 때문이다. 연 1.5억 내외가 고정 유출된다.</li>
+</ul>
+
+<div class="kill">
+<strong>결정타 — 현금흐름.</strong> 2026 상반기 영업활동현금흐름 <strong>4.53억</strong> vs 순이익 <strong>21.67억</strong>. 순이익의 79%가 현금을 동반하지 않았다. 2024·2025년은 영업CF가 순이익과 비슷하거나 컸다. 상반기의 괴리는 위 분해(미실현 환산이익 + 이연법인세)와 정확히 맞는다.
+</div>
+
+<h3>법인세 '수익'의 두 얼굴</h3>
+
+<p>2025년 법인세 주석: 적용세율 법인세 4.62억 − <strong>세액공제 5.67억</strong> − 세율변동 0.66억 − 기타 1.06억 = <strong>−2.62억</strong>. 2024년에도 세액공제 6.63억이 있었다(유효세율 9.1%).</p>
+
+<div class="wrap"><table>
+<tr><th>구성요소</th><th>성격</th><th>정상화 처리</th></tr>
+<tr><td>R&D 세액공제 (연 5.7~6.6억)</td><td class="good">R&D 지출을 유지하는 한 반복</td><td>정상화 이익에 <strong>포함</strong> — 단, R&D 축소 시 사라짐</td></tr>
+<tr><td>이연법인세자산 추가 인식 (2025 3.47억, 1H26 약 6.8억)</td><td class="bad">미래 과세소득 전망에 기반한 비현금 이익</td><td>정상화 이익에서 <strong>제외</strong></td></tr>
+</table></div>
+
+<p>이연법인세자산은 18.42억(2024말) → 21.94억 → <strong>28.73억(2026.06)</strong>으로 쌓이고 있다. 자본총계의 7.3%다. 인식 여력이 소진되거나 과세소득 전망이 꺾이면 법인세가 비용으로 돌아서면서 순이익이 계단식으로 떨어진다. 그 시점에 "어닝 쇼크"로 보일 것이다.</p>
+
+<h2>5. 재고 급증 — GPM 개선 서사의 뒷면</h2>
+
+<p>블로그가 전혀 다루지 않은 항목이다.</p>
+
+<div class="wrap"><table>
+<tr><th>억원</th><th class="r">2024말</th><th class="r">2025말</th><th class="r">2026.06</th></tr>
+<tr><td>제품(완제품) 재고</td><td class="r">25.29</td><td class="r bad">39.68 (+57%)</td><td class="r">n/a</td></tr>
+<tr><td>원재료</td><td class="r">14.08</td><td class="r">13.44</td><td class="r">n/a</td></tr>
+<tr><td>미착품</td><td class="r">5.13</td><td class="r">—</td><td class="r">n/a</td></tr>
+<tr><td>평가충당금</td><td class="r">−2.52</td><td class="r">−3.28</td><td class="r">n/a</td></tr>
+<tr><td><strong>재고자산 합계</strong></td><td class="r">41.98</td><td class="r">49.84</td><td class="r bad">54.47</td></tr>
+<tr><td>매출원가 (연간 / TTM)</td><td class="r">46.22</td><td class="r">47.89</td><td class="r">42.80</td></tr>
+<tr><td><strong>재고회전일수</strong></td><td class="r">331일</td><td class="r">380일</td><td class="r bad">465일</td></tr>
+</table></div>
+
+<p>매출이 +1.5% 늘 때 완제품 재고가 +57% 늘었고, 재고는 1년 3개월치 매출원가에 해당한다. 동시에 2026 상반기 매출총이익률이 +7.0%p 뛰었다. 두 사실을 같이 놓으면 한 가지 가설이 성립한다: <strong>생산량이 판매량을 초과하면 고정 제조원가가 재고에 자본화되어 당기 매출원가가 낮아진다.</strong> 소모품 믹스 개선이 실제 원인일 수도 있으므로 단정하지 않는다 — 다만 3Q26 재고와 GPM이 같은 방향으로 계속 가면 이 가설의 가중치가 올라간다. 2025년 재고평가손실은 0.72억으로 미미했다.</p>
+
+<h3>R&D — 매출의 3분의 1, 절반은 보조금</h3>
+
+<div class="wrap"><table>
+<tr><th></th><th class="r">2024</th><th class="r">2025</th><th class="r">1H26</th></tr>
+<tr><td>연구개발비 총계</td><td class="r">25.76억</td><td class="r">31.20억</td><td class="r">26.06억</td></tr>
+<tr><td>정부보조금</td><td class="r">2.84억 (11%)</td><td class="r">11.02억 (35%)</td><td class="r bad">12.43억 (48%)</td></tr>
+<tr><td>자체 부담</td><td class="r">22.92억</td><td class="r">20.17억</td><td class="r">13.63억</td></tr>
+<tr><td>총계 ÷ 매출</td><td class="r">14.5%</td><td class="r">19.5%</td><td class="r bad">32.6%</td></tr>
+</table></div>
+
+<p>반기 R&D가 이미 2024년 연간 수준이다. 보조금 의존도가 48%까지 올라 국책과제("고령층 노화 염증성질환 분석용 핵심 제품화" 2024-11 선정, "고형암·혈액암 단일세포 분석" 2024-12 선정) 종료 시 자체 부담이 곧바로 판관비로 전이된다. 직원 66명(2025말) 규모에서 매출의 33%를 R&D에 쓰는 것은 상장 장비회사가 아니라 <strong>개발 단계 바이오텍의 비용 구조</strong>다.</p>
+
+<h2>6. 자산의 실체 — "자산주"의 구성을 뜯어보면</h2>
+
+<p>1차에서 "순금융자산 85.55억"이라 했던 것을 정정한다. 구성이 다르다.</p>
+
+<div class="wrap"><table>
+<tr><th>2026.06 연결</th><th class="r">억원</th><th class="r">시총 대비</th><th>성격</th></tr>
+<tr><td>현금및현금성자산 (외화예금 다수)</td><td class="r">114.38</td><td class="r">27%</td><td class="good">유동</td></tr>
+<tr><td>기타유동금융자산 (단기금융상품)</td><td class="r">40.61</td><td class="r">10%</td><td class="good">유동</td></tr>
+<tr><td>(−) 차입금 (장기 117.90 + 유동 25.20)</td><td class="r">−143.10</td><td class="r">−34%</td><td></td></tr>
+<tr><td><strong>순현금</strong></td><td class="r"><strong>11.89</strong></td><td class="r"><strong>3%</strong></td><td>사실상 0</td></tr>
+<tr><td>당기손익-공정가치측정금융자산</td><td class="r">73.66</td><td class="r">17%</td><td class="bad">전액 수준 3 — 비상장 벤처·PEF</td></tr>
+<tr><td>유형자산 (군포 사옥 140억 · 하남 GMP 등)</td><td class="r">196.58</td><td class="r">47%</td><td class="neu">영업용</td></tr>
+<tr><td>투자부동산 (사옥 임대분)</td><td class="r">41.40</td><td class="r">10%</td><td class="good">비영업, 2025 실거래가 기반</td></tr>
+<tr><td>재고자산</td><td class="r">54.47</td><td class="r">13%</td><td class="neu">회전 465일</td></tr>
+<tr><td>자본총계 (BPS 2,757원)</td><td class="r">392.04</td><td class="r">93%</td><td></td></tr>
+</table></div>
+
+<h3>벤처 포트폴리오 73.66억의 내역 (2025말 78.80억 기준)</h3>
+
+<div class="wrap"><table>
+<tr><th>피투자</th><th class="r">2024말</th><th class="r">2025말</th><th class="r">변동</th><th>평가기법</th></tr>
+<tr><td>파트너스3호 글로벌 헬스케어 PEF</td><td class="r">24.53</td><td class="r">23.37</td><td class="r">−5%</td><td>순자산가치법</td></tr>
+<tr><td>BSK 8호 창업초기 투자조합</td><td class="r">14.03</td><td class="r">19.75</td><td class="r good">+41%</td><td>순자산가치법</td></tr>
+<tr><td>Generate Biomedicines (미국)</td><td class="r">11.25</td><td class="r">12.95</td><td class="r">+15%</td><td>이항모형</td></tr>
+<tr><td>(주)메테오바이오텍</td><td class="r">14.56</td><td class="r">11.38</td><td class="r">−22%</td><td>유사기업비교</td></tr>
+<tr><td>(주)뉴라클제네틱스</td><td class="r">5.07</td><td class="r">5.83</td><td class="r">+15%</td><td>이항모형</td></tr>
+<tr><td>(주)큐렉스 RCPS (관계기업)</td><td class="r">2.37</td><td class="r">2.88</td><td class="r">+21%</td><td>이항모형</td></tr>
+<tr><td>Ring Therapeutics (미국)</td><td class="r">7.00</td><td class="r">2.33</td><td class="r bad">−67%</td><td>이항모형</td></tr>
+<tr><td>(주)앰틱스바이오</td><td class="r">1.78</td><td class="r">0.31</td><td class="r bad">−83%</td><td>유사기업비교</td></tr>
+<tr><td><strong>합계</strong></td><td class="r">80.58</td><td class="r">78.80</td><td class="r">−2%</td><td></td></tr>
+</table></div>
+
+<p>이것은 현금이 아니라 <strong>소형 바이오 VC 북</strong>이다. 매년 ±10억의 평가손익을 만들고(2024 평가손실 12.1억 vs 평가이익 7.7억), 회수 시점을 회사가 통제할 수 없으며, 평가는 모델 가정(변동성·PBR 배수·비유동성 할인 0~30%)에 의존한다. 자산가치로 셀 때는 <strong>30% 이상 할인</strong>이 정직하다.</p>
+
+<h3>2025년 사옥 140억 + 차입 120억</h3>
+
+<div class="wrap"><table>
+<tr><th colspan="2">주요사항보고서(유형자산 양수 결정) 2025-09-12</th></tr>
+<tr><td>자산</td><td>경기도 군포시 당정동 453·453-6 토지·건물 (본사 이전 2026-03-31 완료)</td></tr>
+<tr><td>금액</td><td><strong>140억원</strong> — 2024말 자산총액의 31.6%</td></tr>
+<tr><td>상대방</td><td>(주)넥스트스퀘어 — <strong>특수관계 없음</strong>, 외부평가(이음회계법인) "적정"</td></tr>
+<tr><td>조달</td><td>장기차입 120억 (현금흐름표 확인). 이자비용 반기 0.12 → 1.76억</td></tr>
+</table></div>
+
+<p>직원 66명 회사가 140억 사옥을 샀다. 절차는 깨끗하다(비특수관계·외부평가). 그러나 <strong>순현금 133억 회사를 순현금 12억 회사로 바꿨고</strong>, 감가상각과 이자로 매년 영업이익·순이익을 눌러 놓았다. 일부를 임대(투자부동산 41.4억, 임대수익 반기 0.61억)해 수익화하고 있으나 수익률은 연 3% 수준이다.</p>
+
+<h2>7. 자사주 — "소각"의 실질은 622주</h2>
+
+<div class="wrap"><table>
+<tr><th>2026-05-29 이사회 동시 결의</th><th class="r">수량</th><th>내용</th></tr>
+<tr><td>주식소각</td><td class="r">160,622주</td><td>2026-06-15 완료. 발행주식 14,378,896 → 14,218,274</td></tr>
+<tr><td>자기주식 처분 (RSA)</td><td class="r">160,000주</td><td>임직원 11명 제한조건부주식. 기준가 3,725원</td></tr>
+<tr><td><strong>순감소</strong></td><td class="r"><strong>622주</strong></td><td>0.004%. 자사주 잔여 0</td></tr>
+</table></div>
+
+<p>2025년 1~7월 신탁으로 취득한 320,622주의 <strong>평균단가는 3,111원</strong>(소각예정금액 4.997억 ÷ 160,622주)이다. 사업보고서는 이미 "160,000주는 임직원 보상, 160,622주는 소각"이라고 예고했으므로 기만은 아니다. 다만 "자사주 소각 = 주주환원"으로 읽으면 틀리고, <strong>회사는 지금까지 배당을 한 번도 하지 않았다</strong>(2023년 말에야 결손 해소로 배당가능이익 발생). 주주환원 실적은 사실상 없다.</p>
+
+<h2>8. genescale — 6년째 개발 중, 인허가 시계는 0</h2>
+
+<p>공시상 실체는 있다. 상표 등록(한·미·영·일, 2020~2024), 카트리지 조립라인(2022, 20.3억), 양산 금형(2024-12, 5.2억), GMP 전기안전성 시험장비(2025-11). 2025년 사업보고서 "사업추진현황"의 실제 문장:</p>
+
+<blockquote>
+"…사업화에 <strong>성공할 경우</strong> 일회용 카트리지의 매출기여도가 절대적일 것으로 예상되며…"<br>
+"…우리나라 식약처, 유럽 CE-IVD, 미국 FDA 510(k)에서의 인증을 우선적으로 <strong>취득할 계획</strong>입니다."<br>
+"…하남 GMP 생산시설은 보고서 제출일 현재 <strong>시설공사 및 기계장치 설치 진행 중</strong>…"
+</blockquote>
+
+<div class="wrap"><table>
+<tr><th>확인 항목</th><th>상태</th></tr>
+<tr><td>인허가 신청 (식약처·CE·FDA)</td><td class="bad">미신청 — "계획" 단계</td></tr>
+<tr><td>"임상" 언급</td><td class="bad">사업보고서·반기보고서 0회</td></tr>
+<tr><td>출시 시점</td><td class="bad">미공시</td></tr>
+<tr><td>관련 매출</td><td class="bad">0원 (매출 구성에 진단 항목 없음)</td></tr>
+<tr><td>하남 GMP (2021-01 양수)</td><td class="neu">5년째 "설치 진행 중"</td></tr>
+</table></div>
+
+<p>블로그의 PEAK 시나리오(순이익 86억)는 매출 4.6배 또는 OPM 30%에 매출 2.3배를 요구한다. 첫 인허가 신청도 없는 상태에서 이 숫자에 경로를 부여할 수 없다. 옵션으로만 평가해야 한다.</p>
+
+<h2>9. 지배구조 — 1차 정정: 최대주주 측 지분은 39.78%</h2>
+
+<div class="wrap"><table>
+<tr><th>주주 (2025-12-31)</th><th class="r">지분율</th><th>비고</th></tr>
+<tr><td>정연철 (대표이사·최대주주)</td><td class="r">19.12%</td><td>2021·2024 재선임, 5년간 최대주주 불변</td></tr>
+<tr><td>(주)스트라타컨설팅</td><td class="r">10.01%</td><td class="neu">주석에 <strong>기타특수관계자</strong>로 공시</td></tr>
+<tr><td>조근창 (사내이사)</td><td class="r">7.57%</td><td>공동창업자</td></tr>
+<tr><td>기타 특별관계자</td><td class="r">3.08%</td><td></td></tr>
+<tr><td><strong>최대주주 + 특별관계자 합계</strong></td><td class="r"><strong>39.78%</strong></td><td>대량보유상황보고서 2025-04-04 (5,720,496주)</td></tr>
+<tr><td>(주)파트너스홀딩스</td><td class="r">11.21%</td><td>특별관계자 <strong>아님</strong>. 회사가 23.4억을 출자한 "파트너스3호 글로벌 헬스케어 PEF"와 명칭이 같으나 동일 계열인지는 공시로 확정 불가 — 확인 필요</td></tr>
+<tr><td>소액주주 2,527명</td><td class="r">36.97%</td><td>외국인 소진율 1~2%</td></tr>
+</table></div>
+
+<p>지배력은 안정적이다(39.78%). 소액주주 37%, 파트너스홀딩스 11%가 유동 물량이다. 거버넌스 세부: 등기이사 3명 보수 합계 6.71억(1인 2.24억)으로 과하지 않고, 주요경영진 대여금이 2024말 3.8억 → 2025말 1.22억으로 3억 회수됐다. 감사위원회 없이 비상근 감사 1명 체제.</p>
+
+<h2>10. 밸류에이션 재계산</h2>
+
+<h3>① 이익 기준 — 정상화 EPS</h3>
+
+<pre><code>TTM 영업이익 (3Q25~2Q26)                25.26억
+ − 순이자 (차입 120억 반영, 연환산)        −1.50억
+ = 정상화 세전이익                        23.76억
+
+ 법인세 시나리오 A: 20% − R&D 세액공제 5.5억  ≈ 0     → 순이익 23.8억 → EPS 167원
+ 법인세 시나리오 B: 20%, 세액공제 없음       −4.75억 → 순이익 19.0억 → EPS 134원
+
+ 현재가 2,965원 기준 PER:  A 17.8배  /  B 22.1배
+ PER 15배 적용 시 주가:    A 2,500원 /  B 2,010원</code></pre>
+
+<p>1차 보고서의 "EPS 88원"은 상반기×2 연환산 오류였다. 정정해도 결론의 방향은 같다 — <strong>이익만으로는 현재가가 정당화되지 않는다</strong>(정상화 PER 18~22배는 매출 정체·감익 기업에 후한 배수다).</p>
+
+<h3>② 자산 기준 — 부분합(SOTP)</h3>
+
+<div class="wrap"><table>
+<tr><th>구성</th><th class="r">보수</th><th class="r">낙관</th><th>근거</th></tr>
+<tr><td>본업 (TTM EBIT 25.3억 × 8~10배)</td><td class="r">202억</td><td class="r">253억</td><td>정체·감익 장비업 배수. 영업용 사옥·GMP 포함</td></tr>
+<tr><td>투자부동산 (임대분)</td><td class="r">41억</td><td class="r">41억</td><td>2025 실거래가 기반 장부가</td></tr>
+<tr><td>벤처 포트폴리오 73.66억 × 70%</td><td class="r">52억</td><td class="r">52억</td><td>수준 3 비유동성 할인</td></tr>
+<tr><td>순현금</td><td class="r">12억</td><td class="r">12억</td><td></td></tr>
+<tr><td><strong>합계</strong></td><td class="r"><strong>307억</strong></td><td class="r"><strong>358억</strong></td><td></td></tr>
+<tr><td><strong>주당</strong></td><td class="r"><strong>2,160원</strong></td><td class="r"><strong>2,520원</strong></td><td>÷ 14,218,274주</td></tr>
+<tr><td>현재 시총 421.6억과의 차이</td><td class="r">115억</td><td class="r">64억</td><td><strong>= 시장이 genescale 옵션에 매기고 있는 값</strong></td></tr>
+</table></div>
+
+<h3>③ 장부 기준 — 하방</h3>
+<p>BPS <strong>2,757원</strong>(PBR 1.08). 부동산 장부가가 최근 실거래가라 "수십 년 전 취득원가" 함정은 없다. 다만 자본 392억 중 벤처 지분 74억·이연법인세자산 29억·재고 54억은 <strong>청산 시 장부가를 받기 어려운 항목</strong>이라 실질 하방은 BPS보다 낮게 봐야 한다. 이 셋을 30% 할인하면 조정 BPS는 약 2,430원이다.</p>
+
+<div class="box">
+<strong>세 방법의 수렴.</strong> 이익 기준 2,000~2,500원 · SOTP 2,160~2,520원 · 조정 BPS 약 2,430원. 현재가 2,965원은 이 밴드의 <strong>15~40% 위</strong>에 있다.
+그 차이 64~115억이 시장이 genescale에 부여한 옵션 가치다. 블로그의 "+31% 상승 여력(BASE)"는 성립하지 않으며, <strong>현재가는 이미 옵션을 일부 반영한 가격</strong>이다. 자사주 취득단가 3,111원, RSA 기준가 3,725원, 2026-02 고점 6,050원(하루 382만주 거래, 유통주식의 26%)은 모두 위쪽에 있다 — 이 종목의 주가 이력은 실적이 아니라 <strong>기대의 점화와 소진</strong>으로 움직였다.
+</div>
+
+<h2>11. 유동성과 주가 이력</h2>
+
+<div class="wrap"><table>
+<tr><th>2026년 월별</th><th class="r">1월</th><th class="r">2월</th><th class="r">3월</th><th class="r">4월</th><th class="r">5월</th><th class="r">6월</th><th class="r">7월</th><th class="r">8월</th><th class="r">9월</th></tr>
+<tr><td>월말 종가</td><td class="r">3,905</td><td class="r"><strong>4,855</strong></td><td class="r">4,170</td><td class="r">4,315</td><td class="r">3,700</td><td class="r">3,400</td><td class="r">2,860</td><td class="r">3,040</td><td class="r">2,965</td></tr>
+<tr><td>월중 고가</td><td class="r">4,595</td><td class="r bad">6,050</td><td class="r">4,995</td><td class="r">4,600</td><td class="r">4,450</td><td class="r">3,705</td><td class="r">3,600</td><td class="r">3,310</td><td class="r">2,995</td></tr>
+<tr><td>일평균 거래대금 (백만)</td><td class="r">993</td><td class="r"><strong>2,640</strong></td><td class="r">468</td><td class="r">163</td><td class="r">171</td><td class="r">78</td><td class="r">60</td><td class="r">102</td><td class="r bad">40</td></tr>
+</table></div>
+
+<ul>
+<li>2026-02-25 장중·종가 6,050원, 거래량 382만주 — 그날 이후 <strong>−51%</strong>. 7월 저점 2,380원.</li>
+<li>현재 일평균 거래대금 <strong>약 4,000만원</strong>. 기관 진입 불가, 개인도 수천만원 단위에서 슬리피지. 목표가가 맞아도 그 가격에 청산하기 어렵다.</li>
+<li>2023년 100% 무상증자(자본금 35.9 → 71.9억)가 있었으므로 그 이전 주당 지표와의 비교는 주의.</li>
+</ul>
+
+<h2>12. 종합 판정</h2>
+
+<div class="wrap"><table>
+<tr><th>축</th><th>평가</th><th>근거</th></tr>
+<tr><td>본업 성장</td><td class="bad">부정</td><td>장비 3년 연속 감소, 소모품 +31% → +4% → +8.5%, 매출 CAGR 2.6%, OP −27%</td></tr>
+<tr><td>이익의 질</td><td class="bad">부정</td><td>4년 중 2년 환율 부풀림, 1H26 순이익 79% 현금 미동반, 법인세 3분기 연속 '수익'</td></tr>
+<tr><td>마진 구조</td><td class="neu">중립</td><td>GPM 74%는 우수하나 재고 465일과 동행 — 자본화 가설 미해소. R&D 33%가 판관비 압박</td></tr>
+<tr><td>재무 안정</td><td class="neu">중립</td><td>부채비율 55%로 양호하나 순현금 133억 → 12억, 순이자 유출 전환</td></tr>
+<tr><td>자산 방어력</td><td class="neu">중립</td><td>PBR 1.08이나 자본의 40%가 벤처·DTA·재고. 조정 BPS ≈ 2,430원</td></tr>
+<tr><td>신사업</td><td class="neu">중립</td><td>설비 투자 실재, 인허가 미신청, 6년째 개발, 시장은 이미 64~115억 반영</td></tr>
+<tr><td>주주환원</td><td class="bad">부정</td><td>배당 이력 0, 소각 실질 622주, 자사주 재고 0</td></tr>
+<tr><td>거버넌스</td><td class="good">긍정</td><td>최대주주 측 39.78% 안정, 사옥 거래 비특수관계·외부평가, 임원 보수 절제</td></tr>
+<tr><td>유동성</td><td class="bad">부정</td><td>일 거래대금 4,000만원</td></tr>
+</table></div>
+
+<h3>블로그 목표주가에 대한 최종 판단</h3>
+<ul>
+<li><strong>PEAK 10,800원</strong> — 경로 부재. 인허가 신청 전 사업에 매출 4.6배를 요구.</li>
+<li><strong>BULL 6,000원</strong> — 소모품 확대만으로 순이익 57억은 불가. 소모품 성장은 이미 둔화 국면.</li>
+<li><strong>BASE 3,900원</strong> — "본업 유지"라면 이익은 2025년(29억)을 넘을 이유가 없고, 그 29억도 2025년 환율 중립·세액공제 포함이다. 3,900원은 PBR 1.4배로 자산 관점에서도 상단이다.</li>
+</ul>
+
+<p><strong>결론.</strong> 현재가 2,965원은 이익·SOTP·조정장부가 어느 기준으로도 <strong>싸지 않다</strong>. 명목 PBR 1.08이 주는 "저평가" 인상은 자본의 40%가 벤처 지분·이연법인세자산·장기 재고라는 점에서 할인돼야 한다. 이 종목에서 돈이 벌리는 경로는 단 하나 — <strong>genescale 인허가 신청 → 승인 → 첫 매출</strong>이라는 이벤트 체인이고, 2026-02의 6,050원이 보여주듯 그 기대가 점화되면 유동성이 얇아 주가는 크게 튄다. 반대로 이벤트 없이 3Q26·4Q26에서 환율이 되돌아오고 이연법인세 인식이 멈추면 순이익은 계단식으로 꺾이며 "PER 14배" 착시가 무너진다. <strong>실적주로 접근하면 실망하고, 이벤트 옵션으로 접근한다면 포지션 크기를 그에 맞게 잡아야 하는 종목</strong>이다.</p>
+
+<h2>13. 체크리스트 — 무엇이 바뀌면 판단이 바뀌는가</h2>
+
+<ol>
+<li><strong>genescale 인허가 신청 공시</strong> — 식약처·CE-IVD·FDA 중 하나라도. 이것만이 상단을 여는 이벤트다. "투자판단관련주요경영사항" 공시를 감시.</li>
+<li><strong>3Q26 재고 vs GPM</strong> — 재고가 계속 늘면서 GPM이 높게 유지되면 자본화 가설 강화. 재고가 줄며 GPM이 유지되면 믹스 개선이 진짜다.</li>
+<li><strong>4Q26 영업이익</strong> — 계절적 최대 분기. 11억(4Q25) 이상이면 본업 하락이 멈춘 것. 미달이면 3년 감익이 4년으로.</li>
+<li><strong>영업활동현금흐름 ÷ 순이익</strong> — 연간 기준 0.8 이상으로 복귀하는지.</li>
+<li><strong>법인세 부호</strong> — 비용으로 돌아서는 분기가 나오면 순이익이 30% 이상 계단식 하락. 이연법인세자산 28.7억이 상한 신호.</li>
+<li><strong>장비 매출 YoY</strong> — 3년 감소 추세가 꺾이는지. 설치 기반이 늘지 않으면 소모품 성장도 결국 멈춘다.</li>
+<li><strong>파트너스홀딩스(11.21%) 지분 변동</strong> — 유동 물량 중 최대 단일 주체. 대량보유상황보고서 감시. 회사 출자 PEF와의 관계도 확인할 것.</li>
+<li><strong>환율</strong> — 외화예금 77.6억 + 외화 매출채권. 원화 1% 강세 ≈ 환산손실 약 1억. 2026 상반기 이익의 상당 부분은 이 방향이 뒤집히면 반납된다.</li>
+<li><strong>정부과제 종료</strong> — 보조금 12.4억(반기)이 끊기면 자체 R&D 부담이 판관비로 직행. 과제별 종료 시점을 사업보고서 "정부과제 수행실적"에서 추적.</li>
+</ol>
+
+<hr>
+<p class="src">
+검증 출처 — DART OpenAPI: 사업보고서 2025.12(20260323001245) · 반기보고서 2026.06(20260814002717) · 반기보고서 2025.06(20250814003037) · 분기보고서 2024.03/09, 2025.03/09 · 주요사항보고서 유형자산양수(20250912000370) · 자기주식처분 정정(20260630000886) · 주식소각결정(20260529901628) · 대량보유상황보고서(20250404003342) · 손익구조변동(20240124900245) · fnlttSinglAcntAll 2022~2026. 주가: 네이버 금융 siseJson(238120) 일봉 2025-01-02~2026-09-01, 월봉 2020~2026.<br>
+2026 상반기 수치는 검토(비감사) 재무제표. 본 문서는 공시 원본 검증에 기반한 분석이며 투자 권유가 아님. 1차 문서(동일 경로)를 본 2차로 대체함.
+</p>
+
+</body>
+</html>

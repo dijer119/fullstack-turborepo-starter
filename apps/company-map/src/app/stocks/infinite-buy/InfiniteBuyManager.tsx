@@ -48,6 +48,7 @@ export function InfiniteBuyManager({
   const [version, setVersion] = useState<"v1" | "v2.2" | "v4.0">("v1");
   const [starBase, setStarBase] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [edit, setEdit] = useState<{ id: string; principal: string; profitTarget: string; bigBuyPremium: string; lossCut: string } | null>(null);
   const [openOrders, setOpenOrders] = useState<Record<string, OrderView[]>>({});
   const [sells, setSells] = useState<Record<string, OrderView[]>>({});
   const [charts, setCharts] = useState<Record<string, DailyCandle[]>>({});
@@ -76,6 +77,36 @@ export function InfiniteBuyManager({
 
   const setStatus = (c: CycleView, status: string) =>
     start(async () => { await updateCycle(c.id, { status }); router.refresh(); });
+
+  const startEdit = (c: CycleView) =>
+    setEdit(edit?.id === c.id ? null : {
+      id: c.id,
+      principal: String(c.principal),
+      profitTarget: String(c.profitTarget),
+      bigBuyPremium: String(c.bigBuyPremium),
+      lossCut: String(c.lossCut),
+    });
+
+  const saveEdit = (c: CycleView) =>
+    start(async () => {
+      if (!edit) return;
+      setMsg(null);
+      const data: Parameters<typeof updateCycle>[1] = { principal: Number(edit.principal), lossCut: Number(edit.lossCut) };
+      if (c.version === "v1") {
+        data.profitTarget = Number(edit.profitTarget);
+        data.bigBuyPremium = Number(edit.bigBuyPremium);
+      }
+      if (Object.values(data).some((v) => !Number.isFinite(v) || (v as number) <= 0)) {
+        setMsg("모든 값은 0보다 큰 숫자여야 함");
+        return;
+      }
+      if (!c.dryRun && !confirm(`${c.symbol} LIVE 사이클 설정을 변경합니다. 다음 실행부터 적용됩니다. 계속할까요?`)) return;
+      const r = await updateCycle(c.id, data);
+      if (!r.ok) { setMsg(r.reason ?? "수정 실패"); return; }
+      setMsg(`${c.symbol} 설정 변경됨`);
+      setEdit(null);
+      router.refresh();
+    });
 
   const remove = (c: CycleView) =>
     start(async () => {
@@ -336,6 +367,12 @@ export function InfiniteBuyManager({
                   {c.status === "active"
                     ? <button onClick={() => setStatus(c, "paused")} disabled={pending} className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">일시정지</button>
                     : <button onClick={() => setStatus(c, "active")} disabled={pending} className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">재개</button>}
+                  {/* v4.0은 잔금(cashRemaining)이 원금에서 파생되므로 사후 수정 미지원 */}
+                  {c.version !== "v4.0" && (
+                    <button onClick={() => startEdit(c)} disabled={pending} className="rounded border border-gray-300 px-2 py-1 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
+                      {edit?.id === c.id ? "수정 닫기" : "설정 수정"}
+                    </button>
+                  )}
                   <button onClick={() => remove(c)} disabled={pending} className="rounded border border-gray-300 px-2 py-1 text-red-600 hover:bg-red-50 dark:border-gray-700 dark:hover:bg-gray-800">삭제</button>
                 </div>
               </div>
@@ -367,6 +404,42 @@ export function InfiniteBuyManager({
                 )}
                 <div><span className="text-gray-500">마지막실행</span> {c.lastRunDate ?? "—"}</div>
               </div>
+
+              {edit?.id === c.id && (
+                <div className="mt-3 flex flex-wrap items-end gap-2 rounded border border-blue-200 bg-blue-50/50 p-3 text-sm dark:border-blue-900 dark:bg-blue-950/20">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs text-gray-500">원금(USD)</span>
+                    <input type="number" value={edit.principal} onChange={(e) => setEdit({ ...edit, principal: e.target.value })}
+                      className="w-28 rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900" />
+                  </label>
+                  {c.version === "v1" && (
+                    <>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs text-gray-500">익절 %</span>
+                        <input type="number" value={edit.profitTarget} onChange={(e) => setEdit({ ...edit, profitTarget: e.target.value })}
+                          className="w-20 rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900" />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs text-gray-500">큰수 %</span>
+                        <input type="number" value={edit.bigBuyPremium} onChange={(e) => setEdit({ ...edit, bigBuyPremium: e.target.value })}
+                          className="w-20 rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900" />
+                      </label>
+                    </>
+                  )}
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs text-gray-500">손절 %</span>
+                    <input type="number" value={edit.lossCut} onChange={(e) => setEdit({ ...edit, lossCut: e.target.value })}
+                      className="w-20 rounded border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900" />
+                  </label>
+                  <button onClick={() => saveEdit(c)} disabled={pending}
+                    className="rounded bg-blue-600 px-3 py-1.5 text-xs text-white hover:bg-blue-700 disabled:opacity-50">저장</button>
+                  <button onClick={() => setEdit(null)} disabled={pending}
+                    className="rounded border border-gray-300 px-3 py-1.5 text-xs hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">취소</button>
+                  <span className="text-xs text-gray-400">
+                    다음 실행부터 적용{c.version === "v2.2" && " · 익절 +10%·큰수 (10−T/2)%는 v2.2 전략 고정"}
+                  </span>
+                </div>
+              )}
 
               <div className="mt-2 flex gap-3">
                 <button onClick={() => loadChart(c)} disabled={pending} className="text-xs text-blue-600 hover:underline dark:text-blue-400">

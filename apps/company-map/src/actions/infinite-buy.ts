@@ -261,6 +261,12 @@ export async function updateCycle(
   id: string,
   data: Partial<{ dryRun: boolean; status: string; principal: number; profitTarget: number; bigBuyPremium: number; lossCut: number }>,
 ): Promise<{ ok: boolean; reason?: string }> {
+  const nums: Array<[number | undefined, string]> = [
+    [data.principal, "원금"], [data.profitTarget, "익절 %"], [data.bigBuyPremium, "큰수 %"], [data.lossCut, "손절 %"],
+  ];
+  for (const [v, label] of nums) {
+    if (v != null && !(v > 0)) return { ok: false, reason: `${label}은 0보다 커야 함` };
+  }
   if (data.dryRun === false) {
     const cycle = await db.infiniteBuyCycle.findUnique({ where: { id } });
     if (cycle?.version === "v4.0") {

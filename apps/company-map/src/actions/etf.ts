@@ -4,8 +4,9 @@ import { spawn } from "node:child_process";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { diffHoldings } from "@/lib/etf/diff";
-import type { Holding, HoldingChange } from "@/lib/etf/types";
+import type { EtfDividend, EtfReturns, Holding, HoldingChange } from "@/lib/etf/types";
 import { buildShareHistory, type ShareHistory } from "@/lib/etf/history";
+import type { CompareInput } from "@/lib/etf/compare";
 
 export interface EtfWatchView {
   code: string;
@@ -20,7 +21,18 @@ export interface EtfDetailView {
   latestTrdDd: string | null;
   prevTrdDd: string | null;
   marketValue: number | null; // 최신 스냅샷 시가총액(원). BigInt는 직렬화 불가라 Number 변환
+  returns: EtfReturns | null; // 최신 스냅샷의 기간별 수익률. 수집 전 스냅샷이면 null
+  dividend: EtfDividend | null; // 최신 스냅샷의 분배금 요약. 수집 전 스냅샷이면 null
   changes: HoldingChange[];
+}
+
+function parseJsonColumn<T>(raw: string | null): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
 }
 
 const CODE_RE = /^[0-9A-Z]{6}$/;
@@ -298,6 +310,52 @@ export async function getEtfDetail(code: string): Promise<EtfDetailView | null> 
     latestTrdDd: snaps[0]?.trdDd ?? null,
     prevTrdDd: snaps[1]?.trdDd ?? null,
     marketValue: snaps[0]?.marketValue != null ? Number(snaps[0].marketValue) : null,
+    returns: parseJsonColumn<EtfReturns>(snaps[0]?.returnsJson ?? null),
+    dividend: parseJsonColumn<EtfDividend>(snaps[0]?.dividendJson ?? null),
     changes: latest.length ? diffHoldings(latest, prev) : [],
   };
+}
+
+export interface EtfCompareView {
+  watches: { code: string; name: string }[]; // 선택지(관심 ETF 전체, sortOrder 순)
+  selected: string[];                         // 실제 선택된 등록 코드(watches 순서)
+  inputs: CompareInput[];                     // selected 순서
+}
+
+// 비교 화면 데이터. codes가 null이면 관심 ETF 전체를 선택한 것으로 본다(미등록 코드는 무시).
+// 워커 재시작 전 19시 수집은 수익률·분배금을 비워 저장하므로, 최신 스냅샷이 아니라
+// 각 필드가 채워진 가장 최근 스냅샷을 따로 고른다.
+export async function getEtfCompare(codes: string[] | null): Promise<EtfCompareView> {
+  const watches = await db.etfWatch.findMany({
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: { code: true, name: true },
+  });
+  const wanted = codes == null ? null : new Set(codes.map((c) => c.trim().toUpperCase()).filter((c) => CODE_RE.test(c)));
+  const selected = watches.filter((w) => wanted == null || wanted.has(w.code));
+
+  const inputs = await Promise.all(
+    selected.map(async (w): Promise<CompareInput> => {
+      const [ret, div] = await Promise.all([
+        db.etfPdfSnapshot.findFirst({
+          where: { etfCode: w.code, returnsJson: { not: null } },
+          orderBy: { trdDd: "desc" },
+          select: { trdDd: true, returnsJson: true },
+        }),
+        db.etfPdfSnapshot.findFirst({
+          where: { etfCode: w.code, dividendJson: { not: null } },
+          orderBy: { trdDd: "desc" },
+          select: { dividendJson: true },
+        }),
+      ]);
+      return {
+        code: w.code,
+        name: w.name,
+        snapshotTrdDd: ret?.trdDd ?? null,
+        returns: parseJsonColumn<EtfReturns>(ret?.returnsJson ?? null),
+        dividend: parseJsonColumn<EtfDividend>(div?.dividendJson ?? null),
+      };
+    }),
+  );
+
+  return { watches, selected: selected.map((w) => w.code), inputs };
 }

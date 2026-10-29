@@ -5,10 +5,9 @@ import { TagFilter } from "@/components/ui/TagFilter";
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; search?: string; tag?: string; favorites?: string }>;
+  searchParams: Promise<{ search?: string; tag?: string; favorites?: string }>;
 }) {
   const params = await searchParams;
-  const page = Number(params.page) || 1;
   const search = params.search || undefined;
   const tag = params.tag || undefined;
   const showFavorites = params.favorites === "true";
@@ -33,7 +32,6 @@ export default async function HomePage({
       </div>
 
       <PostList
-        page={page}
         search={search}
         tag={tag}
         showFavorites={showFavorites}

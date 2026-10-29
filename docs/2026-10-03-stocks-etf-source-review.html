@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>/stocks/etf 소스 점검</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; vertical-align: top; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .sev { font-weight: 600; } .hi { color: #c53030; } .md { color: #b7791f; } .lo { color: #4a5568; }
+  .muted { color: #718096; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<h1>/stocks/etf 소스 점검</h1>
+<p class="muted">2026-10-03 · 읽기 전용 점검(코드·DB 변경 없음) · 대상: <code>apps/company-map</code>의 <code>src/app/stocks/etf/**</code>, <code>src/actions/etf.ts</code>, <code>src/lib/etf/*</code>, <code>worker/etf-snapshot.ts</code>, <code>worker/etf-pdf-loop.ts</code>, <code>worker/fetch-naver-etf.ts</code>, <code>scripts/refresh-etf-pdf.ts</code> · 근거: 소스 + 실제 DB(<code>etf_pdf_snapshots</code> 14개 ETF) + Naver <code>etfAnalysis</code> 응답 1회 조회</p>
+
+<h2>요약</h2>
+<table>
+<tr><th>#</th><th>심각도</th><th>내용</th></tr>
+<tr><td>1</td><td class="sev hi">높음</td><td>스냅샷 기준일(<code>trdDd</code>)이 데이터 기준일이 아니라 <strong>수집한 날짜</strong>다. Naver 데이터는 1거래일 늦고, 휴장일에도 스냅샷이 생겨 중복 행이 쌓인다.</td></tr>
+<tr><td>2</td><td class="sev md">중간</td><td>칩의 <code>×</code> 버튼 한 번으로 그 ETF의 <strong>스냅샷 이력 전체가 확인 없이 삭제</strong>된다(cascade). 원천에 과거 데이터가 없어 복구할 수 없다.</td></tr>
+<tr><td>3</td><td class="sev lo">낮음</td><td>19시 루프는 개별 ETF가 실패해도 그날을 "완료"로 표시해 당일 재시도하지 않는다.</td></tr>
+<tr><td>4</td><td class="sev lo">낮음</td><td>비중 합산 화면은 ETF마다 "자기 최신 2개"를 쓰므로, 수집이 빠진 ETF가 있으면 기준일이 다른 데이터가 한 표에 섞인다(범례에 날짜가 표시되긴 함).</td></tr>
+</table>
+
+<h2>1. 기준일 라벨이 실제 데이터 날짜와 다르다 <span class="sev hi">(높음)</span></h2>
+<h3>코드</h3>
+<p><code>worker/fetch-naver-etf.ts:15</code>의 <code>lastBusinessDay()</code>는 <strong>주말만</strong> 금요일로 당기고 나머지는 실행 날짜를 그대로 반환한다. <code>snapshotEtf</code>는 이 값을 <code>trdDd</code>로 써서 <code>@@unique([etfCode, trdDd])</code>에 저장한다. 응답에 들어 있는 기준일 필드는 쓰지 않는다.</p>
+<h3>실측 근거</h3>
+<ul>
+<li><strong>1거래일 지연</strong>: 오늘(10/3 토) Naver <code>0074K0/etfAnalysis</code> 응답의 <code>navPerformanceReferenceDate</code>·<code>returnPerformanceReferenceDate</code>·<code>cumulativeNetInflowList.referenceDate</code>가 모두 <code>2026.10.01</code>이다. 그런데 DB에는 10/2 19:10에 수집한 같은 데이터가 <code>20261002</code>로 저장돼 있다.</li>
+<li><strong>휴장일 중복</strong>: 추석 휴장일인 <code>20260924</code>·<code>20260925</code>, 대체공휴일 <code>20260817</code>에도 스냅샷이 있다.</li>
+<li><strong>연휴 직후 중복</strong>: 직전 스냅샷과 구성종목·주식수·비중이 완전히 같은 날을 세어 보면 <code>20260928</code>(연휴 후 첫 거래일)이 <strong>14개 ETF 중 14개</strong>, <code>20260925</code>가 14개, <code>20260818</code>이 12개다. 평일은 대개 0~1개다. 연휴 다음 날까지 "변화 없음"이 되는 것은 1거래일 지연 가설과 맞는다.</li>
+</ul>
+<h3>영향</h3>
+<ul>
+<li>상세 화면의 "직전 대비"와 <code>/stocks/etf/combined</code>의 "전일 대비"가 연휴 앞뒤로 며칠씩 0으로 나온다. 실제 변화는 그다음 날로 밀려서 보인다.</li>
+<li>주식수 이력 표·차트의 x축 날짜가 하루씩 밀리고, 같은 값이 반복된 열이 끼어 있다.</li>
+<li>19시 전에 수동 갱신(<code>구성종목 갱신</code> 버튼, 또는 <code>registerEtf</code>가 띄우는 <strong>전체</strong> 갱신)을 하면 그날 날짜로 먼저 저장되고, 19시 루프는 <code>skipped</code>로 넘어간다. 19시 아닌 시각에 수집된 행이 실제로 92건 있다(6/16 07시 11건, 6/17 07시 12건, 8/31 07시 13건, 9/1 13시 14건 등). 그날 Naver가 늦게 갱신했다면 그 데이터는 버려진다.</li>
+</ul>
+<h3>수정 방향(제안)</h3>
+<p>응답의 기준일(<code>navPerformanceReferenceDate</code>, <code>YYYY.MM.DD</code> → <code>YYYYMMDD</code>)을 <code>trdDd</code>로 쓰고, 이 필드가 없을 때만 <code>lastBusinessDay()</code>로 대체한다. 그러면 휴장일과 수동 재실행은 같은 기준일이 되어 unique 키에서 자연스럽게 <code>skipped</code>가 되고, 휴장일 달력도 필요 없다.</p>
+<blockquote><strong>확인 안 된 전제</strong>: <code>etfTop10MajorConstituentAssets</code> 자체에는 날짜 필드가 없다. 이 목록이 NAV 기준일과 같은 날짜 기준이라는 것은 위 중복 패턴에서 나온 <strong>추정</strong>이다. 수정 전에 평일 하루 동안 시간대별로 응답을 몇 번 받아, Top10 주식수가 바뀌는 시점과 <code>referenceDate</code>가 바뀌는 시점이 같은지 확인해야 한다. 또 기존 행을 다시 라벨링할지(전부 하루 앞당기고 중복 삭제), 앞으로만 적용할지도 정해야 한다.</blockquote>
+
+<h2>2. <code>×</code> 한 번이면 이력 전체가 확인 없이 삭제된다 <span class="sev md">(중간)</span></h2>
+<p><code>EtfManager.tsx:174</code>의 <code>×</code>는 확인 없이 바로 <code>removeEtf</code>를 부르고, <code>removeEtf</code>(<code>src/actions/etf.ts:63</code>)는 <code>etfWatch.delete</code>를 실행한다. 스키마가 <code>EtfPdfSnapshot.watch</code>에 <code>onDelete: Cascade</code>를 걸어 두었으므로 스냅샷과 보유종목 행까지 모두 지워진다. Naver는 현재 시점만 주기 때문에 다시 등록해도 과거 이력은 돌아오지 않는다. 칩이 <code>draggable</code>이라 드래그하다 <code>×</code>를 누르기도 쉽다. 최소한 <code>confirm()</code>을 띄우거나, 감시만 끄는 soft delete로 바꾸는 방안이 있다.</p>
+
+<h2>3. 실패한 ETF를 그날 다시 수집하지 않는다 <span class="sev lo">(낮음)</span></h2>
+<p><code>snapshotAllEtfs</code>는 ETF별 실패를 삼키고(<code>"failed"</code>를 로그로만 남김), <code>etf-pdf-loop.ts:22</code>는 그 뒤 무조건 <code>lastRunDay</code>를 오늘로 세운다. 그래서 Naver가 일시적으로 실패한 ETF는 그날 빠진 채로 남는다. 다음 날 수집되는 데이터와 날짜가 어긋날 뿐 아니라, #4의 혼합 문제도 만든다. 실패가 있으면 <code>lastRunDay</code>를 세우지 않고 30분 뒤 다시 도는 쪽이 간단하다. 이미 저장된 ETF는 unique 키 덕분에 <code>skipped</code>가 된다.</p>
+
+<h2>4. 합산 화면에서 기준일이 섞일 수 있다 <span class="sev lo">(낮음)</span></h2>
+<p><code>getCombinedEtfHoldings</code>(<code>src/actions/etf.ts:169~180</code>)는 ETF마다 자기 최신 스냅샷 2개를 쓴다. 한 ETF만 오늘 수집이 빠지면, 그 ETF는 어제와 그제를 비교하고 나머지는 오늘과 어제를 비교한다. 그런데 결과는 하나의 "전일 대비" 순위로 합쳐진다. 범례에 ETF별 날짜(<code>trdDd ← prevTrdDd</code>)가 나오긴 하지만 경고는 없다. 날짜가 다르면 <code>missing</code>처럼 경고 문구를 띄우는 정도면 충분하다. 덧붙여 이 쿼리는 해당 ETF들의 스냅샷을 <code>take</code> 없이 <strong>전부</strong> 읽고 앱에서 2개만 쓴다. 지금은 ETF당 100여 개라 문제가 없지만 데이터가 계속 쌓인다.</p>
+
+<h2>문제없음으로 확인한 것</h2>
+<ul>
+<li><code>diff.ts</code>·<code>history.ts</code>: 코드가 빈 해외 종목을 이름으로 식별하는 규칙이 두 파일에서 같다. delta는 공백 셀을 건너뛰어 직전 관측치와 비교한다. 테스트도 있다.</li>
+<li><code>reorderEtfWatches</code>: 코드 집합이 정확히 같은지 검증한 뒤 트랜잭션으로 저장하고, 실패하면 낙관적 순서를 되돌린다.</li>
+<li>시가총액 보강 경로(<code>existing.marketValue == null</code>일 때만 <code>updated</code>): 의도대로 동작한다. BigInt는 action에서 Number로 바꿔 직렬화 문제가 없다.</li>
+<li>워커의 날짜 계산은 로컬 시간 기준인데, 이 맥이 KST라 맞다. 서버를 다른 시간대로 옮기면 #1과 함께 다시 봐야 한다.</li>
+</ul>
+<p class="muted">테스트와 lint는 돌리지 않았다(코드 변경이 없는 점검이라서).</p>
+</body>
+</html>

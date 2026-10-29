@@ -3,7 +3,7 @@ import { fetchNaverEtf, lastBusinessDay } from "./fetch-naver-etf";
 import { topN } from "@/lib/etf/diff";
 
 // 관심 ETF 1개의 최신 영업일 스냅샷을 저장(상위 10). 이미 있으면 skip
-// (단, marketValue가 비어 있으면 그 필드만 보강 update → "updated").
+// (단, marketValue·returnsJson·dividendJson이 비어 있으면 그 필드만 보강 update → "updated").
 // 데이터 소스: Naver 모바일 ETF API (KRX MDC는 이 환경에서 차단됨).
 export async function snapshotEtf(
   code: string,
@@ -24,12 +24,16 @@ export async function snapshotEtf(
     const existing = await db.etfPdfSnapshot.findUnique({
       where: { etfCode_trdDd: { etfCode: code, trdDd } },
     });
+    const returnsJson = res.returns ? JSON.stringify(res.returns) : null;
+    const dividendJson = res.dividend ? JSON.stringify(res.dividend) : null;
     if (existing) {
-      if (existing.marketValue == null && res.marketValue != null) {
-        await db.etfPdfSnapshot.update({
-          where: { id: existing.id },
-          data: { marketValue: res.marketValue },
-        });
+      // 비어 있는 필드만 보강한다(이미 있는 값은 덮어쓰지 않음)
+      const patch: { marketValue?: bigint; returnsJson?: string; dividendJson?: string } = {};
+      if (existing.marketValue == null && res.marketValue != null) patch.marketValue = res.marketValue;
+      if (existing.returnsJson == null && returnsJson != null) patch.returnsJson = returnsJson;
+      if (existing.dividendJson == null && dividendJson != null) patch.dividendJson = dividendJson;
+      if (Object.keys(patch).length > 0) {
+        await db.etfPdfSnapshot.update({ where: { id: existing.id }, data: patch });
         return "updated";
       }
       return "skipped";
@@ -41,6 +45,8 @@ export async function snapshotEtf(
         etfCode: code,
         trdDd,
         marketValue: res.marketValue,
+        returnsJson,
+        dividendJson,
         holdings: {
           create: holdings.map((h) => ({
             constituentCode: h.constituentCode,

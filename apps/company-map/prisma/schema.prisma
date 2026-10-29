@@ -10,14 +10,14 @@ datasource db {
 }
 
 model Industry {
-  id          String   @id @default(uuid())
-  name        String
-  parentId    String?  @map("parent_id")
-  parent      Industry?  @relation("IndustryTree", fields: [parentId], references: [id], onDelete: Cascade)
-  children    Industry[] @relation("IndustryTree")
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt       @map("updated_at")
+  id              String            @id @default(uuid())
+  name            String
+  parentId        String?           @map("parent_id")
+  parent          Industry?         @relation("IndustryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children        Industry[]        @relation("IndustryTree")
+  description     String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
   companyMappings CompanyIndustry[]
 
   @@index([parentId])
@@ -26,13 +26,13 @@ model Industry {
 }
 
 model Company {
-  id          String   @id @default(uuid())
-  name        String
-  ticker      String?  @unique
-  market      String?
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt       @map("updated_at")
+  id               String            @id @default(uuid())
+  name             String
+  ticker           String?           @unique
+  market           String?
+  description      String?
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
   industryMappings CompanyIndustry[]
 
   @@index([name])
@@ -52,28 +52,28 @@ model CompanyIndustry {
 }
 
 model StockMaster {
-  code      String   @id
-  name      String
-  market    String?
-  marcap    BigInt?
-  corpCode  String?  @map("corp_code")
+  code                String   @id
+  name                String
+  market              String?
+  marcap              BigInt?
+  corpCode            String?  @map("corp_code")
   // 자사주 소각 결정 공시 누적 횟수. 상세화면 "공시 갱신" 시 fetchDisclosuresForStock가 갱신.
-  treasuryCancelCount Int @default(0) @map("treasury_cancel_count")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  treasuryCancelCount Int      @default(0) @map("treasury_cancel_count")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
-  analysis              StockAnalysis?
-  ncavResult            NcavResult?
-  vipHoldings           VipHolding[]
-  financialSnapshot     FinancialSnapshot?
-  opIncomeHistory       OperatingIncomeHistory[]
-  tags                  StockTag[]
-  priceChange           PriceChange?
-  memo                  StockMemo?
-  override              StockOverride?
-  disclosures           Disclosure[]
-  links                 StockLink[]
-  rating                StockRating?
-  week52Price           Week52Price?
+  analysis          StockAnalysis?
+  ncavResult        NcavResult?
+  vipHoldings       VipHolding[]
+  financialSnapshot FinancialSnapshot?
+  opIncomeHistory   OperatingIncomeHistory[]
+  tags              StockTag[]
+  priceChange       PriceChange?
+  memo              StockMemo?
+  override          StockOverride?
+  disclosures       Disclosure[]
+  links             StockLink[]
+  rating            StockRating?
+  week52Price       Week52Price?
 
   @@index([name])
   @@index([market])
@@ -82,18 +82,18 @@ model StockMaster {
 }
 
 model StockAnalysis {
-  code              String   @id
-  name              String
-  currentPrice      Float?   @map("current_price")
-  intrinsicValue    Float?   @map("intrinsic_value")
-  safetyMargin      Float?   @map("safety_margin")
-  treasuryRatio     Float?   @map("treasury_ratio")
-  dividendYield     Float?   @map("dividend_yield")
-  per               Float?   @map("per")
-  pbr               Float?   @map("pbr")
-  lastUpdated       DateTime @map("last_updated")
+  code           String   @id
+  name           String
+  currentPrice   Float?   @map("current_price")
+  intrinsicValue Float?   @map("intrinsic_value")
+  safetyMargin   Float?   @map("safety_margin")
+  treasuryRatio  Float?   @map("treasury_ratio")
+  dividendYield  Float?   @map("dividend_yield")
+  per            Float?   @map("per")
+  pbr            Float?   @map("pbr")
+  lastUpdated    DateTime @map("last_updated")
 
-  master  StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+  master StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@index([safetyMargin])
   @@index([dividendYield])
@@ -104,20 +104,20 @@ model StockAnalysis {
 }
 
 model NcavResult {
-  code              String   @id
-  name              String
-  ncav              BigInt
-  marcap            BigInt
-  ncavRatio         Float?   @map("ncav_ratio")
-  currentAssets     BigInt   @map("current_assets")
-  totalLiabilities  BigInt   @map("total_liabilities")
-  totalAssets       BigInt   @map("total_assets")
-  totalEquity       BigInt   @map("total_equity")
-  bsnsYear          Int      @map("bsns_year")
-  ncavPositive      Boolean  @map("ncav_positive")
-  lastUpdated       DateTime @map("last_updated")
+  code             String   @id
+  name             String
+  ncav             BigInt
+  marcap           BigInt
+  ncavRatio        Float?   @map("ncav_ratio")
+  currentAssets    BigInt   @map("current_assets")
+  totalLiabilities BigInt   @map("total_liabilities")
+  totalAssets      BigInt   @map("total_assets")
+  totalEquity      BigInt   @map("total_equity")
+  bsnsYear         Int      @map("bsns_year")
+  ncavPositive     Boolean  @map("ncav_positive")
+  lastUpdated      DateTime @map("last_updated")
 
-  master  StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+  master StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@index([ncavRatio])
   @@index([ncavPositive])
@@ -159,7 +159,7 @@ model VipHolding {
   reportResn       String?  @map("report_resn")
   fetchedAt        DateTime @default(now()) @map("fetched_at")
 
-  master           StockMaster? @relation(fields: [code], references: [code], onDelete: SetNull)
+  master StockMaster? @relation(fields: [code], references: [code], onDelete: SetNull)
 
   @@index([code])
   @@index([rceptDt])
@@ -179,19 +179,19 @@ model FinancialSnapshot {
   netIncomeYoyPct    Float?   @map("net_income_yoy_pct")
   fetchedAt          DateTime @default(now()) @map("fetched_at")
 
-  master  StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+  master StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@map("financial_snapshots")
 }
 
 model OperatingIncomeHistory {
-  code       String
-  bsnsYear   Int      @map("bsns_year")
-  reprtCode  String   @map("reprt_code")
-  thstrm     BigInt?  @map("thstrm")
-  fetchedAt  DateTime @default(now()) @map("fetched_at")
+  code      String
+  bsnsYear  Int      @map("bsns_year")
+  reprtCode String   @map("reprt_code")
+  thstrm    BigInt?  @map("thstrm")
+  fetchedAt DateTime @default(now()) @map("fetched_at")
 
-  master     StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+  master StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@id([code, bsnsYear, reprtCode])
   @@index([code, bsnsYear])
@@ -199,13 +199,21 @@ model OperatingIncomeHistory {
 }
 
 model RefreshState {
-  kind        String   @id
-  status      String
-  startedAt   DateTime @map("started_at")
-  finishedAt  DateTime? @map("finished_at")
-  output      String?
+  kind       String    @id
+  status     String
+  startedAt  DateTime  @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  output     String?
 
   @@map("refresh_states")
+}
+
+model CoveredCallSnapshot {
+  id        String   @id
+  payload   String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("covered_call_snapshots")
 }
 
 model Tag {
@@ -222,8 +230,8 @@ model StockTag {
   tagId     Int      @map("tag_id")
   createdAt DateTime @default(now()) @map("created_at")
 
-  master    StockMaster @relation(fields: [stockCode], references: [code], onDelete: Cascade)
-  tag       Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  master StockMaster @relation(fields: [stockCode], references: [code], onDelete: Cascade)
+  tag    Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([stockCode, tagId])
   @@index([tagId])
@@ -239,7 +247,7 @@ model PriceChange {
   marcap       BigInt?   @map("marcap")
   fetchedAt    DateTime  @default(now()) @map("fetched_at")
 
-  master  StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+  master StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@map("price_changes")
 }
@@ -249,7 +257,7 @@ model StockMemo {
   text      String
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  master    StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+  master StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@map("stock_memos")
 }
@@ -259,23 +267,23 @@ model StockOverride {
   manualRoe Float?   @map("manual_roe")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  master    StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+  master StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@map("stock_overrides")
 }
 
 model Disclosure {
-  rcpNo      String   @id @map("rcp_no")
-  code       String
-  corpCode   String   @map("corp_code")
-  reportNm   String   @map("report_nm")
-  pblntfTy   String   @map("pblntf_ty")
-  rceptDt    DateTime @map("rcept_dt")
-  category   String
-  payload    String?
-  fetchedAt  DateTime @default(now()) @map("fetched_at")
+  rcpNo     String   @id @map("rcp_no")
+  code      String
+  corpCode  String   @map("corp_code")
+  reportNm  String   @map("report_nm")
+  pblntfTy  String   @map("pblntf_ty")
+  rceptDt   DateTime @map("rcept_dt")
+  category  String
+  payload   String?
+  fetchedAt DateTime @default(now()) @map("fetched_at")
 
-  master     StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+  master StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@index([code, rceptDt])
   @@index([category])
@@ -293,7 +301,7 @@ model StockLink {
   memo      String?
   createdAt DateTime @default(now()) @map("created_at")
 
-  master    StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+  master StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@unique([code, url])
   @@index([code, createdAt])
@@ -302,10 +310,10 @@ model StockLink {
 
 model StockRating {
   code      String   @id
-  grade     String   // "high"=상 | "mid"=중 | "low"=하
+  grade     String // "high"=상 | "mid"=중 | "low"=하
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  master    StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
+  master StockMaster @relation(fields: [code], references: [code], onDelete: Cascade)
 
   @@index([grade])
   @@map("stock_ratings")
@@ -328,8 +336,8 @@ model EtfWatch {
 model StockWatch {
   symbol        String   @id
   name          String
-  market        String?  // KOSPI/KOSDAQ/NASDAQ/NYSE 등
-  currency      String?  // KRW/USD
+  market        String? // KOSPI/KOSDAQ/NASDAQ/NYSE 등
+  currency      String? // KRW/USD
   purchasePrice Float?   @map("purchase_price") // 사용자 입력 구매가(종목 통화 기준). 미입력 시 null
   sortOrder     Int      @default(0) @map("sort_order")
   createdAt     DateTime @default(now()) @map("created_at")
@@ -343,6 +351,10 @@ model EtfPdfSnapshot {
   etfCode     String   @map("etf_code")
   trdDd       String   @map("trd_dd")
   marketValue BigInt?  @map("market_value")
+  // 기간별 수익률 JSON(EtfReturns: referenceDate·market·nav). Naver etfAnalysis 원값 그대로
+  returnsJson String?  @map("returns_json")
+  // 분배금 요약 JSON(EtfDividend: perShareTtm·yieldTtm·countThisYear·monthsThisYear)
+  dividendJson String? @map("dividend_json")
   fetchedAt   DateTime @default(now()) @map("fetched_at")
 
   watch    EtfWatch        @relation(fields: [etfCode], references: [code], onDelete: Cascade)
@@ -354,10 +366,10 @@ model EtfPdfSnapshot {
 }
 
 model EtfPdfHolding {
-  id              String  @id @default(uuid())
-  snapshotId      String  @map("snapshot_id")
-  constituentCode String  @map("constituent_code")
-  constituentName String  @map("constituent_name")
+  id              String @id @default(uuid())
+  snapshotId      String @map("snapshot_id")
+  constituentCode String @map("constituent_code")
+  constituentName String @map("constituent_name")
   weight          Float?
   shares          Float?
   amount          Float?
@@ -410,24 +422,24 @@ model FundNav {
 // 무한매수법 자동매매 사이클. 평단·보유·수익률은 토스 라이브 조회, 여기엔 설정·회차·주문이력만.
 model InfiniteBuyCycle {
   id            String   @id @default(uuid())
-  symbol        String                          // 토스 심볼(US 티커, 예: TQQQ)
-  name          String                          // 표시용 종목명
-  accountSeq    Int?     @map("account_seq")    // 토스 계좌(null=기본계좌)
-  principal     Float                           // 원금(USD)
+  symbol        String // 토스 심볼(US 티커, 예: TQQQ)
+  name          String // 표시용 종목명
+  accountSeq    Int?     @map("account_seq") // 토스 계좌(null=기본계좌)
+  principal     Float // 원금(USD)
   splits        Int      @default(40)
-  profitTarget  Float    @default(10) @map("profit_target")   // 익절 %
-  bigBuyPremium Float    @default(12) @map("big_buy_premium")  // 큰수 LOC 프리미엄 %
-  lossCut       Float    @default(10) @map("loss_cut")         // 소진 후 손절 기준 %
-  status        String   @default("active")     // active | paused | completed | stopped
+  profitTarget  Float    @default(10) @map("profit_target") // 익절 %
+  bigBuyPremium Float    @default(12) @map("big_buy_premium") // 큰수 LOC 프리미엄 %
+  lossCut       Float    @default(10) @map("loss_cut") // 소진 후 손절 기준 %
+  status        String   @default("active") // active | paused | completed | stopped
   dryRun        Boolean  @default(true) @map("dry_run")
-  version       String   @default("v1")          // "v1" | "v2.2" 전략 버전
+  version       String   @default("v1") // "v1" | "v2.2" 전략 버전
   round         Int      @default(0)
   // ── v4.0 전용 상태 (v1/v2.2에선 null) ──
-  tValue        Float?   @map("t_value")         // 연속 T (체결 반영으로만 갱신)
-  cashRemaining Float?   @map("cash_remaining")  // 잔금(USD). 생성 시 principal
-  starBase      Float?   @map("star_base")       // 별% base = 지정가매도 % (TQQQ 15 / SOXL 20)
-  note          String?                          // 마지막 경고/보류 사유 (대시보드 배지)
-  lastRunDate   String?  @map("last_run_date")  // 마지막 실행 US 거래일
+  tValue        Float?   @map("t_value") // 연속 T (체결 반영으로만 갱신)
+  cashRemaining Float?   @map("cash_remaining") // 잔금(USD). 생성 시 principal
+  starBase      Float?   @map("star_base") // 별% base = 지정가매도 % (TQQQ 15 / SOXL 20)
+  note          String? // 마지막 경고/보류 사유 (대시보드 배지)
+  lastRunDate   String?  @map("last_run_date") // 마지막 실행 US 거래일
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -437,26 +449,26 @@ model InfiniteBuyCycle {
 }
 
 model InfiniteBuyOrder {
-  id          String   @id @default(uuid())
-  cycleId     String   @map("cycle_id")
-  tradeDate   String   @map("trade_date")       // US 거래일
-  round       Int
-  side        String                            // BUY | SELL
-  kind        String                            // v1: first_market|loc_avg|loc_big|target_sell|reset_sell / v2.2: first_market|loc_avg|loc_var|sell_loc_var|sell_lim_10|reset_sell
-  orderType   String   @map("order_type")       // LIMIT | MARKET
-  tif         String                            // CLS | DAY
-  price       Float?
-  quantity    Float
-  avgCost     Float?   @map("avg_cost")          // SELL 시점 평단(실현손익 계산용)
-  filledQty   Float?   @map("filled_qty")        // 실제 체결 수량(토스 동기화)
-  filledPrice Float?   @map("filled_price")      // 평균 체결가(토스 동기화)
-  filledAt    String?  @map("filled_at")         // 체결 시각(토스, ISO KST)
-  tossOrderId String?  @map("toss_order_id")
-  stateApplied Boolean? @map("state_applied")    // v4: 이 체결이 T/잔금에 반영됐는지(멱등 마커)
-  dryRun      Boolean  @map("dry_run")
-  status      String                            // submitted | filled | failed | simulated | skipped
-  error       String?
-  createdAt   DateTime @default(now()) @map("created_at")
+  id           String   @id @default(uuid())
+  cycleId      String   @map("cycle_id")
+  tradeDate    String   @map("trade_date") // US 거래일
+  round        Int
+  side         String // BUY | SELL
+  kind         String // v1: first_market|loc_avg|loc_big|target_sell|reset_sell / v2.2: first_market|loc_avg|loc_var|sell_loc_var|sell_lim_10|reset_sell
+  orderType    String   @map("order_type") // LIMIT | MARKET
+  tif          String // CLS | DAY
+  price        Float?
+  quantity     Float
+  avgCost      Float?   @map("avg_cost") // SELL 시점 평단(실현손익 계산용)
+  filledQty    Float?   @map("filled_qty") // 실제 체결 수량(토스 동기화)
+  filledPrice  Float?   @map("filled_price") // 평균 체결가(토스 동기화)
+  filledAt     String?  @map("filled_at") // 체결 시각(토스, ISO KST)
+  tossOrderId  String?  @map("toss_order_id")
+  stateApplied Boolean? @map("state_applied") // v4: 이 체결이 T/잔금에 반영됐는지(멱등 마커)
+  dryRun       Boolean  @map("dry_run")
+  status       String // submitted | filled | failed | simulated | skipped
+  error        String?
+  createdAt    DateTime @default(now()) @map("created_at")
 
   cycle InfiniteBuyCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
 
@@ -488,25 +500,25 @@ model MarketRate {
 // 보유수량은 저장하지 않고 VrOrder 체결(seed 포함) 누적으로 파생한다.
 model VrAccount {
   id             String   @id @default(uuid())
-  symbol         String                                  // 토스 심볼(US 티커, 예: TQQQ)
-  name           String                                  // 표시용 종목명
-  accountSeq     Int?     @map("account_seq")            // 토스 계좌(null=기본계좌)
-  type           String   @default("accumulate")         // accumulate(적립) | lumpsum(거치)
-  formula        String   @default("skill")              // basic | skill (V 갱신 공식)
-  gValue         Float    @default(10) @map("g_value")   // G 기울기 (수동 조정 가능)
-  bandPct        Float    @default(15) @map("band_pct")  // 밴드 ±%
-  contribution   Float    @default(0)                    // 사이클(2주)당 적립금 USD (거치식 0)
+  symbol         String // 토스 심볼(US 티커, 예: TQQQ)
+  name           String // 표시용 종목명
+  accountSeq     Int?     @map("account_seq") // 토스 계좌(null=기본계좌)
+  type           String   @default("accumulate") // accumulate(적립) | lumpsum(거치)
+  formula        String   @default("skill") // basic | skill (V 갱신 공식)
+  gValue         Float    @default(10) @map("g_value") // G 기울기 (수동 조정 가능)
+  bandPct        Float    @default(15) @map("band_pct") // 밴드 ±%
+  contribution   Float    @default(0) // 사이클(2주)당 적립금 USD (거치식 0)
   poolLimitMode  String   @default("auto") @map("pool_limit_mode") // auto | manual
-  poolLimitPct   Float?   @map("pool_limit_pct")         // manual일 때 고정 %
-  vValue         Float    @map("v_value")                // 현재 목표가치 V
-  pool           Float                                   // 현재 Pool(USD)
-  startDate      String   @map("start_date")             // 시작 US 거래일 (주차 앵커)
+  poolLimitPct   Float?   @map("pool_limit_pct") // manual일 때 고정 %
+  vValue         Float    @map("v_value") // 현재 목표가치 V
+  pool           Float // 현재 Pool(USD)
+  startDate      String   @map("start_date") // 시작 US 거래일 (주차 앵커)
   cycleIndex     Int      @default(0) @map("cycle_index")
-  cycleStartDate String   @map("cycle_start_date")       // 현재 사이클 시작 거래일
-  status         String   @default("active")             // active | paused | stopped
+  cycleStartDate String   @map("cycle_start_date") // 현재 사이클 시작 거래일
+  status         String   @default("active") // active | paused | stopped
   dryRun         Boolean  @default(true) @map("dry_run")
-  note           String?                                 // 마지막 경고/보류 사유 (대시보드 배지)
-  lastRunDate    String?  @map("last_run_date")          // 마지막 실행 US 거래일 (중복 실행 방지)
+  note           String? // 마지막 경고/보류 사유 (대시보드 배지)
+  lastRunDate    String?  @map("last_run_date") // 마지막 실행 US 거래일 (중복 실행 방지)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -520,20 +532,20 @@ model VrOrder {
   id           String   @id @default(uuid())
   accountId    String   @map("account_id")
   cycleIndex   Int      @map("cycle_index")
-  tradeDate    String   @map("trade_date")     // US 거래일
-  side         String                          // BUY | SELL
-  kind         String                          // seed | loc_buy | limit_sell
-  orderType    String   @map("order_type")     // LIMIT | MARKET
-  tif          String                          // CLS | DAY
+  tradeDate    String   @map("trade_date") // US 거래일
+  side         String // BUY | SELL
+  kind         String // seed | loc_buy | limit_sell
+  orderType    String   @map("order_type") // LIMIT | MARKET
+  tif          String // CLS | DAY
   price        Float?
   quantity     Float
   filledQty    Float?   @map("filled_qty")
   filledPrice  Float?   @map("filled_price")
   filledAt     String?  @map("filled_at")
   tossOrderId  String?  @map("toss_order_id")
-  stateApplied Boolean? @map("state_applied")  // 이 체결이 Pool에 반영됐는지(멱등 마커)
+  stateApplied Boolean? @map("state_applied") // 이 체결이 Pool에 반영됐는지(멱등 마커)
   dryRun       Boolean  @map("dry_run")
-  status       String                          // simulated | simulated_filled | expired | submitted | filled | failed | skipped
+  status       String // simulated | simulated_filled | expired | submitted | filled | failed | skipped
   error        String?
   createdAt    DateTime @default(now()) @map("created_at")
 
@@ -547,11 +559,11 @@ model VrOrder {
 model VrCycleLog {
   id           String   @id @default(uuid())
   accountId    String   @map("account_id")
-  cycleIndex   Int      @map("cycle_index")    // 갱신 후 사이클 번호
-  date         String                          // 사이클 시작 US 거래일
-  vValue       Float    @map("v_value")        // 갱신 후 V
-  evalAmount   Float    @map("eval_amount")    // 공식에 쓴 E (직전 거래일 종가 × 보유)
-  pool         Float                           // 갱신 시점 Pool (적립 반영 후)
+  cycleIndex   Int      @map("cycle_index") // 갱신 후 사이클 번호
+  date         String // 사이클 시작 US 거래일
+  vValue       Float    @map("v_value") // 갱신 후 V
+  evalAmount   Float    @map("eval_amount") // 공식에 쓴 E (직전 거래일 종가 × 보유)
+  pool         Float // 갱신 시점 Pool (적립 반영 후)
   contribution Float
   gValue       Float    @map("g_value")
   poolLimitPct Float    @map("pool_limit_pct")

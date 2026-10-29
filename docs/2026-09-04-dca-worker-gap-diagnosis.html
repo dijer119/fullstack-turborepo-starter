@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>DCA 데이터 미적립 진단 — 2026-09-04</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+  h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+  h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+  h3 { color: #2c5282; margin-top: 1.5rem; }
+  pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+  code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+  table th { background: #edf2f7; text-align: left; }
+  table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: 0.2rem 0; }
+  blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+  .verdict { background: #ebf8ff; border-left: 3px solid #2c5282; padding: 0.8rem 1rem; margin: 1rem 0; }
+  .miss { color: #c53030; font-weight: 600; }
+  .ok { color: #276749; font-weight: 600; }
+  .warn { color: #b7791f; font-weight: 600; }
+  .muted { color: #718096; font-size: 0.92em; }
+</style>
+</head>
+<body>
+
+<h1>DCA 데이터가 쌓이지 않는 원인 진단</h1>
+<p class="muted">대상: <code>http://localhost:3004/stocks/dca</code> · 계좌 &ldquo;QQQ·QLD 적립식&rdquo;(dryRun) · 진단 시각 2026-09-04 07:00 KST</p>
+
+<div class="verdict">
+<p><strong>결론:</strong> DCA 코드의 결함이 아닙니다. 백그라운드 워커가 <strong>US 정규장 시간대에 살아 있지 않았던 것</strong>이 원인입니다. 워커는 IDE 터미널에서 수동 실행되는 프로세스이고 자동 재시작 설정이 없는데, DCA가 주문을 낼 수 있는 창은 한국시간 <strong>22:30~04:00</strong>이라 매일 밤에 걸쳐 있습니다.</p>
+<p>그 결과 <strong>2026-09-02 거래일은 적립·주문이 모두 누락</strong>됐고, <strong>2026-09-03 거래일은 워커가 마감 12분 뒤에 기동해 적립만 반영</strong>됐습니다.</p>
+</div>
+
+<h2>1. 현재 장부 상태</h2>
+
+<table>
+  <tr><th>항목</th><th>값</th></tr>
+  <tr><td>이월 잔액 <code>cashKrw</code></td><td>50,004원</td></tr>
+  <tr><td>거래일당 적립액</td><td>50,000원</td></tr>
+  <tr><td>마지막 실행 <code>lastRunDate</code></td><td>2026-09-03</td></tr>
+  <tr><td>마지막 적립 <code>lastAccrualDate</code></td><td>2026-09-03</td></tr>
+  <tr><td>주문 이력 건수</td><td>2건 (2026-08-31, 2026-09-01) — 모두 <code>simulated_filled</code></td></tr>
+  <tr><td>누적 보유(시뮬)</td><td>QQQ 0.102256주</td></tr>
+  <tr><td>계좌 경고 배지</td><td>금액 기반 주문 접수 시간(정규장 종료 1시간 전) 경과 — 적립만 반영</td></tr>
+  <tr><td>모드</td><td>dryRun (실제 매수 없음)</td></tr>
+</table>
+
+<p>잔액 50,004원은 계산과 정확히 일치합니다. 즉 <strong>09-01 이후 적립이 단 한 번만 일어났다</strong>는 뜻입니다.</p>
+
+<pre><code>08-31  적립 +50,000 → 50,000   체결 차감 −49,987.75 → 잔액   12.25
+09-01  적립 +50,000 → 50,012   체결 차감 −50,008.38 → 잔액    3.87
+09-02  (적립 없음)                                    잔액    3.87
+09-03  적립 +50,000 →                                 잔액 50,003.87  ≈ DB 50,004</code></pre>
+
+<h2>2. 거래일별 무슨 일이 있었나</h2>
+
+<table>
+  <tr><th>US 거래일</th><th>워커 첫 정상 폴 (KST)</th><th>주문 접수 창<br><span class="muted">22:30~04:00</span></th><th>DCA 결과</th></tr>
+  <tr><td>2026-08-31</td><td>08-31 22:51</td><td class="ok">열림</td><td class="ok">주문 기록 — 49,988원 / QQQ 0.050928주</td></tr>
+  <tr><td>2026-09-01</td><td>09-01 23:27</td><td class="ok">열림</td><td class="ok">주문 기록 — 50,008원 / QQQ 0.051328주</td></tr>
+  <tr><td>2026-09-02</td><td class="miss">폴 없음</td><td>—</td><td class="miss">적립·주문 모두 없음</td></tr>
+  <tr><td>2026-09-03</td><td>09-04 04:12~04:27</td><td class="miss">닫힘 (12분 초과)</td><td class="warn">적립만 반영 · <code>lastRunDate</code> 소진</td></tr>
+</table>
+
+<h3>왜 04:00이 마감인가</h3>
+<p>US 정규장은 09:30~16:00 ET, 한국시간으로 22:30~05:00입니다. 토스는 금액 기반(<code>orderAmount</code>) 주문을 <strong>정규장 종료 1시간 전까지만</strong> 받고 그 뒤에는 <code>422 amount-order-outside-regular-hours</code>로 거절합니다. <code>src/lib/dca/market-window.ts</code>의 <code>ORDER_CUTOFF_MS</code>가 이 1시간입니다. 따라서 실질 마감은 한국시간 04:00이고, 워커는 04:12에 기동했습니다.</p>
+
+<h2>3. 근거</h2>
+
+<h3>워커는 오늘 04:12에 수동으로 시작됐다</h3>
+<pre><code>PID 82621  yarn worker        경과 02:49  부모 → /bin/zsh -il (IDE 터미널)
+PID 82624  tsx worker/index.ts 경과 02:49
+
+launchd 등록: 없음    pm2: 미설치</code></pre>
+<p>워커는 <code>nps dev</code>/turbo의 자식이 아니라 <strong>IDE 안 인터랙티브 셸에서 직접 띄운 프로세스</strong>입니다. 터미널이 닫히거나 머신이 재부팅되면 그대로 사라지고, 자동으로 되살아나는 장치가 없습니다.</p>
+
+<h3>자매 전략 루프도 같은 시각에 처음 깨어났다</h3>
+<p>같은 워커 프로세스에서 도는 VR·무한매수 루프의 기록입니다. 세 전략이 <strong>동시에</strong> 2026-09-03 거래일분을 04:12에 처리했습니다.</p>
+<table>
+  <tr><th>루프</th><th>2026-09-01 기록 시각</th><th>2026-09-02</th><th>2026-09-03 기록 시각</th></tr>
+  <tr><td>무한매수</td><td>09-01 22:30:48</td><td class="miss">없음</td><td>09-04 04:12:42</td></tr>
+  <tr><td>VR</td><td>—</td><td class="miss">없음</td><td>09-04 04:12:41</td></tr>
+  <tr><td>DCA</td><td>09-01 23:27:47</td><td class="miss">없음</td><td>09-04 04:27:41 <span class="muted">(적립만)</span></td></tr>
+</table>
+<p>09-01에 무한매수가 22:30:48 — 개장 48초 뒤 — 에 기록한 것이 정상 동작의 기준선입니다. 워커가 살아 있으면 개장 직후 곧바로 돕니다. 09-03에 그 시각 기록이 없다는 것은 워커가 그때 없었다는 직접 증거입니다.</p>
+
+<h3>머신은 09-02 20:00에 재부팅됐다</h3>
+<pre><code>kern.boottime = Wed Sep  2 20:00:33 2026 KST
+uptime        = up 1 day, 10:59</code></pre>
+<p>09-02 세션 개장(22:30)은 부팅 2시간 30분 뒤였고, 그 사이 워커가 다시 실행되지 않았습니다. 그래서 09-02는 어떤 루프에도 기록이 없습니다.</p>
+
+<h3>배제한 가설</h3>
+<ul>
+  <li><strong>주문 창 판정 버그</strong> — 08-31·09-01에 22:51·23:27로 정상 통과했습니다. 창 판정 로직은 워커가 일찍 살아 있을 때 제대로 동작합니다.</li>
+  <li><strong>DCA 루프만 크래시</strong> — VR·무한매수도 같은 구간에 기록이 없습니다. 특정 루프가 아니라 프로세스 전체가 부재했습니다.</li>
+  <li><strong>토스 API 장애</strong> — 04:12에 세 루프가 모두 정상적으로 시세·캘린더를 받아 처리했습니다.</li>
+  <li><strong>DCA 코드 회귀</strong> — 단위 테스트 6파일 94건 전부 통과했습니다.</li>
+</ul>
+
+<h2>4. 왜 DCA만 비어 보이는가</h2>
+<p>이번 09-03 건이 핵심입니다. 워커가 04:12에 기동했을 때 세 전략의 결과가 갈렸습니다.</p>
+<blockquote>
+<p>VR·무한매수는 <strong>LOC·지정가</strong> 주문이라 토스가 종가(05:00 KST)까지 접수합니다. 04:12 기동으로도 그날 주문이 들어갑니다.</p>
+<p>DCA는 <strong>금액 기반 시장가</strong> 주문이라 04:00에 접수가 끊깁니다. 같은 지연에서 DCA만 그날을 통째로 놓칩니다.</p>
+</blockquote>
+<p>즉 워커 기동이 늦을 때 <strong>DCA가 가장 먼저, 그리고 혼자서 조용히 실패하는 전략</strong>입니다. 화면에서는 다른 전략은 돌아가는데 DCA만 멈춘 것처럼 보입니다.</p>
+
+<h2>5. 장부에 남은 어긋남 <span class="ok">— 해소됨</span></h2>
+<table>
+  <tr><th>거래일</th><th>어긋남</th><th>처리</th></tr>
+  <tr><td>2026-09-02</td><td>적립 50,000원 + 주문 누락</td><td class="ok">재구성 완료 (아래 6항)</td></tr>
+  <tr><td>2026-09-03</td><td>주문 누락 (적립은 반영됨)</td><td class="ok">재구성 완료 (아래 6항)</td></tr>
+</table>
+<p>계좌가 dryRun이므로 실제 자금 이동은 없었고, 시뮬레이션 정확도만 어긋난 상태였습니다.</p>
+
+<h2>6. 재구성 실행 기록 <span class="muted">— 2026-09-04 07:43 KST 적용</span></h2>
+
+<p>누락된 두 거래일을 실제 전략 코드 함수(<code>accrue</code> → <code>updatePeak</code> → <code>pickSymbol</code> → <code>planAmountBuy</code> → <code>estimateQuantity</code> → <code>applyFills</code>)로 순서대로 재생해 산출한 값을 삽입했습니다. 손으로 계산한 값이 아니라, 워커가 그날 살아 있었다면 같은 함수들이 만들어낸 값입니다.</p>
+
+<h3>삽입한 주문 2건</h3>
+<table>
+  <tr><th>거래일</th><th>종목</th><th>전일종가</th><th>낙폭</th><th>환율</th><th>주문액</th><th>체결가</th><th>수량</th></tr>
+  <tr><td>2026-09-02</td><td>QQQ</td><td>707.64</td><td>-5.16%</td><td>1362.56</td><td>$36.69 / 49,992원</td><td>709.24</td><td>0.051731</td></tr>
+  <tr><td>2026-09-03</td><td>QQQ</td><td>709.24</td><td>-4.95%</td><td>1357.29</td><td>$36.84 / 50,003원</td><td>717.67</td><td>0.051333</td></tr>
+</table>
+<p>두 날 모두 낙폭이 임계 15%에 한참 못 미쳐 레버리지 전환 없이 기준 종목 QQQ를 삽니다. 최고 종가 746.16(2026-06-02)도 두 날의 종가가 모두 그 아래라 갱신되지 않습니다.</p>
+
+<h3>계좌 상태 변경</h3>
+<table>
+  <tr><th>항목</th><th>변경 전</th><th>변경 후</th></tr>
+  <tr><td><code>cashKrw</code></td><td>50,004원</td><td>9원</td></tr>
+  <tr><td><code>note</code></td><td>금액 기반 주문 접수 시간 경과 — 적립만 반영</td><td>(지움)</td></tr>
+  <tr><td><code>peakPrice</code> / <code>peakDate</code></td><td>746.16 / 2026-06-02</td><td>변경 없음</td></tr>
+  <tr><td><code>lastRunDate</code> / <code>lastAccrualDate</code></td><td>2026-09-03</td><td>변경 없음</td></tr>
+  <tr><td>누적 보유 (시뮬)</td><td>QQQ 0.102256주</td><td>QQQ 0.205320주</td></tr>
+</table>
+<p><code>note</code>를 지운 이유는 &ldquo;09-03은 적립만 반영&rdquo;이라는 경고가 이제 사실과 다르기 때문입니다. 정상 시뮬 주문 성공 경로도 <code>note</code>를 <code>null</code>로 만듭니다.</p>
+
+<h3>검산</h3>
+<pre><code>적립 4회(50,000 × 4) + 체결 4회 재생 → 잔액 9원   ·  DB 9원  ✓
+주문 원화 합계 199,991원 = 적립 총액 200,000 − 잔액 9  ✓
+미반영 체결 행(stateApplied 미설정) 0건  ✓
+DCA 단위 테스트 6파일 94건 통과  ✓
+화면: 이월 잔액 9원 · 보유 QQQ 0.2053주 · 평가액 $147.16  ✓</code></pre>
+<blockquote>
+<p>가장 중요한 검산은 <strong>미반영 체결 행 0건</strong>입니다. 삽입한 행에 <code>stateApplied: true</code>를 세우지 않으면 다음 워커 폴의 <code>applyPendingFills</code>가 같은 체결을 한 번 더 차감해 잔액이 10만원 가까이 어긋납니다.</p>
+</blockquote>
+
+<h3>근사한 값과 그 오차</h3>
+<p>재구성이 원본과 완전히 같지는 않습니다. 두 값이 근사입니다.</p>
+<ul>
+  <li><strong>체결가</strong> — 원래는 주문 시점(한국시간 22:30~23:30, 개장 직후) 시세입니다. 토스 일봉은 종가와 고가만 주고 분봉 과거 데이터가 없어 <strong>그날 종가</strong>를 썼습니다. 09-03은 종가가 고가에 가까워(717.67 / 718.92) 실제 개장 직후보다 다소 비싸게 산 것으로 기록됐을 가능성이 있습니다.</li>
+  <li><strong>환율</strong> — 토스에는 과거 환율 API가 없어 ECB 일별 고시환율(Frankfurter)을 썼습니다. 편차는 기존 실측 행과 대조해 확인했습니다.</li>
+</ul>
+<table>
+  <tr><th>날짜</th><th>토스 실측 (기존 행)</th><th>ECB</th><th>편차</th></tr>
+  <tr><td>2026-08-31</td><td>1372.54</td><td>1368.03</td><td>-0.33%</td></tr>
+  <tr><td>2026-09-01</td><td>1374.99</td><td>1374.61</td><td>-0.03%</td></tr>
+  <tr><td>2026-09-02</td><td class="muted">(없음)</td><td>1362.56</td><td>—</td></tr>
+  <tr><td>2026-09-03</td><td class="muted">(없음)</td><td>1357.29</td><td>—</td></tr>
+</table>
+<p>0.03~0.33% 편차는 코드가 이미 감수하는 센트 절삭 오차와 같은 수준입니다. 삽입한 두 행은 주문 이력 화면에서 <code>재구성(워커 미가동 누락분 · 종가·ECB환율 기준)</code> 표시가 붙어 구분됩니다.</p>
+<p class="muted">되돌리려면 백업본이 있습니다: <code>apps/company-map/data/company-map.db.bak-20260904-074226</code></p>
+
+<h3>오늘 밤 실행</h3>
+<p>화면의 &ldquo;오늘 주문 미리보기&rdquo;가 <strong>주문 없음 — 잔액이 1센트 미만</strong>으로 보이는 것은 정상입니다. 현재 잔액 9원은 $0.0066이라 1센트에 못 미치지만, 실행 순서가 <strong>적립 → 주문</strong>이라 오늘 밤 22:30에 50,000원이 먼저 붙어 약 50,009원으로 주문이 나갑니다. 08-31(직전 잔액 12원)과 09-01(4원)도 같은 모양이었습니다.</p>
+<p><code>lastRunDate</code>가 2026-09-03이고 2026-09-04 주문 행이 없으며 LIVE 미해결 주문도 0건이라, 오늘 세션을 막는 가드는 없습니다. <strong>단 워커가 그때까지 살아 있어야 합니다</strong> — 재발 방지(launchd 등록)는 이번에 적용하지 않았습니다.</p>
+
+<h2>7. 인접 관찰 <span class="muted">— DCA와 별개</span></h2>
+<p><code>infinite_buy_orders</code>에 2026-09-03 거래일 <strong>LIVE</strong> 주문 3건이 <code>submitted</code> 상태로 남아 있습니다(04:12 기록, <code>dry_run=0</code>). 무한매수는 <code>src/lib/infinite-buy/sync.ts</code>가 토스 체결 목록과 대조해 반영하는 별도 경로가 있어 다음 세션 폴에서 정산될 것으로 보이지만, 실제 자금이 걸린 건이라 토스 앱에서 체결 여부를 따로 확인하시는 편이 좋습니다.</p>
+
+</body>
+</html>

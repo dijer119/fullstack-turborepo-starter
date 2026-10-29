@@ -52,4 +52,73 @@ describe("parseNaverEtfAnalysis", () => {
     const { marketValue } = parseNaverEtfAnalysis({ itemName: "x", marketValue: "1.2조" });
     expect(marketValue).toBe(1_200_000_000_000n);
   });
+
+  it("기간별 수익률(시장가·NAV)과 기준일을 파싱한다", () => {
+    const { returns } = parseNaverEtfAnalysis({
+      itemName: "x",
+      returnPerformanceReferenceDate: "2026.10.01",
+      returnPerformanceList: [
+        { periodTypeCode: "D1", value: -0.5 },
+        { periodTypeCode: "Y10", value: 13.72 },
+      ],
+      navPerformanceReferenceDate: "2026.10.01",
+      navPerformanceList: [{ periodTypeCode: "D1", value: -0.5 }],
+    });
+    expect(returns).toEqual({
+      referenceDate: "20261001",
+      market: [
+        { period: "D1", value: -0.5 },
+        { period: "Y10", value: 13.72 },
+      ],
+      nav: [{ period: "D1", value: -0.5 }],
+    });
+  });
+
+  it("값이 숫자가 아니거나 기간 코드가 없는 수익률 항목은 버린다", () => {
+    const { returns } = parseNaverEtfAnalysis({
+      itemName: "x",
+      returnPerformanceReferenceDate: "2026.10.01",
+      returnPerformanceList: [
+        { periodTypeCode: "D1", value: null },
+        { periodTypeCode: "M1", value: "-3.53" },
+        { value: 1 },
+      ],
+    });
+    expect(returns).toEqual({
+      referenceDate: "20261001",
+      market: [{ period: "M1", value: -3.53 }],
+      nav: [],
+    });
+  });
+
+  it("분배금 요약(TTM 분배금·분배율·올해 횟수·지급월)을 파싱한다", () => {
+    const { dividend } = parseNaverEtfAnalysis({
+      itemName: "x",
+      dividend: {
+        dividendYieldTtm: 1.22,
+        dividendPerShareTtm: 400,
+        dividendCountThisYear: 3,
+        dividendMonthThisYear: "1,4,7",
+      },
+    });
+    expect(dividend).toEqual({ perShareTtm: 400, yieldTtm: 1.22, countThisYear: 3, monthsThisYear: [1, 4, 7] });
+  });
+
+  it("분배가 없는 ETF는 0과 빈 지급월로 파싱한다", () => {
+    const { dividend } = parseNaverEtfAnalysis({
+      itemName: "x",
+      dividend: { dividendYieldTtm: 0, dividendPerShareTtm: 0, dividendCountThisYear: 0, dividendMonthThisYear: "" },
+    });
+    expect(dividend).toEqual({ perShareTtm: 0, yieldTtm: 0, countThisYear: 0, monthsThisYear: [] });
+  });
+
+  it("dividend 필드가 없으면 null", () => {
+    const { dividend } = parseNaverEtfAnalysis({ itemName: "x" });
+    expect(dividend).toBeNull();
+  });
+
+  it("수익률 목록이 둘 다 없으면 returns는 null", () => {
+    const { returns } = parseNaverEtfAnalysis({ itemName: "x" });
+    expect(returns).toBeNull();
+  });
 });

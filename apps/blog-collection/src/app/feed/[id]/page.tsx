@@ -10,11 +10,10 @@ export default async function FeedPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string; search?: string; tag?: string }>;
+  searchParams: Promise<{ search?: string; tag?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const page = Number(sp.page) || 1;
 
   const supabase = await createClient();
   const { data: feed } = await supabase
@@ -50,7 +49,7 @@ export default async function FeedPage({
         {/* <RefreshButton feedId={id} /> */}
       </div>
 
-      <PostList feedId={id} page={page} search={sp.search} tag={sp.tag} />
+      <PostList feedId={id} search={sp.search} tag={sp.tag} />
     </div>
   );
 }

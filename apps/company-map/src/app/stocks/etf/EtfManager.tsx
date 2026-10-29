@@ -10,6 +10,7 @@ import { moveCode } from "@/lib/etf/reorder";
 import { formatMarcap } from "@/lib/format-marcap";
 import { triggerRefresh, type RefreshStateView } from "@/actions/refresh-jobs";
 import type { ShareHistory } from "@/lib/etf/history";
+import type { EtfDividend, EtfPeriodReturn, EtfReturns } from "@/lib/etf/types";
 import { ShareHistorySection } from "./ShareHistorySection";
 
 function pct(v: number | null): string { return v == null ? "—" : `${v.toFixed(2)}%`; }
@@ -17,6 +18,91 @@ function deltaP(v: number | null): string { return v == null ? "" : `${v >= 0 ? 
 function deltaColor(v: number | null): string {
   if (v == null || v === 0) return "text-gray-400";
   return v > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
+}
+
+// Naver 기간 코드 → 표시명. 표에는 응답에 있는 기간만 이 순서로 나온다(모르는 코드는 뒤에 원문 그대로).
+const PERIOD_LABELS: [string, string][] = [
+  ["D1", "1일"], ["W1", "1주"], ["M1", "1개월"], ["M3", "3개월"], ["M6", "6개월"],
+  ["YTD", "YTD"], ["Y1", "1년"], ["Y3", "3년"], ["Y5", "5년"], ["Y10", "10년"],
+];
+
+// "20261001" → "2026-10-01"
+function fmtYmd(ymd: string): string {
+  return ymd.length === 8 ? `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}` : ymd;
+}
+
+function ReturnsTable({ returns }: { returns: EtfReturns }) {
+  const present = new Set([...returns.market, ...returns.nav].map((r) => r.period));
+  const known = new Set(PERIOD_LABELS.map(([c]) => c));
+  const periods: [string, string][] = [
+    ...PERIOD_LABELS.filter(([c]) => present.has(c)),
+    ...[...present].filter((c) => !known.has(c)).map((c): [string, string] => [c, c]),
+  ];
+  if (periods.length === 0) return null;
+  const rows: [string, EtfPeriodReturn[]][] = [["시장가", returns.market], ["NAV", returns.nav]];
+  return (
+    <div className="mb-3">
+      <div className="mb-1 text-xs text-gray-500">
+        기간별 수익률{returns.referenceDate && ` · 기준일 ${fmtYmd(returns.referenceDate)}`} (Naver)
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-separate border-spacing-0">
+          <thead>
+            <tr>
+              <th className="border-b p-2 text-left" />
+              {periods.map(([c, label]) => (
+                <th key={c} className="whitespace-nowrap border-b p-2 text-right">{label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([label, list]) => {
+              const byPeriod = new Map(list.map((r) => [r.period, r.value]));
+              return (
+                <tr key={label}>
+                  <td className="whitespace-nowrap p-2 text-gray-500">{label}</td>
+                  {periods.map(([c]) => {
+                    const v = byPeriod.get(c) ?? null;
+                    return (
+                      <td key={c} className={`whitespace-nowrap p-2 text-right tabular-nums ${deltaColor(v)}`}>
+                        {v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function DividendLine({ dividend }: { dividend: EtfDividend }) {
+  const perShare = dividend.perShareTtm ?? 0;
+  if (perShare <= 0) {
+    return <div className="mb-3 text-sm text-gray-500">최근 12개월 분배 없음</div>;
+  }
+  const count = dividend.countThisYear ?? 0;
+  return (
+    <div className="mb-3 text-sm">
+      <span className="text-gray-500">분배금(최근 12개월)</span>{" "}
+      <span className="font-medium tabular-nums">{perShare.toLocaleString()}원</span>
+      {dividend.yieldTtm != null && (
+        <>
+          {" · "}<span className="text-gray-500">분배율</span>{" "}
+          <span className="font-medium tabular-nums">{dividend.yieldTtm.toFixed(2)}%</span>
+        </>
+      )}
+      {count > 0 && (
+        <span className="text-gray-500">
+          {" · "}올해 {count}회 지급
+          {dividend.monthsThisYear.length > 0 && ` (${dividend.monthsThisYear.join("·")}월)`}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function fmtTime(iso: string | null): string {
@@ -121,6 +207,11 @@ export function EtfManager({
           className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
           비중 합산 보기
         </button>
+        <button
+          onClick={() => router.push("/stocks/etf/compare")}
+          className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
+          수익률·분배 비교
+        </button>
         {msg && <span className="text-xs text-gray-500">{msg}</span>}
       </div>
 
@@ -185,6 +276,8 @@ export function EtfManager({
             {detail.prevTrdDd ? ` · 직전 ${detail.prevTrdDd} 대비` : " · 비교할 직전 데이터 없음"}
             {detail.marketValue != null && ` · 시가총액 ${formatMarcap(detail.marketValue)}`}
           </div>
+          {detail.returns && <ReturnsTable returns={detail.returns} />}
+          {detail.dividend && <DividendLine dividend={detail.dividend} />}
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-separate border-spacing-0">
               <thead>

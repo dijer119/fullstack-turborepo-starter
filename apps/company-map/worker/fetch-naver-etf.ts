@@ -1,5 +1,5 @@
 import { parseNaverEtfAnalysis } from "@/lib/etf/naver";
-import type { Holding } from "@/lib/etf/types";
+import type { EtfDividend, EtfReturns, Holding } from "@/lib/etf/types";
 
 // Naver 모바일 ETF API로 구성종목(상위 10)을 가져온다. KRX MDC가 이 환경에서
 // 차단되어(LOGOUT) 동작하는 Naver로 전환. 단축코드(예: 0074K0)를 그대로 사용.
@@ -22,7 +22,14 @@ export function lastBusinessDay(d = new Date()): string {
 
 export async function fetchNaverEtf(
   code: string,
-): Promise<{ name: string; holdings: Holding[]; marketValue: bigint | null; trdDd: string } | null> {
+): Promise<{
+  name: string;
+  holdings: Holding[];
+  marketValue: bigint | null;
+  returns: EtfReturns | null;
+  dividend: EtfDividend | null;
+  trdDd: string;
+} | null> {
   try {
     const res = await fetch(
       `https://m.stock.naver.com/api/stock/${encodeURIComponent(code)}/etfAnalysis`,
@@ -33,8 +40,8 @@ export async function fetchNaverEtf(
       return null;
     }
     const json = await res.json();
-    const { name, holdings, marketValue } = parseNaverEtfAnalysis(json);
-    return { name, holdings, marketValue, trdDd: lastBusinessDay() };
+    const { name, holdings, marketValue, returns, dividend } = parseNaverEtfAnalysis(json);
+    return { name, holdings, marketValue, returns, dividend, trdDd: lastBusinessDay() };
   } catch (err) {
     console.warn(`[naver-etf] ${code} fetch failed:`, err instanceof Error ? err.message : err);
     return null;
