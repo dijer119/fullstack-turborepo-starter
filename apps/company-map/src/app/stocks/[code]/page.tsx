@@ -19,6 +19,7 @@ import { listLinksByCode } from "@/actions/stock-links";
 import { QuantDashboard } from "./QuantDashboard";
 import { getWeek52Price } from "@/lib/stocks/week52";
 import { getTreasuryYield } from "@/lib/rates/ecos";
+import { RecordStockView } from "@/components/stocks/RecordStockView";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,7 @@ export default async function StockDetailPage({
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-6">
+      <RecordStockView symbol={code} />
       <Link
         href="/stocks"
         className="text-sm text-blue-600 hover:underline dark:text-blue-400"

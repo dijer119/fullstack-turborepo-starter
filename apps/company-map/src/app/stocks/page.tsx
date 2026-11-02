@@ -89,7 +89,7 @@ export default async function StocksPage({
           <p className="mt-1 text-sm text-gray-500">
             KOSPI · KOSDAQ 전체 상장 종목. 필터·정렬로 탐색하세요.
           </p>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Link href="/stocks/etf" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
               액티브 ETF 구성종목 변화 →
             </Link>
@@ -104,6 +104,9 @@ export default async function StocksPage({
             </Link>
             <Link href="/stocks/infinite-buy" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
               무한매수법 →
+            </Link>
+            <Link href="/stocks/split" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
+              분할매매 →
             </Link>
           </div>
         </div>

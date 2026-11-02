@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>종목 진행 상세 화면 분석</title><style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:880px;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#1a202c;background:#fff}h1{border-bottom:2px solid #2c5282;padding-bottom:.4rem}h2{border-bottom:1px solid #e2e8f0;padding-bottom:.3rem;margin-top:2rem;color:#2c5282}h3{color:#2c5282}table{border-collapse:collapse;width:100%;margin:.6rem 0}th{background:#edf2f7;text-align:left}th,td{border:1px solid #cbd5e0;padding:.5rem;vertical-align:top}.scroll{overflow-x:auto}ul,ol{padding-left:1.5rem}li{margin:.3rem 0}.note{border-left:3px solid #d69e2e;background:#fffaf0;padding:.6rem 1rem}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.7rem}.card{border:1px solid #e2e8f0;border-radius:10px;padding:1rem;background:#f8fafc}.muted{font-size:.9rem;color:#64748b}.positive{color:#d93665}code{background:#f7fafc;padding:.1rem .35rem;border-radius:3px}strong{font-weight:650}.wire{border:1px solid #cbd5e0;border-radius:12px;padding:1rem}.band{border-radius:8px;background:#f1f5f9;margin:.7rem 0;padding:.8rem}.tabs{display:flex;flex-wrap:wrap;gap:.5rem}.tabs span{border-radius:20px;background:#e2e8f0;padding:.3rem 1rem}.tabs .active{background:#24365b;color:white}
+</style></head><body>
+<h1>종목 진행 상세 화면 분석</h1><p class="muted">2026-11-01 · 첨부 이미지와 현재 company-map의 분할매매 상세 코드 기준. 이번 작업은 분석이며 기능 코드는 변경하지 않았다.</p>
+<p><strong>핵심은 ‘설정값을 입력하는 화면’에서 한 단계 더 나아가, 종목이 어떤 가격 흐름을 거쳐 몇 번 사고팔렸고 현재 어디까지 진행됐는지 설명하는 것이다.</strong> 가격 차트, 차수별 반복 현황, 누적 실현손익, 최근 거래가 같은 맥락으로 연결된다.</p>
+<h2>1. 이미지에서 확인되는 구성</h2>
+<div class="scroll"><table><thead><tr><th>영역</th><th>확인되는 내용</th><th>사용자가 얻는 정보</th></tr></thead><tbody>
+<tr><td>가격 흐름과 거래 표시</td><td>빨간 선, 1·2·3차 점선, 빨간 B와 파란 S 표식</td><td>가격 하락 중 분할 진입과 반등 중 매도·재진입 흐름을 시각적으로 파악한다. B는 매수, S는 매도로 해석하는 것이 자연스럽다.</td></tr>
+<tr><td>전략 설정 요약</td><td>차수 3, 매수 간격 3%, 매도 간격 3%와 슬라이더 모양</td><td>전체 전략의 기본 규모와 간격을 빠르게 확인한다. 이미지로는 실제 편집 가능 여부와 저장 방식까지 확인할 수 없다.</td></tr>
+<tr><td>차수별 거래 현황</td><td>1~5차의 막대와 매수·매도·반복 횟수</td><td>어떤 차수가 많이 반복되고 어느 차수에 보유가 남았는지 비교한다.</td></tr>
+<tr><td>성과 합계</td><td>총 완성 거래 16회 반복, 누적 수익 +1,500,000</td><td>전략의 누적 성과를 한 번에 확인한다. 수수료·세금 포함 여부와 통화는 이미지에서 명확하지 않다.</td></tr>
+<tr><td>최근 거래</td><td>2차, 99,000, 매도, +500</td><td>최근 어떤 차수에서 매도가 있었는지 확인한다. 99,000이 단가인지 거래금액인지, +500의 정확한 계산 기준인지는 라벨이 부족하다.</td></tr>
+</tbody></table></div>
+<h2>2. 숫자로 읽히는 운용 상태</h2>
+<div class="scroll"><table><thead><tr><th>차수</th><th>매수</th><th>매도</th><th>표시된 반복</th><th>해석</th></tr></thead><tbody>
+<tr><td>1차</td><td>1</td><td>0</td><td>0</td><td>처음 진입한 보유가 남은 것으로 해석 가능</td></tr>
+<tr><td>2차</td><td>6</td><td>5</td><td>5</td><td>5번 회수하고 다시 진입한 상태로 해석 가능</td></tr>
+<tr><td>3차</td><td>8</td><td>7</td><td>7</td><td>7번 회수하고 다시 진입한 상태로 해석 가능</td></tr>
+<tr><td>4차</td><td>4</td><td>4</td><td>4</td><td>진입한 물량을 모두 회수한 상태로 해석 가능</td></tr>
+<tr><td>5차</td><td>0</td><td>0</td><td>0</td><td>아직 거래하지 않은 차수</td></tr>
+</tbody></table></div>
+<p><strong>반복 합계는 0 + 5 + 7 + 4 + 0 = 16회</strong>로 하단 합계와 일치한다. 매수 합계는 19회, 매도 합계는 16회다. 각 횟수가 ‘완료된 진입·청산’ 단위이고 부분 매도가 없다는 전제에서는 1·2·3차에 각각 한 회차가 남아 있다고 볼 수 있다. 이 숫자만으로 보유 주식 수나 투자금은 알 수 없다.</p>
+<div class="note"><strong>확정할 수 없는 부분</strong><ul><li>상단 설정은 3차인데 4차 거래 이력이 있다. 과거 설정 이력, 다른 예시의 조합, 활성 차수 표시 중 어느 것인지는 이미지로 판단할 수 없다.</li><li>차수별 막대의 길이는 매수 횟수·반복 횟수와 정확하게 일치하지 않는다. 거래 횟수, 투입금, 보유 비율 중 무엇을 뜻하는지 범례가 필요하다.</li><li>큰 B/S 표식의 크기는 거래량이나 강조·선택 상태일 수 있다. 크기를 수량으로 해석해서는 안 된다.</li><li>상단 그래프에는 날짜·가격 축이 없어 실제 시계열 차트인지 전략 설명용 도식인지 확정할 수 없다.</li></ul></div>
+<h2>3. 현재 앱과 비교</h2>
+<div class="scroll"><table><thead><tr><th>기능</th><th>현재 상태</th><th>추가할 내용</th></tr></thead><tbody>
+<tr><td>차수별 설정</td><td>개별 매수금액·하락률·익절률과 LIVE 중 저장 기능이 있다.</td><td>진행 화면에는 설정 요약만 보여주고 편집은 설정 탭에서 제공한다. 개별 값이 다르면 ‘차수별 개별 설정’으로 표시한다.</td></tr>
+<tr><td>보유·누적 손익</td><td>배정 잔액, 누적 실현손익, 보유 평가액, 총자산·총손익이 있다.</td><td>실현손익과 미실현 평가손익을 분리해 우선 표시하고, 완결 거래 횟수와 현재 보유 차수를 추가한다.</td></tr>
+<tr><td>차수·회차 장부</td><td>slot·generation별 실제 매수·매도 수량과 비용을 보존한다.</td><td>차수별 진입 회수·완결 회수·현재 잔량을 요약할 수 있다.</td></tr>
+<tr><td>주문 이력</td><td>주문별 누적 체결량·금액·비용과 접수·동기화 시각을 보존한다.</td><td>보유 중·매도 완료·미체결·확인 필요 상태를 포함한 최근 거래 타임라인을 제공한다.</td></tr>
+<tr><td>가격 차트와 체결 표식</td><td>분할매매 장부 자체에는 마지막 판단가와 주문별 누적 체결이 있다. 체결별 시각·가격의 시계열은 없다.</td><td>정확한 체결 차트에는 시세 이력과 체결 이벤트 기록이 필요하다. 주문 시각·누적 평균 체결가로 그리는 표식은 ‘주문일 기준’임을 구분한다.</td></tr>
+</tbody></table></div>
+<h2>4. 이 앱에 맞는 화면 제안</h2>
+<div class="wire"><strong>종목명 · 코드 · 운용 상태</strong><p class="muted">최근 시세 시각 · 현재 보유수량 · 주문 확인 상태</p><div class="tabs"><span class="active">진행 현황</span><span>차수별 장부</span><span>거래 이력</span><span>설정</span></div><div class="band">가격 차트 · 매수/매도 표식 · 보유 차수 매수가 · 다음 매수 기준 · 차수별 익절 목표</div><div class="cards"><div class="card">누적 실현손익<br><strong>비용 차감 후</strong></div><div class="card">보유 평가손익<br><strong>아직 실현하지 않은 손익</strong></div><div class="card">완결 거래<br><strong>청산 완료 회차 수</strong></div><div class="card">현재 보유<br><strong>차수 수 · 주식 수</strong></div></div><div class="band">차수별 현황: 매수 회차 / 청산 완료 / 보유수량 / 다음 매수·익절 기준 / 실현손익</div><div class="band">최근 거래: 시각 / 차수·회차 / 매수·매도 / 체결수량 / 평균체결가 / 상태</div></div>
+<p>이미지처럼 통합 슬라이더만 두면 이미 구현한 차수별 개별 설정을 표현하기 어렵다. 슬라이더를 복제하기보다 <strong>현재 전략 요약 + 설정 화면 이동</strong>이 적합하다. 진행 현황에서는 관측과 성과를 읽고, 저장 동작은 기존 설정 화면에서 수행하게 한다.</p>
+<h2>5. 집계와 차트에서 지켜야 할 기준</h2>
+<ul><li><strong>차수와 회차를 구분:</strong> 2차를 매도한 뒤 다시 사면 같은 2차의 다음 회차다.</li><li><strong>반복 횟수:</strong> 한 회차의 매입 수량을 모두 매도하고 미해결 주문이 정리된 청산 완료 단위로 센다. 매도 주문 수나 부분 체결 건수를 반복 횟수로 세지 않는다.</li><li><strong>누적 수익:</strong> 기존 장부의 수수료·세금·손실 반영 실현손익을 그대로 사용한다. 완료 회차 수와 별개로 부분 매도의 실현손익도 포함한다.</li><li><strong>진행 막대:</strong> 보유 비율을 표시한다면 잔량 ÷ 매입수량처럼 분모를 명시한다. 반복 횟수 비교를 원하면 횟수 막대라고 별도로 표시한다.</li><li><strong>기준선:</strong> 현재 전략은 앞 차수의 실제 매수가에서 다음 하락 기준을 계산하므로 최초 가격의 고정 수평선 세 개만으로 표현하면 부정확할 수 있다. 현재 보유 회차 기준선과 과거 체결을 구분한다.</li><li><strong>표식:</strong> 주문 접수·실제 체결·부분 체결·취소를 같은 B/S로 표시하지 않는다. 정확한 체결 시각이 없는 기록은 시간 정밀도를 부풀리지 않는다.</li></ul>
+<h2>6. 구현 우선순위</h2>
+<ol><li><strong>기존 데이터로 가능한 진행 현황:</strong> 요약 카드, 차수별 완료 회차·현재 잔량·실현손익, 최근 거래 목록. 현재 상세 화면을 가장 빠르게 이해하기 쉬워진다.</li><li><strong>가격과 기준선 시각화:</strong> 사용할 가격 이력의 주기와 기간을 정한 뒤 현재 보유 매수가·다음 매수 기준·익절 목표를 표시한다.</li><li><strong>정확한 체결 차트:</strong> 체결 이벤트와 관측 시각을 저장하고 가격 시계열 위에 연결한다. 기존 기록은 가능한 정확도 범위 안에서만 제공한다.</li></ol>
+<p><strong>추천 방향:</strong> 현재 ‘설정·장부’ 상세를 진행 현황 중심으로 재배치하고, 설정 편집을 별도 탭으로 옮기는 구성이 가장 잘 맞는다. 이미지의 반복 거래 집계는 도입 가치가 높지만, 축 없는 가격선이나 정의되지 않은 막대 길이까지 복제할 필요는 없다.</p>
+</body></html>

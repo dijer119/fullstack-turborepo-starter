@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <!-- 점검 시간이면 Flutter를 띄우지 않고 점검 안내 페이지로 보냅니다. -->
+  <script src="maintenance_config.js"></script>
+  <script>
+    (function () {
+      if (!window.MaintenanceGate) return;
+
+      // 지금이 점검 시간이면 안내 페이지로 바로 이동합니다.
+      if (MaintenanceGate.isMaintenanceNow()) {
+        location.replace(MaintenanceGate.CONFIG.maintenanceUrl);
+        return;
+      }
+
+      // 앱을 켠 뒤 점검이 시작되면 그 시각에 안내 페이지로 전환합니다.
+      var untilStart = MaintenanceGate.msUntilStart();
+      if (untilStart != null) {
+        setTimeout(function () {
+          location.replace(MaintenanceGate.CONFIG.maintenanceUrl);
+        }, untilStart);
+      }
+    })();
+  </script>
+
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+
+  <!--
+    <base href="/eugene/">
+  -->
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+  <meta name="description" content="매직스플릿 유진투자증권 KR 웹앱 버전입니다.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="매직스플릿 유진투자증권 KR">
+  <link rel="apple-touch-icon" href="icons/magicsplit_icon.svg">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg" />
+
+  <title>매직스플릿 유진투자증권 KR</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- ★ 추가: 초기 로딩 화면 스타일 -->
+  <style>
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #1d2f58;
+      overflow: hidden;
+    }
+
+    #flutter-loading {
+      position: fixed;
+      inset: 0;
+      background: #1d2f58;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    #flutter-loading img {
+      width: 280px;
+      max-width: 80vw;
+    }
+
+    #flutter-loading span {
+      font-size: 14px;
+      color: #666;
+    }
+  </style>
+
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="./vendor/x8byte-common-2.2.8-min.js"></script>
+  <script src="./vendor/x8byte-safetoken-3.1.0-min.js"></script>
+  <script src="drift_worker.dart.js" defer></script>
+  <script>
+    function checkSafetoken() {
+      var w = window;
+      var ok = !!(w.eightbyte && w.eightbyte.safetoken && w.eightbyte.safetoken.SafetokenSimpleClient);
+      w.__safetokenReady = ok;
+      if (!ok) {
+        if (!w.eightbyte) w.__safetokenReadyReason = "eightbyte is undefined";
+        else w.__safetokenReadyReason = "SafetokenSimpleClient is undefined";
+      }
+      console.log("Safetoken Ready Check:", ok, w.__safetokenReadyReason);
+    }
+
+    // 페이지 로드 및 스크립트 로드 후 실행되도록 보장
+    window.addEventListener('load', checkSafetoken);
+  </script>
+</head>
+
+<body>
+
+  <!-- ★ 추가: Flutter 로딩 중 표시될 화면 -->
+  <div id="flutter-loading">
+    <!-- loading.gif / loading.png 자유롭게 교체 가능 -->
+    <img src="icons/magicsplit_icon.svg?v=1.4.14" alt="loading">
+    <p style="margin:16px 0 0;color:#ccc;font-size:14px;font-family:sans-serif;">로딩 중...</p>
+  </div>
+
+  <!-- ★ TradingView Lightweight Charts (패널 API 동작 고정을 위해 버전을 명시합니다) -->
+  <script src="https://unpkg.com/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js"></script>
+  <!-- ★ 커스텀 차트 마커 (매수/매도 배지 형태) -->
+  <script src="custom_chart_markers.js"></script>
+  <!-- ★ 위쪽 둥근 거래량 막대 -->
+  <script src="custom_rounded_volume.js?v=3"></script>
+  <!-- ★ 캔들·거래량 2패널 구성 및 높이 비율 제어 -->
+  <script src="custom_chart_panes.js?v=1"></script>
+
+  <!--
+    Flutter 부트스트랩은 아래 캐시 정리 스크립트가 Service Worker 해제·Cache Storage 삭제를
+    끝낸 뒤에만 동적으로 로드합니다. (async 고정 태그는 구 캐시와 경합합니다)
+  -->
+  <script>
+    (function () {
+      var DEPLOY_VERSION = '1.4.14';
+      // v2 키: 1.4.4에서 localStorage만 갱신되고 캐시가 남은 기기를 다시 정리합니다.
+      var STORAGE_KEY = 'magicsplit_kr_deploy_v2';
+      var RELOAD_FLAG = 'magicsplit_kr_reload_v2';
+      var AUTO_RECOVERY_KEY = 'magicsplit_kr_auto_recovery';
+
+      // 1단계: 등록된 Service Worker를 모두 해제합니다.
+      function unregisterAllServiceWorkers() {
+        if (!('serviceWorker' in navigator)) {
+          return Promise.resolve();
+        }
+
+        return navigator.serviceWorker.getRegistrations().then(function (registrations) {
+          return Promise.all(
+            registrations.map(function (registration) {
+              return registration.unregister();
+            })
+          );
+        });
+      }
+
+      // 2단계: Cache Storage에 남은 Flutter 정적 파일 캐시를 모두 삭제합니다.
+      function deleteAllCaches() {
+        if (!('caches' in window)) {
+          return Promise.resolve();
+        }
+
+        return caches.keys().then(function (names) {
+          return Promise.all(
+            names.map(function (name) {
+              return caches.delete(name);
+            })
+          );
+        });
+      }
+
+      // 3단계: Service Worker와 Cache Storage를 함께 정리합니다.
+      function purgeAllWebCaches() {
+        return Promise.all([unregisterAllServiceWorkers(), deleteAllCaches()]);
+      }
+
+      // 4단계: Flutter 부트스트랩을 로드합니다.
+      // 버전 변경·첫 접속·자동 복구 시에만 main.dart.js를 no-store로 선-fetch합니다.
+      function loadFlutterBootstrap(forceFresh) {
+        var bootstrapUrl = 'flutter_bootstrap.js?v=' + encodeURIComponent(DEPLOY_VERSION);
+
+        function appendBootstrap() {
+          var script = document.createElement('script');
+          script.src = bootstrapUrl;
+          document.body.appendChild(script);
+        }
+
+        if (forceFresh) {
+          var mainJsUrl = 'main.dart.js?v=' + encodeURIComponent(DEPLOY_VERSION);
+          fetch(mainJsUrl, { cache: 'no-store' }).finally(appendBootstrap);
+          return;
+        }
+
+        appendBootstrap();
+      }
+
+      // 5단계: 배포 버전이 바뀌었는지 확인합니다.
+      function getSavedDeployVersion() {
+        try {
+          return localStorage.getItem(STORAGE_KEY);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      // 6단계: 버전 변경 시 1회 새로고침 후 앱을 시작합니다.
+      function bootstrapAfterCachePurge() {
+        var savedVersion = getSavedDeployVersion();
+        var reloadedForVersion = false;
+
+        try {
+          reloadedForVersion = sessionStorage.getItem(RELOAD_FLAG) === DEPLOY_VERSION;
+        } catch (e) {
+          // sessionStorage 불가 시 새로고침 없이 진행합니다.
+        }
+
+        purgeAllWebCaches().then(function () {
+          if (savedVersion !== DEPLOY_VERSION && !reloadedForVersion) {
+            try {
+              sessionStorage.setItem(RELOAD_FLAG, DEPLOY_VERSION);
+            } catch (e) {
+              // sessionStorage 저장 실패여도 새로고침은 시도합니다.
+            }
+            location.reload();
+            return;
+          }
+
+          try {
+            localStorage.setItem(STORAGE_KEY, DEPLOY_VERSION);
+          } catch (e) {
+            // localStorage 저장 실패여도 앱 로드는 계속합니다.
+          }
+
+          // 버전 변경·배포 직후 reload·자동 복구 직후에만 no-store 선-fetch
+          var forceFresh = savedVersion !== DEPLOY_VERSION || reloadedForVersion;
+          loadFlutterBootstrap(forceFresh);
+        });
+      }
+
+      // 다른 스크립트에서 로딩 실패 시 자동 복구에 사용합니다.
+      window.__magicsplitPurgeCaches = purgeAllWebCaches;
+      window.__magicsplitDeployVersion = DEPLOY_VERSION;
+      window.__magicsplitStorageKey = STORAGE_KEY;
+      window.__magicsplitAutoRecoveryKey = AUTO_RECOVERY_KEY;
+
+      bootstrapAfterCachePurge();
+    })();
+  </script>
+
+  <!-- ★ 추가: Flutter 첫 프레임 렌더링 후 로딩 화면 제거 -->
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      window.__flutterFirstFrameReceived = true;
+      const loading = document.getElementById('flutter-loading');
+      if (loading) {
+        loading.remove();
+      }
+    });
+
+    // 60초 안에 Flutter가 뜨지 않으면 캐시를 자동 정리하고 1회 새로고침합니다.
+    setTimeout(function () {
+      if (window.__flutterFirstFrameReceived) {
+        return;
+      }
+
+      var deployVersion = window.__magicsplitDeployVersion || '';
+      var autoRecoveryKey = window.__magicsplitAutoRecoveryKey || 'magicsplit_kr_auto_recovery';
+      var storageKey = window.__magicsplitStorageKey || 'magicsplit_kr_deploy_v2';
+      var alreadyRetried = false;
+
+      try {
+        alreadyRetried = sessionStorage.getItem(autoRecoveryKey) === deployVersion;
+      } catch (e) {
+        // sessionStorage 불가 시 자동 복구를 건너뜁니다.
+      }
+
+      // 1차: 사용자 조작 없이 캐시 자동 정리 후 재시도
+      if (!alreadyRetried && typeof window.__magicsplitPurgeCaches === 'function') {
+        try {
+          sessionStorage.setItem(autoRecoveryKey, deployVersion);
+          localStorage.removeItem(storageKey);
+        } catch (e) {
+          // storage 저장 실패여도 purge는 시도합니다.
+        }
+
+        window.__magicsplitPurgeCaches().finally(function () {
+          location.reload();
+        });
+        return;
+      }
+
+      // 2차: 자동 복구 후에도 실패하면 안내만 표시합니다.
+      var loading = document.getElementById('flutter-loading');
+      if (!loading) {
+        return;
+      }
+
+      loading.innerHTML =
+        '<div style="color:#fff;text-align:center;padding:24px;line-height:1.6;font-size:14px;">' +
+        '앱을 불러오지 못했습니다.<br>' +
+        '잠시 후 다시 접속해 주세요.' +
+        '</div>';
+    }, 120000);
+  </script>
+
+  <!-- ★ Android 시스템 뒤로가기 브라우저 종료 방지 + 포커스 복구 -->
+<!--
+  <script>
+    (function () {
+      var flutterReady = false;
+
+      window.addEventListener('flutter-first-frame', function () {
+        setTimeout(function () { flutterReady = true; }, 500);
+      });
+
+      window.addEventListener('popstate', function (event) {
+        if (!flutterReady) return;
+
+        // popstate 후 Flutter 뷰에 강제 포커스
+        // pop 후 캔버스 포커스 유실 방지 (터치 없이도 다음 back 처리 가능)
+        requestAnimationFrame(function () {
+          var el = document.querySelector('flt-glass-pane');
+          if (el) {
+            el.focus();
+            // shadowRoot 내부 요소에도 포커스 시도
+            if (el.shadowRoot) {
+              var inner = el.shadowRoot.querySelector('flt-semantics-placeholder');
+              if (inner && inner.focus) inner.focus();
+            }
+          }
+        });
+
+        // Flutter 관리 영역 밖으로 나간 경우 브라우저 종료 방지
+        var state = event.state;
+        var isFlutterState = state && typeof state === 'object' && state.flutter === true;
+        if (!isFlutterState) {
+          window.history.forward();
+        }
+      });
+    })();
+  </script> -->
+
+</body>
+
+</html>

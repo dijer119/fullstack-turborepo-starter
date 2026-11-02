@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>차수별 예산 증가 방식 검토</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:880px;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#1a202c}h1{border-bottom:2px solid #2c5282;padding-bottom:.4rem}h2{border-bottom:1px solid #e2e8f0;padding-bottom:.3rem;margin-top:2rem;color:#2c5282}h3{color:#2c5282;margin-top:1.5rem}pre{background:#f7fafc;border:1px solid #e2e8f0;padding:.8rem;overflow-x:auto;border-radius:4px}code{background:#f7fafc;padding:.1rem .35rem;border-radius:3px;font-size:.92em}pre code{background:none;padding:0}table{border-collapse:collapse;width:100%;margin:.6rem 0}th{background:#edf2f7;text-align:left}th,td{border:1px solid #cbd5e0;padding:.4rem .6rem}ul,ol{padding-left:1.5rem}li{margin:.4rem 0}blockquote{border-left:3px solid #d69e2e;background:#fffaf0;padding:.5rem .9rem;margin:1rem 0}.decision{background:#edf7f3;padding:1rem;border-radius:8px}.muted{color:#57677b;font-size:.9rem}.scroll{overflow:auto}a{color:#245c9b}tfoot{font-weight:700;background:#f7fafc}
+</style></head><body>
+<p class="muted">company-map · 2026-10-30 · 코드 기반 검토안 / 증가 방식은 아직 미구현</p>
+<h1>차수별 예산, 두 증가 방식 모두 지원</h1>
+<div class="decision"><strong>검토 결론: 둘 다 구현 가능.</strong> 현재 동일 금액 방식에 누적 배수와 일정 금액 증가를 추가해 전략별로 선택하도록 한다. 기존 토스 연동과 차수 장부는 재사용하며, 추가 API 호출은 필요하지 않다.</div>
+<p>이번 검토는 자동 실거래 설정을 대상으로 한다. 새 실거래 전략의 최대 차수 기본값 10은 이미 반영되어 있다. 기존 전략의 차수·예산·주문 설정은 변경하지 않는다. 아래 계산식과 화면 구성은 구현 제안이다.</p>
+<h2>1. 입력 방식과 계산식</h2>
+<p><strong>예산 방식</strong>은 동일 금액 / 누적 배수 / 일정 금액 증가 중 하나를 선택한다. 기존 ‘차수당 예산’은 ‘1차 예산’으로 표시한다. 두 증가 방식에 공통으로 쓰는 입력은 <strong>예산 배수 (2차 ÷ 1차)</strong>로 명시한다. 배수 2라면 두 방식 모두 2차는 1차의 두 배가 되고, 3차부터 달라진다.</p>
+<p><code>B</code>는 1차 예산, <code>r</code>은 예산 배수, <code>n</code>은 차수다.</p>
+<div class="scroll"><table><thead><tr><th>방식</th><th>n차 예산</th><th>10만원·배수 2 예시</th></tr></thead><tbody>
+<tr><td>동일 금액</td><td><code>B</code> (배수 입력 숨김)</td><td>10만 → 10만 → 10만</td></tr>
+<tr><td>누적 배수</td><td><code>B × r^(n−1)</code></td><td>10만 → 20만 → 40만</td></tr>
+<tr><td>일정 금액 증가</td><td><code>B × [1 + (n−1) × (r−1)]</code></td><td>10만 → 20만 → 30만</td></tr>
+</tbody></table></div>
+<p>일정 금액 증가에서는 매 차수 <code>B × (r−1)</code>를 더한다. 배수 1.5라면 누적 배수는 10만 → 15만 → 22.5만, 일정 금액 증가는 10만 → 15만 → 20만이다. 배수 1은 두 방식 모두 동일 금액과 같다.</p>
+<h2>2. 10차까지의 예산 비교</h2>
+<p>1차 예산 100,000원, 배수 2, 최대 10차. 아래는 매수 비용 여유액을 포함할 예산 한도이며, 실제 체결금액은 정수주·호가·비용에 따라 달라진다.</p>
+<div class="scroll"><table><thead><tr><th>차수</th><th>동일 금액</th><th>누적 2배</th><th>매 차수 10만원 증가</th></tr></thead><tbody><tr><td>1차</td><td>100,000원</td><td>100,000원</td><td>100,000원</td></tr><tr><td>2차</td><td>100,000원</td><td>200,000원</td><td>200,000원</td></tr><tr><td>3차</td><td>100,000원</td><td>400,000원</td><td>300,000원</td></tr><tr><td>4차</td><td>100,000원</td><td>800,000원</td><td>400,000원</td></tr><tr><td>5차</td><td>100,000원</td><td>1,600,000원</td><td>500,000원</td></tr><tr><td>6차</td><td>100,000원</td><td>3,200,000원</td><td>600,000원</td></tr><tr><td>7차</td><td>100,000원</td><td>6,400,000원</td><td>700,000원</td></tr><tr><td>8차</td><td>100,000원</td><td>12,800,000원</td><td>800,000원</td></tr><tr><td>9차</td><td>100,000원</td><td>25,600,000원</td><td>900,000원</td></tr><tr><td>10차</td><td>100,000원</td><td>51,200,000원</td><td>1,000,000원</td></tr></tbody><tfoot><tr><td>총 필요 자금</td><td>1,000,000원</td><td>102,300,000원</td><td>5,500,000원</td></tr></tfoot></table></div>
+<blockquote>누적 2배의 합계는 1억 230만원이다. 배정 자금 100만원 상태에서는 저장을 막고 부족 금액을 표시해야 한다. 자금 입력값을 자동으로 올리지는 않는다.</blockquote>
+<h2>3. 설정 화면 제안</h2>
+<ul><li>최대 차수 기본값 10, 예산 방식 기본값 동일 금액. 배수 입력 초기값 1.</li>
+<li>예산·배수·차수를 바꿀 때마다 1차부터 마지막 차수까지의 예정 금액, 총 필요 자금, 배정 자금 대비 부족액을 즉시 표시한다.</li>
+<li>일정 금액 증가를 선택하면 ‘매 차수 100,000원 추가’처럼 실제 증가액을 함께 보여준다.</li>
+<li>전략 목록과 자동매매 시작 확인에도 예산 방식·배수·1차 예산·최대 차수를 표시한다.</li>
+<li>입력은 배수 1 이상, 소수 둘째 자리까지. 유한한 수인지 확인하고 각 차수 금액과 합계가 앱의 금액 범위 안에 있는지 서버에서도 검사한다.</li></ul>
+<h2>4. 구현할 때 함께 바꿔야 하는 부분</h2>
+<table><thead><tr><th>영역</th><th>필요 변경</th></tr></thead><tbody>
+<tr><td>전략 저장</td><td>예산 방식과 배수 필드를 추가한다. 기존 행은 동일 금액·1배로 기본값을 채운다. 최대 차수 등 기존 값은 그대로 둔다.</td></tr>
+<tr><td>예산 계산</td><td>공통 순수 함수로 차수별 예산을 계산한다. 화면 미리보기, 서버 검증, 워커 주문 계산이 같은 함수를 쓴다. 증가 예산은 KRW 원 단위·USD 센트 단위로 내림하고, 총액은 실제 차수별 금액을 합산한다. 기존 동일 금액 장부의 저장 정밀도는 유지한다.</td></tr>
+<tr><td>자금 검증</td><td>현재의 ‘차수 예산 × 최대 차수’를 선택한 방식의 차수별 합계로 바꾼다. 실거래 생성이 모의용 validateConfig를 재사용하므로 모의 검증에 증가 방식을 잘못 적용하지 않도록 분리한다.</td></tr>
+<tr><td>주문 계산</td><td>현재 ‘배정 잔액과 고정 차수 예산 중 작은 값’에서 고정 예산 부분을 해당 차수의 계산 예산으로 교체한다. 비용 여유율·정수주 계산·실제 주문 가능 금액 검사는 유지한다.</td></tr>
+<tr><td>중복·재진입</td><td>배수의 지수는 회차(generation)가 아니라 차수(slot)를 기준으로 한다. 3차를 익절하고 다시 사면 같은 3차 예산이다. 전량 익절 후에는 다시 원래 1차 예산부터 시작한다.</td></tr>
+<tr><td>배포</td><td>기본값을 가진 컬럼 추가 마이그레이션, 해당 앱 Prisma 클라이언트 생성, 검증 후 단일 워커 교체가 필요하다. 신규 설정을 저장할 수 있는 시점에는 워커도 새 계산 규칙을 읽고 있어야 한다.</td></tr>
+</tbody></table>
+<p>모의 장부에도 같은 선택지를 추가할 수 있다. 다만 별도 저장 모델과 모의 엔진이므로 실거래 변경만으로 자동 적용되지는 않는다. 모의 지원을 추가할 때도 예산 계산 함수만 공유하고 자금·주문·체결 장부의 분리는 유지한다.</p>
+<h2>5. 기존 운용 규칙과 충돌하는지</h2>
+<ul><li><strong>실제 체결 기준:</strong> 다음 차수의 매수 가격 조건은 계속 직전 차수의 실제 평균 매수가를 기준으로 판단한다. 배수는 예산에만 적용한다.</li>
+<li><strong>부분 체결:</strong> 같은 차수의 주문 일부가 체결됐다는 이유로 배수를 다시 곱하거나 별도 추가 주문을 만들지 않는다.</li>
+<li><strong>수익금:</strong> 누적 수익금은 장부 잔액에 남지만 최초 1차 예산과 배수는 자동 확대하지 않는다.</li>
+<li><strong>주문 한도:</strong> 현재 코드에는 원화 환산 단일 주문금액 1억원 이상 차단이 있다. 이 규칙은 유지한다. 전략 총 예산이 1억원을 넘는 것과 단일 주문이 1억원을 넘는 것은 다르다. 미국 주문은 제출 시 환율로 재검사한다.</li>
+<li><strong>부족 자금:</strong> 생성 시 전체 계획 예산을 확보하게 한다. 실행 중에는 현재처럼 배정 잔액 안에서 수량을 계산하고, 실제 계좌 주문 가능 금액이 부족하면 보류한다. 배정 자금은 계좌에서 예약되는 돈이 아니다.</li></ul>
+<h2>6. 구현 완료를 판단할 검증</h2>
+<ul><li>동일 금액·배수 1의 결과가 기존 주문 수량과 동일한지 확인.</li><li>배수 2·1.5의 각 방식별 차수 예산, 10차 총액, KRW/USD 반올림 경계를 확인.</li><li>0·음수·NaN·무한대·합계 초과·배정 자금 부족을 서버에서 거절.</li><li>부분 체결, 3차 재진입, 전량 익절 반복에서 배수가 중복 적용되지 않는지 임시 SQLite와 가짜 브로커로 확인.</li><li>기존 전략의 데이터와 동작 보존, 미체결 주문 유지, 워커 재시작 후 설정 유지 확인.</li><li>UI 미리보기와 서버·워커 계산 일치, 전체 테스트·타입 검사·변경 파일 린트 확인.</li></ul>
+<h2>확인한 근거</h2><p>현재 로컬 코드와 기존 사용자 가이드를 직접 확인한 검토다. 위 기능의 구현·실주문 검증을 완료했다는 의미는 아니다.</p><ul><li><a href="../apps/company-map/src/lib/split/live-rules.ts">apps/company-map/src/lib/split/live-rules.ts</a><br>planLiveOrder: 모든 차수의 매수 예산은 현재 min(잔액, trancheBudget). 매도와 재진입 차수 결정은 별도 처리.</li><li><a href="../apps/company-map/src/lib/split/engine.ts">apps/company-map/src/lib/split/engine.ts</a><br>validateConfig: 최대 차수 1~50, 차수 예산 × 최대 차수 ≤ 배정 자금을 검사. 모의 엔진도 이 검사를 사용.</li><li><a href="../apps/company-map/src/lib/split/live-run.ts">apps/company-map/src/lib/split/live-run.ts</a><br>createLiveStrategy는 공통 validateConfig를 호출. 실주문 전 배정 잔액·실제 주문 가능 금액 검사. 전량 익절 후 다음 감시에 1차로 재진입.</li><li><a href="../apps/company-map/src/lib/split/live-toss.ts">apps/company-map/src/lib/split/live-toss.ts</a><br>submit: 원화 환산 단일 주문금액이 1억원 이상이면 차단. 전략의 총 예산 한도와 구분해야 함.</li><li><a href="../apps/company-map/prisma/schema.prisma">apps/company-map/prisma/schema.prisma</a><br>SplitLiveStrategy는 현재 trancheBudget·maxTranches만 저장. 증가 방식·배수 필드가 필요.</li><li><a href="../apps/company-map/src/app/stocks/split/LiveManager.tsx">apps/company-map/src/app/stocks/split/LiveManager.tsx</a><br>신규 실거래 기본값: 최대 10차, 배정 100만원, 차수 예산 10만원. 모의 화면의 기본값은 별도.</li><li><a href="../docs/split-live-user-guide-2026-10-30.html">docs/split-live-user-guide-2026-10-30.html</a><br>실제 비용 정산, 독립 차수 재진입, 전량 익절 반복, 수익금으로 차수 예산을 자동 확대하지 않는 기존 동작.</li></ul></body></html>

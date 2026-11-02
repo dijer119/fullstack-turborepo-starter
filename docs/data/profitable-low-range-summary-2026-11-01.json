@@ -1,0 +1,2519 @@
+{
+  "price_asof": "2026-10-30",
+  "financial_periods": [
+    "2025Q3",
+    "2025Q4",
+    "2026Q1",
+    "2026Q2"
+  ],
+  "selection": "same 20 stocks as prior strict screen; no added 70%/40% filter",
+  "sort": "position52_pct ascending",
+  "position_formula": "(close-low)/(high-low)*100",
+  "results": [
+    {
+      "code": "214320",
+      "name": "이노션",
+      "corp_code": "00565154",
+      "market_cap": 714400000000,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 51327081354,
+          "prior": 45896006406
+        },
+        {
+          "period": "2025Q4",
+          "value": 45215563299,
+          "prior": 42630178158
+        },
+        {
+          "period": "2026Q1",
+          "value": 39790935932,
+          "prior": 29842242089
+        },
+        {
+          "period": "2026Q2",
+          "value": 44586457502,
+          "prior": 36415108527
+        }
+      ],
+      "trailing_op": 180920038087,
+      "trailing_prior_op": 154783535180,
+      "trailing_yoy_pct": 16.88584181554291,
+      "latest_yoy_pct": 22.439446992012524,
+      "reports": [
+        {
+          "stock_code": "214320",
+          "corp_code": "00565154",
+          "rcept_no": "20251114002644",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "51,327,081,354",
+          "thstrm_add_amount": "117,584,431,970",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "45,896,006,406",
+          "frmtrm_add_amount": "113,032,939,042",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "214320",
+          "corp_code": "00565154",
+          "rcept_no": "20260310003051",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "162,799,995,269",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "155,663,117,200",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "214320",
+          "corp_code": "00565154",
+          "rcept_no": "20260515002698",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "39,790,935,932",
+          "thstrm_add_amount": "39,790,935,932",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "29,842,242,089",
+          "frmtrm_add_amount": "29,842,242,089",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "214320",
+          "corp_code": "00565154",
+          "rcept_no": "20260814004031",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "44,586,457,502",
+          "thstrm_add_amount": "84,377,393,434",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "36,415,108,527",
+          "frmtrm_add_amount": "66,257,350,616",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 22650,
+      "low52": 16730,
+      "range_pct": 35.38553496712493,
+      "last_close": 17280,
+      "price_return_pct": 0.7580174927113603,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260515"
+      ],
+      "low_dates": [
+        "20251104"
+      ],
+      "average_value_estimate_20d": 1433574042.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=214320&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 28,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 11,
+      "position52_pct": 9.29054054054054,
+      "position_rank": 1,
+      "assessment": "20개 중 52주 위치가 가장 낮음. 4분기 합계 영업이익 +16.9%, 최근 분기 +22.4%."
+    },
+    {
+      "code": "010240",
+      "name": "흥국",
+      "corp_code": "00167031",
+      "market_cap": 65319480000,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 3599906539,
+          "prior": 1755453319
+        },
+        {
+          "period": "2025Q4",
+          "value": 3915993385,
+          "prior": 760641270
+        },
+        {
+          "period": "2026Q1",
+          "value": 4932255306,
+          "prior": 3614413909
+        },
+        {
+          "period": "2026Q2",
+          "value": 4566678792,
+          "prior": 3767370374
+        }
+      ],
+      "trailing_op": 17014834022,
+      "trailing_prior_op": 9897878872,
+      "trailing_yoy_pct": 71.90384164159734,
+      "latest_yoy_pct": 21.216613676115294,
+      "reports": [
+        {
+          "stock_code": "010240",
+          "corp_code": "00167031",
+          "rcept_no": "20251114000420",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "3,599,906,539",
+          "thstrm_add_amount": "10,981,690,822",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "1,755,453,319",
+          "frmtrm_add_amount": "8,026,859,402",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "010240",
+          "corp_code": "00167031",
+          "rcept_no": "20260727000170",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "14,897,684,207",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "8,787,500,672",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "010240",
+          "corp_code": "00167031",
+          "rcept_no": "20260515000534",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "4,932,255,306",
+          "thstrm_add_amount": "4,932,255,306",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "3,614,413,909",
+          "frmtrm_add_amount": "3,614,413,909",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "010240",
+          "corp_code": "00167031",
+          "rcept_no": "20260814001304",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "4,566,678,792",
+          "thstrm_add_amount": "9,498,934,098",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "3,767,370,374",
+          "frmtrm_add_amount": "7,381,784,283",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 6110,
+      "low52": 4750,
+      "range_pct": 28.631578947368432,
+      "last_close": 4920,
+      "price_return_pct": 0.5107252298263587,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260428"
+      ],
+      "low_dates": [
+        "20251105"
+      ],
+      "average_value_estimate_20d": 51864910.5,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=010240&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 13,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 6,
+      "position52_pct": 12.5,
+      "position_rank": 2,
+      "assessment": "4분기 합계 +71.9%. 최근 20일 거래 규모 추정치가 하루 0.52억원으로 작음."
+    },
+    {
+      "code": "383220",
+      "name": "F&F",
+      "corp_code": "01568413",
+      "market_cap": 2413345725000,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 128019678069,
+          "prior": 108304866337
+        },
+        {
+          "period": "2025Q4",
+          "value": 132908182321,
+          "prior": 120420406319
+        },
+        {
+          "period": "2026Q1",
+          "value": 153481999734,
+          "prior": 123616388060
+        },
+        {
+          "period": "2026Q2",
+          "value": 86499071634,
+          "prior": 84029901879
+        }
+      ],
+      "trailing_op": 500908931758,
+      "trailing_prior_op": 436371562595,
+      "trailing_yoy_pct": 14.789545125079018,
+      "latest_yoy_pct": 2.938441792488966,
+      "reports": [
+        {
+          "stock_code": "383220",
+          "corp_code": "01568413",
+          "rcept_no": "20251114002801",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "128,019,678,069",
+          "thstrm_add_amount": "335,665,968,008",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "108,304,866,337",
+          "frmtrm_add_amount": "330,317,053,418",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "383220",
+          "corp_code": "01568413",
+          "rcept_no": "20260318001512",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "468,574,150,329",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "450,737,459,737",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "383220",
+          "corp_code": "01568413",
+          "rcept_no": "20260515002764",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "153,481,999,734",
+          "thstrm_add_amount": "153,481,999,734",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "123,616,388,060",
+          "frmtrm_add_amount": "123,616,388,060",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "383220",
+          "corp_code": "01568413",
+          "rcept_no": "20260814004123",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "86,499,071,634",
+          "thstrm_add_amount": "239,981,071,368",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "84,029,901,879",
+          "frmtrm_add_amount": "207,646,289,939",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 89000,
+      "low52": 58000,
+      "range_pct": 53.448275862068975,
+      "last_close": 62200,
+      "price_return_pct": 1.4681892332789603,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260610"
+      ],
+      "low_dates": [
+        "20260309"
+      ],
+      "average_value_estimate_20d": 4897494060.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=383220&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 62,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 19,
+      "position52_pct": 13.548387096774196,
+      "position_rank": 3,
+      "assessment": "4개 분기 모두 전년 이상. 최근 분기 성장률 +2.9%는 네 분기 중 가장 낮음."
+    },
+    {
+      "code": "011040",
+      "name": "경동제약",
+      "corp_code": "00101549",
+      "market_cap": 164920585760,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 3088495412,
+          "prior": 528556480
+        },
+        {
+          "period": "2025Q4",
+          "value": 2569490242,
+          "prior": 2226511616
+        },
+        {
+          "period": "2026Q1",
+          "value": 2410534894,
+          "prior": 1529815642
+        },
+        {
+          "period": "2026Q2",
+          "value": 3703349342,
+          "prior": 478355679
+        }
+      ],
+      "trailing_op": 11771869890,
+      "trailing_prior_op": 4763239417,
+      "trailing_yoy_pct": 147.13999989138063,
+      "latest_yoy_pct": 674.1832081395652,
+      "reports": [
+        {
+          "stock_code": "011040",
+          "corp_code": "00101549",
+          "rcept_no": "20251114001036",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "3,088,495,412",
+          "thstrm_add_amount": "5,096,666,733",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "528,556,480",
+          "frmtrm_add_amount": "397,093,361",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "011040",
+          "corp_code": "00101549",
+          "rcept_no": "20260320001252",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "7,666,156,975",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "2,623,604,977",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "011040",
+          "corp_code": "00101549",
+          "rcept_no": "20260514000981",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "2,410,534,894",
+          "thstrm_add_amount": "2,410,534,894",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "1,529,815,642",
+          "frmtrm_add_amount": "1,529,815,642",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "011040",
+          "corp_code": "00101549",
+          "rcept_no": "20260814003626",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "3,703,349,342",
+          "thstrm_add_amount": "6,113,884,236",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "478,355,679",
+          "frmtrm_add_amount": "2,008,171,321",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 6270,
+      "low52": 4700,
+      "range_pct": 33.404255319148945,
+      "last_close": 4930,
+      "price_return_pct": -13.204225352112676,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20251217"
+      ],
+      "low_dates": [
+        "20260626"
+      ],
+      "average_value_estimate_20d": 128184149.5,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=011040&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 22,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 10,
+      "position52_pct": 14.64968152866242,
+      "position_rank": 4,
+      "assessment": "4분기 합계 +147.1%. 최근 분기 +674.2%는 작은 전년 비교금액을 함께 봐야 함."
+    },
+    {
+      "code": "102260",
+      "name": "동성케미컬",
+      "corp_code": "00679314",
+      "market_cap": 209237218470,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 34258523757,
+          "prior": 20721700037
+        },
+        {
+          "period": "2025Q4",
+          "value": 30051616546,
+          "prior": 27640664835
+        },
+        {
+          "period": "2026Q1",
+          "value": 25361903639,
+          "prior": 21155913484
+        },
+        {
+          "period": "2026Q2",
+          "value": 46133195773,
+          "prior": 26576478673
+        }
+      ],
+      "trailing_op": 135805239715,
+      "trailing_prior_op": 96094757029,
+      "trailing_yoy_pct": 41.324296885433576,
+      "latest_yoy_pct": 73.58656254136622,
+      "reports": [
+        {
+          "stock_code": "102260",
+          "corp_code": "00679314",
+          "rcept_no": "20251114001800",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "34,258,523,757",
+          "thstrm_add_amount": "81,990,915,914",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "20,721,700,037",
+          "frmtrm_add_amount": "63,389,250,980",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "102260",
+          "corp_code": "00679314",
+          "rcept_no": "20260318001381",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "112,042,532,460",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "91,029,915,815",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "102260",
+          "corp_code": "00679314",
+          "rcept_no": "20260514001409",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "25,361,903,639",
+          "thstrm_add_amount": "25,361,903,639",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "21,155,913,484",
+          "frmtrm_add_amount": "21,155,913,484",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "102260",
+          "corp_code": "00679314",
+          "rcept_no": "20260814003663",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "46,133,195,773",
+          "thstrm_add_amount": "71,495,099,412",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "26,576,478,673",
+          "frmtrm_add_amount": "47,732,392,157",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 4773,
+      "low52": 3150,
+      "range_pct": 51.523809523809526,
+      "last_close": 3395,
+      "price_return_pct": -14.33257633106233,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20251126"
+      ],
+      "low_dates": [
+        "20260729"
+      ],
+      "average_value_estimate_20d": 279316209.5,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=102260&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 57,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 17,
+      "position52_pct": 15.095502156500306,
+      "position_rank": 5,
+      "assessment": "최근 분기 +73.6%, 4분기 합계 +41.3%. 위치는 하단 15.1%지만 연중 변동폭은 51.5%."
+    },
+    {
+      "code": "072710",
+      "name": "농심홀딩스",
+      "corp_code": "00459871",
+      "market_cap": 439662492000,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 22801565011,
+          "prior": 19453833745
+        },
+        {
+          "period": "2025Q4",
+          "value": 14580476364,
+          "prior": 2724648821
+        },
+        {
+          "period": "2026Q1",
+          "value": 30892802451,
+          "prior": 25262947847
+        },
+        {
+          "period": "2026Q2",
+          "value": 34608834171,
+          "prior": 18471790972
+        }
+      ],
+      "trailing_op": 102883677997,
+      "trailing_prior_op": 65913221385,
+      "trailing_yoy_pct": 56.08959148886847,
+      "latest_yoy_pct": 87.36046885470354,
+      "reports": [
+        {
+          "stock_code": "072710",
+          "corp_code": "00459871",
+          "rcept_no": "20251114002710",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "22,801,565,011",
+          "thstrm_add_amount": "66,536,303,830",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "19,453,833,745",
+          "frmtrm_add_amount": "83,914,250,094",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "072710",
+          "corp_code": "00459871",
+          "rcept_no": "20260318001210",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "81,116,780,194",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "86,638,898,915",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "072710",
+          "corp_code": "00459871",
+          "rcept_no": "20260515001393",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "30,892,802,451",
+          "thstrm_add_amount": "30,892,802,451",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "25,262,947,847",
+          "frmtrm_add_amount": "25,262,947,847",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "072710",
+          "corp_code": "00459871",
+          "rcept_no": "20260814003032",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "34,608,834,171",
+          "thstrm_add_amount": "65,501,636,622",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "18,471,790,972",
+          "frmtrm_add_amount": "43,734,738,819",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 102800,
+      "low52": 81700,
+      "range_pct": 25.826193390452868,
+      "last_close": 85400,
+      "price_return_pct": -9.245483528161536,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260223"
+      ],
+      "low_dates": [
+        "20260626"
+      ],
+      "average_value_estimate_20d": 232273365.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=072710&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 6,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 3,
+      "position52_pct": 17.535545023696685,
+      "position_rank": 6,
+      "assessment": "변동폭 25.8%, 위치 17.5%. 4분기 합계 영업이익 +56.1%."
+    },
+    {
+      "code": "015890",
+      "name": "태경산업",
+      "corp_code": "00153339",
+      "market_cap": 142782443750,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 16747724963,
+          "prior": 16539850004
+        },
+        {
+          "period": "2025Q4",
+          "value": 13017282727,
+          "prior": 12730673392
+        },
+        {
+          "period": "2026Q1",
+          "value": 17216607095,
+          "prior": 12003703632
+        },
+        {
+          "period": "2026Q2",
+          "value": 22084681625,
+          "prior": 13663376191
+        }
+      ],
+      "trailing_op": 69066296410,
+      "trailing_prior_op": 54937603219,
+      "trailing_yoy_pct": 25.71770947974963,
+      "latest_yoy_pct": 61.63414749238241,
+      "reports": [
+        {
+          "stock_code": "015890",
+          "corp_code": "00153339",
+          "rcept_no": "20251113000829",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "16,747,724,963",
+          "thstrm_add_amount": "42,414,804,786",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "16,539,850,004",
+          "frmtrm_add_amount": "42,952,956,657",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "015890",
+          "corp_code": "00153339",
+          "rcept_no": "20260323001550",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "55,432,087,513",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "55,683,630,049",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "015890",
+          "corp_code": "00153339",
+          "rcept_no": "20260515002457",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "17,216,607,095",
+          "thstrm_add_amount": "17,216,607,095",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "12,003,703,632",
+          "frmtrm_add_amount": "12,003,703,632",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "015890",
+          "corp_code": "00153339",
+          "rcept_no": "20260814000379",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "22,084,681,625",
+          "thstrm_add_amount": "39,301,288,720",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "13,663,376,191",
+          "frmtrm_add_amount": "25,667,079,823",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 5340,
+      "low52": 4300,
+      "range_pct": 24.1860465116279,
+      "last_close": 4500,
+      "price_return_pct": -11.067193675889332,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20251222",
+        "20251223"
+      ],
+      "low_dates": [
+        "20260629"
+      ],
+      "average_value_estimate_20d": 154759609.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=015890&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 3,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 1,
+      "position52_pct": 19.230769230769234,
+      "position_rank": 7,
+      "assessment": "20개 중 고저 변동폭이 가장 작음. 최근 분기 영업이익 +61.6%."
+    },
+    {
+      "code": "271560",
+      "name": "오리온",
+      "corp_code": "01238169",
+      "market_cap": 5139697160000,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 137871938192,
+          "prior": 137067139651
+        },
+        {
+          "period": "2025Q4",
+          "value": 167559517176,
+          "prior": 159675585031
+        },
+        {
+          "period": "2026Q1",
+          "value": 165471489634,
+          "prior": 131375562707
+        },
+        {
+          "period": "2026Q2",
+          "value": 132571784163,
+          "prior": 121451009117
+        }
+      ],
+      "trailing_op": 603474729165,
+      "trailing_prior_op": 549569296506,
+      "trailing_yoy_pct": 9.808668897937878,
+      "latest_yoy_pct": 9.156593367854837,
+      "reports": [
+        {
+          "stock_code": "271560",
+          "corp_code": "01238169",
+          "rcept_no": "20251113000368",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "137,871,938,192",
+          "thstrm_add_amount": "390,698,510,016",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "137,067,139,651",
+          "frmtrm_add_amount": "383,912,193,210",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "271560",
+          "corp_code": "01238169",
+          "rcept_no": "20260318001320",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "558,258,027,192",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "543,587,778,241",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "271560",
+          "corp_code": "01238169",
+          "rcept_no": "20260515000512",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "165,471,489,634",
+          "thstrm_add_amount": "165,471,489,634",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "131,375,562,707",
+          "frmtrm_add_amount": "131,375,562,707",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "271560",
+          "corp_code": "01238169",
+          "rcept_no": "20260818000305",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "132,571,784,163",
+          "thstrm_add_amount": "298,043,273,797",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "121,451,009,117",
+          "frmtrm_add_amount": "252,826,571,824",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 150100,
+      "low52": 99000,
+      "range_pct": 51.61616161616163,
+      "last_close": 114200,
+      "price_return_pct": 15.005035246727093,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260429"
+      ],
+      "low_dates": [
+        "20251104"
+      ],
+      "average_value_estimate_20d": 10455349475.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=271560&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 58,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 18,
+      "position52_pct": 29.74559686888454,
+      "position_rank": 8,
+      "assessment": "2026년 2분기 1,325.7억원까지 반영. 직전 분기보다 감소했지만 전년 동기 +9.2%."
+    },
+    {
+      "code": "015230",
+      "name": "대창단조",
+      "corp_code": "00112679",
+      "market_cap": 198576998500,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 10565205983,
+          "prior": 7009472044
+        },
+        {
+          "period": "2025Q4",
+          "value": 7460365224,
+          "prior": 6461706567
+        },
+        {
+          "period": "2026Q1",
+          "value": 11523347964,
+          "prior": 11263075403
+        },
+        {
+          "period": "2026Q2",
+          "value": 15725020377,
+          "prior": 8744956562
+        }
+      ],
+      "trailing_op": 45273939548,
+      "trailing_prior_op": 33479210576,
+      "trailing_yoy_pct": 35.23000921788522,
+      "latest_yoy_pct": 79.81816451016923,
+      "reports": [
+        {
+          "stock_code": "015230",
+          "corp_code": "00112679",
+          "rcept_no": "20251113000226",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "10,565,205,983",
+          "thstrm_add_amount": "30,573,237,948",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "7,009,472,044",
+          "frmtrm_add_amount": "23,612,207,020",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "015230",
+          "corp_code": "00112679",
+          "rcept_no": "20260319000402",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "38,033,603,172",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "30,073,913,587",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "015230",
+          "corp_code": "00112679",
+          "rcept_no": "20260514000249",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "11,523,347,964",
+          "thstrm_add_amount": "11,523,347,964",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "11,263,075,403",
+          "frmtrm_add_amount": "11,263,075,403",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "015230",
+          "corp_code": "00112679",
+          "rcept_no": "20260814000441",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "15,725,020,377",
+          "thstrm_add_amount": "27,248,368,341",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "8,744,956,562",
+          "frmtrm_add_amount": "20,008,031,965",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 7490,
+      "low52": 5170,
+      "range_pct": 44.87427466150871,
+      "last_close": 5910,
+      "price_return_pct": -11.52694610778443,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260507"
+      ],
+      "low_dates": [
+        "20260729"
+      ],
+      "average_value_estimate_20d": 232865967.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=015230&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 41,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 12,
+      "position52_pct": 31.896551724137932,
+      "position_rank": 9,
+      "assessment": "최근 분기 +79.8%, 4분기 합계 +35.2%. 현재가는 범위의 하단 31.9% 지점."
+    },
+    {
+      "code": "267290",
+      "name": "경동도시가스",
+      "corp_code": "01208885",
+      "market_cap": 132351864700,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 3564674008,
+          "prior": 1524537978
+        },
+        {
+          "period": "2025Q4",
+          "value": 8701655194,
+          "prior": 5146816965
+        },
+        {
+          "period": "2026Q1",
+          "value": 19578117425,
+          "prior": 17887532858
+        },
+        {
+          "period": "2026Q2",
+          "value": 7090256931,
+          "prior": 2892006387
+        }
+      ],
+      "trailing_op": 38934703558,
+      "trailing_prior_op": 27450894188,
+      "trailing_yoy_pct": 41.834008361811705,
+      "latest_yoy_pct": 145.1674022184654,
+      "reports": [
+        {
+          "stock_code": "267290",
+          "corp_code": "01208885",
+          "rcept_no": "20251114000240",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "3,564,674,008",
+          "thstrm_add_amount": "24,344,213,253",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "1,524,537,978",
+          "frmtrm_add_amount": "21,827,325,769",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "267290",
+          "corp_code": "01208885",
+          "rcept_no": "20260316000333",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "33,045,868,447",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "26,974,142,734",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "267290",
+          "corp_code": "01208885",
+          "rcept_no": "20260515000050",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "19,578,117,425",
+          "thstrm_add_amount": "19,578,117,425",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "17,887,532,858",
+          "frmtrm_add_amount": "17,887,532,858",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "267290",
+          "corp_code": "01208885",
+          "rcept_no": "20260814001069",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "7,090,256,931",
+          "thstrm_add_amount": "26,668,374,356",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "2,892,006,387",
+          "frmtrm_add_amount": "20,779,539,245",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 24300,
+      "low52": 18370,
+      "range_pct": 32.280892759934666,
+      "last_close": 20650,
+      "price_return_pct": 0.7317073170731714,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260303"
+      ],
+      "low_dates": [
+        "20260626"
+      ],
+      "average_value_estimate_20d": 121697135.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=267290&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 20,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 9,
+      "position52_pct": 38.44856661045531,
+      "position_rank": 10,
+      "assessment": "분기 영업이익이 35.7~195.8억원으로 편차가 큼. 네 분기는 모두 전년 이상."
+    },
+    {
+      "code": "004080",
+      "name": "신흥",
+      "corp_code": "00173795",
+      "market_cap": 131788000000,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 1490025880,
+          "prior": 898492855
+        },
+        {
+          "period": "2025Q4",
+          "value": 3174560983,
+          "prior": 2061366771
+        },
+        {
+          "period": "2026Q1",
+          "value": 805650195,
+          "prior": 727830213
+        },
+        {
+          "period": "2026Q2",
+          "value": 3643861213,
+          "prior": 1698704385
+        }
+      ],
+      "trailing_op": 9114098271,
+      "trailing_prior_op": 5386394224,
+      "trailing_yoy_pct": 69.20592685902152,
+      "latest_yoy_pct": 114.5082596581394,
+      "reports": [
+        {
+          "stock_code": "004080",
+          "corp_code": "00173795",
+          "rcept_no": "20251114001086",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "1,490,025,880",
+          "thstrm_add_amount": "3,916,560,478",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "898,492,855",
+          "frmtrm_add_amount": "4,216,499,452",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "004080",
+          "corp_code": "00173795",
+          "rcept_no": "20260319000887",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "7,091,121,461",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "6,277,866,223",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "004080",
+          "corp_code": "00173795",
+          "rcept_no": "20260515002060",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "805,650,195",
+          "thstrm_add_amount": "805,650,195",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "727,830,213",
+          "frmtrm_add_amount": "727,830,213",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "004080",
+          "corp_code": "00173795",
+          "rcept_no": "20260814001972",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "3,643,861,213",
+          "thstrm_add_amount": "4,449,511,408",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "1,698,704,385",
+          "frmtrm_add_amount": "2,426,534,598",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 16470,
+      "low52": 13150,
+      "range_pct": 25.247148288973385,
+      "last_close": 14440,
+      "price_return_pct": 5.171158048069913,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260918"
+      ],
+      "low_dates": [
+        "20260602",
+        "20260617"
+      ],
+      "average_value_estimate_20d": 62501161.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=004080&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 5,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 2,
+      "position52_pct": 38.855421686746986,
+      "position_rank": 11,
+      "assessment": "최근 분기 +114.5%. 거래 규모 추정치는 하루 0.63억원으로 작음."
+    },
+    {
+      "code": "352090",
+      "name": "스톰테크",
+      "corp_code": "01226270",
+      "market_cap": 98086442700,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 3799624858,
+          "prior": 3631077606
+        },
+        {
+          "period": "2025Q4",
+          "value": 2196230558,
+          "prior": 1954390223
+        },
+        {
+          "period": "2026Q1",
+          "value": 2281910951,
+          "prior": 1783805921
+        },
+        {
+          "period": "2026Q2",
+          "value": 4586653935,
+          "prior": 4159720466
+        }
+      ],
+      "trailing_op": 12864420302,
+      "trailing_prior_op": 11528994216,
+      "trailing_yoy_pct": 11.58319677311217,
+      "latest_yoy_pct": 10.26351343773204,
+      "reports": [
+        {
+          "stock_code": "352090",
+          "corp_code": "01226270",
+          "rcept_no": "20251114002626",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "3,799,624,858",
+          "thstrm_add_amount": "9,743,151,245",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "3,631,077,606",
+          "frmtrm_add_amount": "10,469,489,764",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "352090",
+          "corp_code": "01226270",
+          "rcept_no": "20260320001099",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "11,939,381,803",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "12,423,879,987",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "352090",
+          "corp_code": "01226270",
+          "rcept_no": "20260515001543",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "2,281,910,951",
+          "thstrm_add_amount": "2,281,910,951",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "1,783,805,921",
+          "frmtrm_add_amount": "1,783,805,921",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "352090",
+          "corp_code": "01226270",
+          "rcept_no": "20260814001841",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "4,586,653,935",
+          "thstrm_add_amount": "6,868,564,886",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "4,159,720,466",
+          "frmtrm_add_amount": "5,943,526,387",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 4200,
+      "low52": 3330,
+      "range_pct": 26.126126126126124,
+      "last_close": 3670,
+      "price_return_pct": -0.4070556309362261,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260512"
+      ],
+      "low_dates": [
+        "20260113"
+      ],
+      "average_value_estimate_20d": 103585123.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=352090&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 8,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 4,
+      "position52_pct": 39.08045977011494,
+      "position_rank": 12,
+      "assessment": "고저 변동폭 26.1%. 4분기 합계 영업이익 +11.6%, 최근 분기 +10.3%."
+    },
+    {
+      "code": "068270",
+      "name": "셀트리온",
+      "corp_code": "00413046",
+      "market_cap": 46671748722000,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 301411957351,
+          "prior": 207686368229
+        },
+        {
+          "period": "2025Q4",
+          "value": 475171738296,
+          "prior": 196404027736
+        },
+        {
+          "period": "2026Q1",
+          "value": 321869634415,
+          "prior": 149420804340
+        },
+        {
+          "period": "2026Q2",
+          "value": 451791591338,
+          "prior": 242466845608
+        }
+      ],
+      "trailing_op": 1550244921400,
+      "trailing_prior_op": 795978045913,
+      "trailing_yoy_pct": 94.75975868427922,
+      "latest_yoy_pct": 86.33128591461887,
+      "reports": [
+        {
+          "stock_code": "068270",
+          "corp_code": "00413046",
+          "rcept_no": "20251114002699",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "301,411,957,351",
+          "thstrm_add_amount": "693,299,607,299",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "207,686,368,229",
+          "frmtrm_add_amount": "295,611,507,111",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "068270",
+          "corp_code": "00413046",
+          "rcept_no": "20260316001415",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "1,168,471,345,595",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "492,015,534,847",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "068270",
+          "corp_code": "00413046",
+          "rcept_no": "20260515002932",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "321,869,634,415",
+          "thstrm_add_amount": "321,869,634,415",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "149,420,804,340",
+          "frmtrm_add_amount": "149,420,804,340",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "068270",
+          "corp_code": "00413046",
+          "rcept_no": "20260814003751",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "451,791,591,338",
+          "thstrm_add_amount": "773,661,225,753",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "242,466,845,608",
+          "frmtrm_add_amount": "391,887,649,948",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 239244,
+      "low52": 158500,
+      "range_pct": 50.94258675078864,
+      "last_close": 190200,
+      "price_return_pct": 13.636363636363647,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260224"
+      ],
+      "low_dates": [
+        "20260608"
+      ],
+      "average_value_estimate_20d": 96579637710.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=068270&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 53,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 16,
+      "position52_pct": 39.25988308728822,
+      "position_rank": 13,
+      "assessment": "네 분기 영업이익이 각각 전년 대비 +45.1~141.9%. 이 20개 중 거래 규모 추정치가 가장 큼."
+    },
+    {
+      "code": "004370",
+      "name": "농심",
+      "corp_code": "00108241",
+      "market_cap": 2259701503000,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 54375550192,
+          "prior": 37602265991
+        },
+        {
+          "period": "2025Q4",
+          "value": 33353485977,
+          "prior": 20410990753
+        },
+        {
+          "period": "2026Q1",
+          "value": 67424701255,
+          "prior": 56051767375
+        },
+        {
+          "period": "2026Q2",
+          "value": 59252095212,
+          "prior": 40152228653
+        }
+      ],
+      "trailing_op": 214405832636,
+      "trailing_prior_op": 154217252772,
+      "trailing_yoy_pct": 39.02843474522584,
+      "latest_yoy_pct": 47.56863367177737,
+      "reports": [
+        {
+          "stock_code": "004370",
+          "corp_code": "00108241",
+          "rcept_no": "20251114001491",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "54,375,550,192",
+          "thstrm_add_amount": "150,579,546,220",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "37,602,265,991",
+          "frmtrm_add_amount": "142,662,941,177",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "004370",
+          "corp_code": "00108241",
+          "rcept_no": "20260311003892",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "183,933,032,197",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "163,073,931,930",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "004370",
+          "corp_code": "00108241",
+          "rcept_no": "20260515000865",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "67,424,701,255",
+          "thstrm_add_amount": "67,424,701,255",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "56,051,767,375",
+          "frmtrm_add_amount": "56,051,767,375",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "004370",
+          "corp_code": "00108241",
+          "rcept_no": "20260814000362",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "59,252,095,212",
+          "thstrm_add_amount": "126,676,796,467",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "40,152,228,653",
+          "frmtrm_add_amount": "96,203,996,028",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 480500,
+      "low52": 319000,
+      "range_pct": 50.626959247648905,
+      "last_close": 394000,
+      "price_return_pct": -9.633027522935777,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20251119"
+      ],
+      "low_dates": [
+        "20260626"
+      ],
+      "average_value_estimate_20d": 9343078250.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=004370&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 51,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 15,
+      "position52_pct": 46.43962848297213,
+      "position_rank": 14,
+      "assessment": "4분기 합계 +39.0%. 52주 위치는 46.4%로 하단 40% 구간보다 위."
+    },
+    {
+      "code": "002960",
+      "name": "한국쉘석유",
+      "corp_code": "00158149",
+      "market_cap": 622700000000,
+      "fs_div": "OFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 14312632090,
+          "prior": 11995340440
+        },
+        {
+          "period": "2025Q4",
+          "value": 9533248477,
+          "prior": 8653304750
+        },
+        {
+          "period": "2026Q1",
+          "value": 16009001378,
+          "prior": 14518789121
+        },
+        {
+          "period": "2026Q2",
+          "value": 15564070340,
+          "prior": 14416657990
+        }
+      ],
+      "trailing_op": 55418952285,
+      "trailing_prior_op": 49584092301,
+      "trailing_yoy_pct": 11.767604716003488,
+      "latest_yoy_pct": 7.958934385458072,
+      "reports": [
+        {
+          "stock_code": "002960",
+          "corp_code": "00158149",
+          "rcept_no": "20251114000941",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "OFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "14,312,632,090",
+          "thstrm_add_amount": "43,248,079,201",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "11,995,340,440",
+          "frmtrm_add_amount": "37,301,762,589",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "002960",
+          "corp_code": "00158149",
+          "rcept_no": "20260319000588",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "OFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "52,781,327,678",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "45,955,067,339",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "002960",
+          "corp_code": "00158149",
+          "rcept_no": "20260515003130",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "OFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "16,009,001,378",
+          "thstrm_add_amount": "16,009,001,378",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "14,518,789,121",
+          "frmtrm_add_amount": "14,518,789,121",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "002960",
+          "corp_code": "00158149",
+          "rcept_no": "20260814003708",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "OFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "15,564,070,340",
+          "thstrm_add_amount": "31,573,071,718",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "14,416,657,990",
+          "frmtrm_add_amount": "28,935,447,111",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 620000,
+      "low52": 426500,
+      "range_pct": 45.369284876905034,
+      "last_close": 520000,
+      "price_return_pct": 18.047673098751417,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260515"
+      ],
+      "low_dates": [
+        "20260119"
+      ],
+      "average_value_estimate_20d": 971459850.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=002960&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 42,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 13,
+      "position52_pct": 48.320413436692505,
+      "position_rank": 15,
+      "assessment": "최근 분기 영업이익 +8.0%. 현재가는 52주 범위의 중간 부근인 48.3%."
+    },
+    {
+      "code": "155660",
+      "name": "DSR",
+      "corp_code": "00110608",
+      "market_cap": 67680000000,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 5493902141,
+          "prior": 1589546105
+        },
+        {
+          "period": "2025Q4",
+          "value": 5119194690,
+          "prior": 3491541442
+        },
+        {
+          "period": "2026Q1",
+          "value": 6673854822,
+          "prior": 5728005822
+        },
+        {
+          "period": "2026Q2",
+          "value": 4074908974,
+          "prior": 2950636953
+        }
+      ],
+      "trailing_op": 21361860627,
+      "trailing_prior_op": 13759730322,
+      "trailing_yoy_pct": 55.2491228178011,
+      "latest_yoy_pct": 38.102688975575916,
+      "reports": [
+        {
+          "stock_code": "155660",
+          "corp_code": "00110608",
+          "rcept_no": "20251114000824",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "5,493,902,141",
+          "thstrm_add_amount": "14,172,544,916",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "1,589,546,105",
+          "frmtrm_add_amount": "11,848,972,609",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "155660",
+          "corp_code": "00110608",
+          "rcept_no": "20260319001193",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "19,291,739,606",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "15,340,514,051",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "155660",
+          "corp_code": "00110608",
+          "rcept_no": "20260515000740",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "6,673,854,822",
+          "thstrm_add_amount": "6,673,854,822",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "5,728,005,822",
+          "frmtrm_add_amount": "5,728,005,822",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "155660",
+          "corp_code": "00110608",
+          "rcept_no": "20260814001412",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "4,074,908,974",
+          "thstrm_add_amount": "10,748,763,796",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "2,950,636,953",
+          "frmtrm_add_amount": "8,678,642,775",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 4800,
+      "low52": 3630,
+      "range_pct": 32.231404958677686,
+      "last_close": 4240,
+      "price_return_pct": 12.317880794701995,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260727"
+      ],
+      "low_dates": [
+        "20251105"
+      ],
+      "average_value_estimate_20d": 82932424.75,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=155660&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 19,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 8,
+      "position52_pct": 52.13675213675214,
+      "position_rank": 16,
+      "assessment": "4분기 합계 +55.3%. 위치는 52.1%이며 거래 규모 추정치가 하루 0.83억원으로 작음."
+    },
+    {
+      "code": "282330",
+      "name": "BGF리테일",
+      "corp_code": "01263022",
+      "market_cap": 2309129841600,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 97630927160,
+          "prior": 91155803123
+        },
+        {
+          "period": "2025Q4",
+          "value": 64266900904,
+          "prior": 51644585509
+        },
+        {
+          "period": "2026Q1",
+          "value": 38109787404,
+          "prior": 22625658073
+        },
+        {
+          "period": "2026Q2",
+          "value": 84851551888,
+          "prior": 69423840540
+        }
+      ],
+      "trailing_op": 284859167356,
+      "trailing_prior_op": 234849887245,
+      "trailing_yoy_pct": 21.294146953892024,
+      "latest_yoy_pct": 22.222497672267206,
+      "reports": [
+        {
+          "stock_code": "282330",
+          "corp_code": "01263022",
+          "rcept_no": "20251114001662",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "97,630,927,160",
+          "thstrm_add_amount": "189,680,425,773",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "91,155,803,123",
+          "frmtrm_add_amount": "199,996,661,730",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "282330",
+          "corp_code": "01263022",
+          "rcept_no": "20260318000829",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "253,947,326,677",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "251,641,247,239",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "282330",
+          "corp_code": "01263022",
+          "rcept_no": "20260515001474",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "38,109,787,404",
+          "thstrm_add_amount": "38,109,787,404",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "22,625,658,073",
+          "frmtrm_add_amount": "22,625,658,073",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "282330",
+          "corp_code": "01263022",
+          "rcept_no": "20260814004307",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "84,851,551,888",
+          "thstrm_add_amount": "122,961,339,292",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "69,423,840,540",
+          "frmtrm_add_amount": "92,049,498,613",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 156600,
+      "low52": 101200,
+      "range_pct": 54.74308300395256,
+      "last_close": 131900,
+      "price_return_pct": 27.316602316602314,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260811"
+      ],
+      "low_dates": [
+        "20260107",
+        "20260108"
+      ],
+      "average_value_estimate_20d": 5763848220.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=282330&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 64,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 20,
+      "position52_pct": 55.415162454873645,
+      "position_rank": 17,
+      "assessment": "4분기 합계 영업이익 +21.3%. 52주 위치는 55.4%로 범위 중간보다 위."
+    },
+    {
+      "code": "023450",
+      "name": "동남합성",
+      "corp_code": "00115065",
+      "market_cap": 105875000000,
+      "fs_div": "OFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 3287077791,
+          "prior": 2154163697
+        },
+        {
+          "period": "2025Q4",
+          "value": 2099537860,
+          "prior": 1864680101
+        },
+        {
+          "period": "2026Q1",
+          "value": 3813476802,
+          "prior": 2992789876
+        },
+        {
+          "period": "2026Q2",
+          "value": 5353449992,
+          "prior": 985926310
+        }
+      ],
+      "trailing_op": 14553542445,
+      "trailing_prior_op": 7997559984,
+      "trailing_yoy_pct": 81.97478323533633,
+      "latest_yoy_pct": 442.98682748409465,
+      "reports": [
+        {
+          "stock_code": "023450",
+          "corp_code": "00115065",
+          "rcept_no": "20251110000408",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "OFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "3,287,077,791",
+          "thstrm_add_amount": "7,265,793,977",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "2,154,163,697",
+          "frmtrm_add_amount": "7,069,906,706",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "023450",
+          "corp_code": "00115065",
+          "rcept_no": "20260318000382",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "OFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "9,365,331,837",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "8,934,586,807",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "023450",
+          "corp_code": "00115065",
+          "rcept_no": "20260515000261",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "OFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "3,813,476,802",
+          "thstrm_add_amount": "3,813,476,802",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "2,992,789,876",
+          "frmtrm_add_amount": "2,992,789,876",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "023450",
+          "corp_code": "00115065",
+          "rcept_no": "20260812000350",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "OFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "5,353,449,992",
+          "thstrm_add_amount": "9,166,926,794",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "985,926,310",
+          "frmtrm_add_amount": "3,978,716,186",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 34400,
+      "low52": 26100,
+      "range_pct": 31.800766283524908,
+      "last_close": 30750,
+      "price_return_pct": -3.301886792452835,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260102",
+        "20260105"
+      ],
+      "low_dates": [
+        "20260601"
+      ],
+      "average_value_estimate_20d": 12558555.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=023450&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 16,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 7,
+      "position52_pct": 56.024096385542165,
+      "position_rank": 18,
+      "assessment": "4분기 합계 +82.0%. 거래 규모 추정치는 하루 약 0.13억원으로 주문 크기 확인 필요."
+    },
+    {
+      "code": "120240",
+      "name": "대정화금",
+      "corp_code": "00250997",
+      "market_cap": 100234050540,
+      "fs_div": "OFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 3650083112,
+          "prior": 2323992842
+        },
+        {
+          "period": "2025Q4",
+          "value": 3028352081,
+          "prior": 2094494095
+        },
+        {
+          "period": "2026Q1",
+          "value": 3979093128,
+          "prior": 1937026206
+        },
+        {
+          "period": "2026Q2",
+          "value": 5262253226,
+          "prior": 2566892994
+        }
+      ],
+      "trailing_op": 15919781547,
+      "trailing_prior_op": 8922406137,
+      "trailing_yoy_pct": 78.42475787985978,
+      "latest_yoy_pct": 105.00477574640965,
+      "reports": [
+        {
+          "stock_code": "120240",
+          "corp_code": "00250997",
+          "rcept_no": "20251114000190",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "OFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "3,650,083,112",
+          "thstrm_add_amount": "8,154,002,312",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "2,323,992,842",
+          "frmtrm_add_amount": "6,385,646,781",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "120240",
+          "corp_code": "00250997",
+          "rcept_no": "20260318000412",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "OFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "11,182,354,393",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "8,480,140,876",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "120240",
+          "corp_code": "00250997",
+          "rcept_no": "20260514000145",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "OFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "3,979,093,128",
+          "thstrm_add_amount": "3,979,093,128",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "1,937,026,206",
+          "frmtrm_add_amount": "1,937,026,206",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "120240",
+          "corp_code": "00250997",
+          "rcept_no": "20260814000766",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "OFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "5,262,253,226",
+          "thstrm_add_amount": "9,241,346,354",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "2,566,892,994",
+          "frmtrm_add_amount": "4,503,919,200",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 15230,
+      "low52": 12030,
+      "range_pct": 26.60016625103907,
+      "last_close": 14190,
+      "price_return_pct": 13.793103448275868,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20260917"
+      ],
+      "low_dates": [
+        "20251104",
+        "20251105"
+      ],
+      "average_value_estimate_20d": 106094600.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=120240&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 9,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 5,
+      "position52_pct": 67.5,
+      "position_rank": 19,
+      "assessment": "고저 변동폭은 26.6%로 작지만 현재가는 범위의 67.5% 지점."
+    },
+    {
+      "code": "033780",
+      "name": "KT&G",
+      "corp_code": "00244455",
+      "market_cap": 18176248232500,
+      "fs_div": "CFS",
+      "quarters": [
+        {
+          "period": "2025Q3",
+          "value": 465289000000,
+          "prior": 417750000000
+        },
+        {
+          "period": "2025Q4",
+          "value": 242935000000,
+          "prior": 212501000000
+        },
+        {
+          "period": "2026Q1",
+          "value": 364536000000,
+          "prior": 285560000000
+        },
+        {
+          "period": "2026Q2",
+          "value": 414452000000,
+          "prior": 349882000000
+        }
+      ],
+      "trailing_op": 1487212000000,
+      "trailing_prior_op": 1265693000000,
+      "trailing_yoy_pct": 17.50179545908841,
+      "latest_yoy_pct": 18.454793330322804,
+      "reports": [
+        {
+          "stock_code": "033780",
+          "corp_code": "00244455",
+          "rcept_no": "20251114002334",
+          "bsns_year": "2025",
+          "reprt_code": "11014",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.09.30",
+          "thstrm_amount": "465,289,000,000",
+          "thstrm_add_amount": "1,100,731,000,000",
+          "frmtrm_dt": "2024.01.01 ~ 2024.09.30",
+          "frmtrm_amount": "417,750,000,000",
+          "frmtrm_add_amount": "976,313,000,000",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "033780",
+          "corp_code": "00244455",
+          "rcept_no": "20260318001422",
+          "bsns_year": "2025",
+          "reprt_code": "11011",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2025.01.01 ~ 2025.12.31",
+          "thstrm_amount": "1,343,666,000,000",
+          "thstrm_add_amount": null,
+          "frmtrm_dt": "2024.01.01 ~ 2024.12.31",
+          "frmtrm_amount": "1,188,814,000,000",
+          "frmtrm_add_amount": null,
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "033780",
+          "corp_code": "00244455",
+          "rcept_no": "20260515002914",
+          "bsns_year": "2026",
+          "reprt_code": "11013",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.03.31",
+          "thstrm_amount": "364,536,000,000",
+          "thstrm_add_amount": "364,536,000,000",
+          "frmtrm_dt": "2025.01.01 ~ 2025.03.31",
+          "frmtrm_amount": "285,560,000,000",
+          "frmtrm_add_amount": "285,560,000,000",
+          "currency": "KRW"
+        },
+        {
+          "stock_code": "033780",
+          "corp_code": "00244455",
+          "rcept_no": "20260814004174",
+          "bsns_year": "2026",
+          "reprt_code": "11012",
+          "account_nm": "영업이익",
+          "fs_div": "CFS",
+          "sj_div": "IS",
+          "thstrm_dt": "2026.01.01 ~ 2026.06.30",
+          "thstrm_amount": "414,452,000,000",
+          "thstrm_add_amount": "778,988,000,000",
+          "frmtrm_dt": "2025.01.01 ~ 2025.06.30",
+          "frmtrm_amount": "349,882,000,000",
+          "frmtrm_add_amount": "635,442,000,000",
+          "currency": "KRW"
+        }
+      ],
+      "high52": 196900,
+      "low52": 132100,
+      "range_pct": 49.05374716124149,
+      "last_close": 196100,
+      "price_return_pct": 46.12518628912072,
+      "valid_days": 244,
+      "zero_or_invalid_days": 0,
+      "high_dates": [
+        "20261030"
+      ],
+      "low_dates": [
+        "20251104"
+      ],
+      "average_value_estimate_20d": 47814557960.0,
+      "price_source": "https://api.finance.naver.com/siseJson.naver?symbol=033780&requestType=1&startTime=20251031&endTime=20261030&timeframe=day",
+      "rank": 48,
+      "growth_quarters_count": 4,
+      "all_four_yoy_growth": true,
+      "strict_rank": 14,
+      "position52_pct": 98.76543209876543,
+      "position_rank": 20,
+      "assessment": "네 분기 영업이익 모두 전년 증가. 52주 위치는 98.8%로 고가에 가까움."
+    }
+  ]
+}

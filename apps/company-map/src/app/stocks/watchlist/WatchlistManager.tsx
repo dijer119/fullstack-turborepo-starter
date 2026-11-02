@@ -32,8 +32,8 @@ function fmtPrice(currency: string | null, v: number | null): string {
 
 function signClass(v: number): string {
   if (v > 0) return "text-green-600 dark:text-green-400";
-  if (v < 0) return "text-red-600 dark:text-red-400";
-  return "text-gray-500";
+  if (v < 0) return "text-red-ink ";
+  return "text-muted";
 }
 
 function FilterButton({
@@ -51,8 +51,8 @@ function FilterButton({
       onClick={onClick}
       className={`rounded border px-3 py-1.5 text-sm ${
         active
-          ? "border-blue-500 bg-blue-50 font-medium text-blue-700 dark:border-blue-400 dark:bg-blue-900/30 dark:text-blue-300"
-          : "border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+          ? "border-blue-500 bg-blue-50 font-medium text-blue-ink dark:border-blue-400 dark:bg-blue-900/30 "
+          : "border-line hover:bg-surface-muted  "
       }`}
     >
       {children}
@@ -96,7 +96,7 @@ function WatchRow({
       : null;
 
   return (
-    <tr className="border-b border-gray-100 text-right last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50">
+    <tr className="border-b border-line text-right last:border-0 hover:bg-surface-muted  ">
       <td className="p-2 text-left">
         <div className="flex items-center gap-1.5">
           <span
@@ -111,15 +111,15 @@ function WatchRow({
           {krCode ? (
             <Link
               href={`/stocks/${w.symbol}`}
-              className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+              className="font-medium text-blue-ink hover:underline "
             >
               {w.name}
             </Link>
           ) : (
             <span className="font-medium">{w.name}</span>
           )}
-          <span className="text-xs text-gray-400">{w.symbol}</span>
-          {w.market && <span className="text-xs text-gray-400">· {w.market}</span>}
+          <span className="text-xs text-subtle">{w.symbol}</span>
+          {w.market && <span className="text-xs text-subtle">· {w.market}</span>}
         </div>
       </td>
       <td className="p-2 tabular-nums">{fmtPrice(w.currency, w.lastPrice)}</td>
@@ -140,7 +140,7 @@ function WatchRow({
             );
           })()
         ) : (
-          <span className="text-gray-400">—</span>
+          <span className="text-subtle">—</span>
         )}
       </td>
       <td className="p-2">
@@ -156,7 +156,7 @@ function WatchRow({
           onBlur={save}
           disabled={pending}
           placeholder="구매가"
-          className="w-24 rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm tabular-nums disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900"
+          className="w-24 rounded border border-line bg-surface px-2 py-1 text-right text-sm tabular-nums disabled:opacity-50  "
         />
       </td>
       <td className="p-2 tabular-nums">
@@ -173,7 +173,7 @@ function WatchRow({
             </div>
           </div>
         ) : (
-          <span className="text-gray-400">—</span>
+          <span className="text-subtle">—</span>
         )}
       </td>
       <td className="p-2 text-center">
@@ -191,7 +191,7 @@ function WatchRow({
           onClick={() => onRemove(w.symbol)}
           disabled={pending}
           title="삭제"
-          className="text-gray-400 hover:text-red-600 disabled:opacity-50"
+          className="text-subtle hover:text-red-600 disabled:opacity-50"
         >
           <X size={14} />
         </button>
@@ -202,8 +202,10 @@ function WatchRow({
 
 export function WatchlistManager({
   initialWatches,
+  compact = false,
 }: {
   initialWatches: StockWatchRow[];
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -274,6 +276,7 @@ export function WatchlistManager({
 
   return (
     <div className="space-y-4">
+      {!compact && <>
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative">
           <input
@@ -295,16 +298,16 @@ export function WatchlistManager({
               }
             }}
             placeholder="종목명 또는 심볼 (예: 삼성전자, 로빈후드, HOOD)"
-            className="w-72 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900"
+            className="w-72 rounded border border-line bg-surface px-3 py-1.5 text-sm  "
           />
           {results.length > 0 && (
-            <ul className="absolute z-20 mt-1 max-h-72 w-72 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+            <ul className="absolute z-20 mt-1 max-h-72 w-72 overflow-auto rounded-md border border-line bg-surface shadow-lg  ">
               {results.map((r) => (
                 <li key={`${r.country}-${r.symbol}`}>
                   <button
                     type="button"
                     onClick={() => add(r.symbol)}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-surface-inset "
                   >
                     <span
                       className={`rounded px-1 py-0.5 text-[10px] font-medium ${
@@ -316,7 +319,7 @@ export function WatchlistManager({
                       {r.country}
                     </span>
                     <span className="flex-1 truncate text-sm font-medium">{r.name}</span>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-subtle">
                       {r.symbol} · {r.market}
                     </span>
                   </button>
@@ -337,11 +340,11 @@ export function WatchlistManager({
           type="button"
           onClick={() => startTransition(() => router.refresh())}
           disabled={pending}
-          className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800"
+          className="rounded border border-line px-3 py-1.5 text-sm hover:bg-surface-muted disabled:opacity-50  "
         >
           ↻ 새로고침
         </button>
-        {msg && <span className="text-xs text-gray-500">{msg}</span>}
+        {msg && <span className="text-xs text-muted">{msg}</span>}
       </div>
 
       <div className="flex gap-2">
@@ -356,39 +359,40 @@ export function WatchlistManager({
         </FilterButton>
       </div>
 
+      </>}
       {initialWatches.length === 0 ? (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted">
           관심목록이 비어 있습니다. 심볼을 입력해 추가하세요.
         </p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-gray-500">표시할 종목이 없습니다.</p>
+        <p className="text-sm text-muted">표시할 종목이 없습니다.</p>
       ) : (
-        <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
+        <div className="overflow-x-auto rounded-md border border-line ">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-right">
-                <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 text-left font-medium dark:border-gray-700 dark:bg-gray-900">
+                <th className="sticky top-0 z-10 border-b border-line bg-surface-muted p-2 text-left font-medium  ">
                   종목
                 </th>
-                <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">
+                <th className="sticky top-0 z-10 border-b border-line bg-surface-muted p-2 font-medium  ">
                   현재가
                 </th>
-                <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">
+                <th className="sticky top-0 z-10 border-b border-line bg-surface-muted p-2 font-medium  ">
                   전일종가
                 </th>
-                <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">
+                <th className="sticky top-0 z-10 border-b border-line bg-surface-muted p-2 font-medium  ">
                   전일대비
                 </th>
-                <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">
+                <th className="sticky top-0 z-10 border-b border-line bg-surface-muted p-2 font-medium  ">
                   구매가
                 </th>
-                <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">
+                <th className="sticky top-0 z-10 border-b border-line bg-surface-muted p-2 font-medium  ">
                   등락
                 </th>
-                <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900">
+                <th className="sticky top-0 z-10 border-b border-line bg-surface-muted p-2 font-medium  ">
                   주문
                 </th>
-                <th className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 p-2 font-medium dark:border-gray-700 dark:bg-gray-900" />
+                <th className="sticky top-0 z-10 border-b border-line bg-surface-muted p-2 font-medium  " />
               </tr>
             </thead>
             <tbody>

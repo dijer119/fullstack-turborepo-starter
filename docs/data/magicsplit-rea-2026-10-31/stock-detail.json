@@ -1,0 +1,368 @@
+{
+  "code": "004000",
+  "name": "롯데정밀화학",
+  "market": "KOSPI",
+  "sector": "화학",
+  "stockType": "STOCK",
+  "securityGroup": "ST",
+  "nxtTradable": true,
+  "isActive": true,
+  "currentPrice": 34950,
+  "changeRate": 0,
+  "changeRate1w": -2.24,
+  "changeRate1m": -19.1,
+  "week52Range": {
+    "low": 34300,
+    "high": 71800,
+    "current": 34950,
+    "fromLow": 1.9,
+    "fromHigh": -51.32,
+    "positionPercent": 1.73
+  },
+  "filterCategories": [
+    {
+      "category": "핵심 지표",
+      "indicators": [
+        {
+          "conditionId": 3,
+          "condition": "52주최저가대비",
+          "category": "가격",
+          "passed": true,
+          "actualValue": 1.9,
+          "threshold": 10,
+          "operator": "lte",
+          "unit": "%",
+          "description": "52주 최저가 대비 10% 이내",
+          "thresholdLabel": "10% 이하"
+        },
+        {
+          "conditionId": 12,
+          "condition": "영업이익률",
+          "category": "수익성",
+          "passed": true,
+          "actualValue": 8.622,
+          "threshold": 5,
+          "operator": "gte",
+          "unit": "%",
+          "description": "영업이익률 5% 이상",
+          "thresholdLabel": "5% 이상"
+        },
+        {
+          "conditionId": 16,
+          "condition": "부채비율",
+          "category": "안정성",
+          "passed": true,
+          "actualValue": 11.084,
+          "threshold": 100,
+          "operator": "lte",
+          "unit": "%",
+          "description": "부채비율 100% 이하",
+          "thresholdLabel": "100% 이하"
+        }
+      ]
+    },
+    {
+      "category": "가격",
+      "indicators": [
+        {
+          "conditionId": 3,
+          "condition": "52주최저가대비",
+          "category": "가격",
+          "passed": true,
+          "actualValue": 1.9,
+          "threshold": 10,
+          "operator": "lte",
+          "unit": "%",
+          "description": "52주 최저가 대비 10% 이내",
+          "thresholdLabel": "10% 이하"
+        },
+        {
+          "conditionId": 4,
+          "condition": "52주최고가대비",
+          "category": "가격",
+          "passed": true,
+          "actualValue": -51.32,
+          "threshold": -30,
+          "operator": "lte",
+          "unit": "%",
+          "description": "52주 최고가 대비 30% 이상 하락",
+          "thresholdLabel": "-30% 이하"
+        }
+      ]
+    },
+    {
+      "category": "가치",
+      "indicators": [
+        {
+          "conditionId": 5,
+          "condition": "PER",
+          "category": "가치",
+          "passed": true,
+          "actualValue": 4.49,
+          "threshold": 5,
+          "operator": "lte",
+          "unit": "배",
+          "description": "PER 5배 이하",
+          "thresholdLabel": "5배 이하"
+        },
+        {
+          "conditionId": 6,
+          "condition": "PBR",
+          "category": "가치",
+          "passed": true,
+          "actualValue": 0.35,
+          "threshold": 2,
+          "operator": "lte",
+          "unit": "배",
+          "description": "PBR 2배 이하",
+          "thresholdLabel": "2배 이하"
+        },
+        {
+          "conditionId": 7,
+          "condition": "PSR",
+          "category": "가치",
+          "passed": true,
+          "actualValue": 0.46,
+          "threshold": 5,
+          "operator": "lte",
+          "unit": "배",
+          "description": "PSR 5배 이하",
+          "thresholdLabel": "5배 이하"
+        },
+        {
+          "conditionId": 8,
+          "condition": "PCR",
+          "category": "가치",
+          "passed": true,
+          "actualValue": 3.47,
+          "threshold": 10,
+          "operator": "lte",
+          "unit": "배",
+          "description": "PCR 10배 이하",
+          "thresholdLabel": "10배 이하"
+        },
+        {
+          "conditionId": 9,
+          "condition": "PEG",
+          "category": "가치",
+          "passed": true,
+          "actualValue": 0.02,
+          "threshold": 1,
+          "operator": "lte",
+          "unit": "",
+          "description": "PEG 1 이하",
+          "thresholdLabel": "1 이하"
+        }
+      ]
+    },
+    {
+      "category": "수익성",
+      "indicators": [
+        {
+          "conditionId": 10,
+          "condition": "ROE",
+          "category": "수익성",
+          "passed": true,
+          "actualValue": 5.651,
+          "threshold": 5,
+          "operator": "gte",
+          "unit": "%",
+          "description": "ROE 5% 이상",
+          "thresholdLabel": "5% 이상"
+        },
+        {
+          "conditionId": 11,
+          "condition": "ROA",
+          "category": "수익성",
+          "passed": true,
+          "actualValue": 5.002,
+          "threshold": 3,
+          "operator": "gte",
+          "unit": "%",
+          "description": "ROA 3% 이상",
+          "thresholdLabel": "3% 이상"
+        },
+        {
+          "conditionId": 12,
+          "condition": "영업이익률",
+          "category": "수익성",
+          "passed": true,
+          "actualValue": 8.622,
+          "threshold": 5,
+          "operator": "gte",
+          "unit": "%",
+          "description": "영업이익률 5% 이상",
+          "thresholdLabel": "5% 이상"
+        },
+        {
+          "conditionId": 13,
+          "condition": "순이익률",
+          "category": "수익성",
+          "passed": true,
+          "actualValue": 12.6587,
+          "threshold": 3,
+          "operator": "gte",
+          "unit": "%",
+          "description": "순이익률 3% 이상",
+          "thresholdLabel": "3% 이상"
+        }
+      ]
+    },
+    {
+      "category": "성장성",
+      "indicators": [
+        {
+          "conditionId": 14,
+          "condition": "매출증가율",
+          "category": "성장성",
+          "passed": true,
+          "actualValue": 26.0456,
+          "threshold": 1,
+          "operator": "gte",
+          "unit": "%",
+          "description": "매출 증가율 1% 이상",
+          "thresholdLabel": "1% 이상"
+        },
+        {
+          "conditionId": 15,
+          "condition": "순이익증가율",
+          "category": "성장성",
+          "passed": true,
+          "actualValue": 216.2303,
+          "threshold": 1,
+          "operator": "gte",
+          "unit": "%",
+          "description": "순이익 증가율 1% 이상",
+          "thresholdLabel": "1% 이상"
+        }
+      ]
+    },
+    {
+      "category": "안정성",
+      "indicators": [
+        {
+          "conditionId": 16,
+          "condition": "부채비율",
+          "category": "안정성",
+          "passed": true,
+          "actualValue": 11.084,
+          "threshold": 100,
+          "operator": "lte",
+          "unit": "%",
+          "description": "부채비율 100% 이하",
+          "thresholdLabel": "100% 이하"
+        },
+        {
+          "conditionId": 17,
+          "condition": "유동비율",
+          "category": "안정성",
+          "passed": true,
+          "actualValue": 605.0746,
+          "threshold": 200,
+          "operator": "gte",
+          "unit": "%",
+          "description": "유동비율 200% 이상",
+          "thresholdLabel": "200% 이상"
+        },
+        {
+          "conditionId": 18,
+          "condition": "유보율",
+          "category": "안정성",
+          "passed": true,
+          "actualValue": 1629.0185,
+          "threshold": 200,
+          "operator": "gte",
+          "unit": "%",
+          "description": "유보율 200% 이상",
+          "thresholdLabel": "200% 이상"
+        }
+      ]
+    },
+    {
+      "category": "규모",
+      "indicators": [
+        {
+          "conditionId": 1,
+          "condition": "시가총액",
+          "category": "규모",
+          "passed": true,
+          "actualValue": 926200000000,
+          "threshold": 300000000000,
+          "operator": "gte",
+          "unit": "원",
+          "description": "시가총액 3000억 이상",
+          "thresholdLabel": "300000000000원 이상"
+        }
+      ]
+    },
+    {
+      "category": "거래",
+      "indicators": [
+        {
+          "conditionId": 2,
+          "condition": "증거금률",
+          "category": "거래",
+          "passed": true,
+          "actualValue": 30,
+          "threshold": 40,
+          "operator": "lte",
+          "unit": "%",
+          "description": "증거금률 40% 이하",
+          "thresholdLabel": "40% 이하"
+        }
+      ]
+    },
+    {
+      "category": "배당",
+      "indicators": [
+        {
+          "conditionId": 19,
+          "condition": "배당수익률",
+          "category": "배당",
+          "passed": true,
+          "actualValue": 4.2918,
+          "threshold": 3,
+          "operator": "gte",
+          "unit": "%",
+          "description": "배당수익률 3% 이상",
+          "thresholdLabel": "3% 이상"
+        }
+      ]
+    },
+    {
+      "category": "수급",
+      "indicators": [
+        {
+          "conditionId": 20,
+          "condition": "외국인지분율",
+          "category": "수급",
+          "passed": false,
+          "actualValue": 23.78,
+          "threshold": 30,
+          "operator": "gte",
+          "unit": "%",
+          "description": "외국인 지분율 30% 이상",
+          "thresholdLabel": "30% 이상"
+        }
+      ]
+    }
+  ],
+  "aiHistory": [
+    {
+      "date": "2026-10-31",
+      "score": 95,
+      "passedConditions": 19,
+      "totalConditions": 20
+    },
+    {
+      "date": "2026-10-18",
+      "score": 90,
+      "passedConditions": 18,
+      "totalConditions": 20
+    }
+  ],
+  "aiReport": {
+    "available": false,
+    "viewedToday": false
+  }
+}

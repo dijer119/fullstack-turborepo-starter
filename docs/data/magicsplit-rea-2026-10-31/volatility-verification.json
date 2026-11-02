@@ -1,0 +1,20 @@
+{
+  "candles": 120,
+  "computedIntervals": 119,
+  "mean": 4.15362580114151,
+  "min": 1.2318029115341544,
+  "max": 9.207459207459207,
+  "populationStd": 1.5746898610931745,
+  "reported": {
+    "timeframe": "custom_180d",
+    "label": "180\uc77c \uc77c\ubd09",
+    "periodLabel": "180\uc77c",
+    "candleLabel": "\uc77c\ubd09",
+    "days": 180,
+    "avgVolatility": 4.1536,
+    "maxVolatility": 9.2075,
+    "minVolatility": 1.2318,
+    "stdDeviation": 1.5747,
+    "dataPoints": 120
+  }
+}

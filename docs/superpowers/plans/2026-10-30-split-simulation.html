@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>차수별 장부·모의 실행 구현 계획</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        max-width: 880px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.6;
+        color: #1a202c;
+      }
+      h1 {
+        border-bottom: 2px solid #2c5282;
+        padding-bottom: 0.4rem;
+      }
+      h2 {
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 0.3rem;
+        margin-top: 2rem;
+        color: #2c5282;
+      }
+      h3 {
+        color: #2c5282;
+      }
+      pre {
+        background: #f7fafc;
+        border: 1px solid #e2e8f0;
+        padding: 0.8rem;
+        overflow-x: auto;
+        border-radius: 4px;
+      }
+      code {
+        background: #f7fafc;
+        padding: 0.1rem 0.35rem;
+        border-radius: 3px;
+        font-size: 0.92em;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 0.6rem 0;
+      }
+      th {
+        background: #edf2f7;
+        text-align: left;
+      }
+      th,
+      td {
+        border: 1px solid #cbd5e0;
+        padding: 0.4rem 0.6rem;
+      }
+      ul,
+      ol {
+        padding-left: 1.5rem;
+      }
+      li {
+        margin: 0.2rem 0;
+      }
+      blockquote {
+        border-left: 3px solid #d69e2e;
+        background: #fffaf0;
+        padding: 0.5rem 0.9rem;
+        margin: 1rem 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>차수별 장부·모의 실행 구현 계획</h1>
+    <p>
+      2026-10-30 · 사용자 승인 범위: 앞선 가능성 보고서의 모의 장부 단계. 기존
+      토스 조회를 재사용하며 실거래는 연결하지 않는다. 기존 company-map 패턴을
+      따라 현재 기능 브랜치에서 순차 구현한다. 커밋·운영 worker 재시작은 하지
+      않는다.
+    </p>
+    <h2>구현 완료 · 2026-10-30</h2>
+    <p>
+      <a href="http://localhost:3004/stocks/split">분할매매 모의 장부 열기</a>.
+      전종목 조회 화면에서도 진입할 수 있다. DB 백업 후 모의 전략·차수·실행 이력용
+      테이블 3개를 추가했다. 기존 실계좌 데이터와 운영 worker는 변경하지 않았다.
+    </p>
+    <ol>
+      <li>모의 전략 만들기에서 종목, 자금, 차수, 하락 간격, 익절률과 비용을 정한다.</li>
+      <li>직접 입력 전략은 시간 순서의 가격을 입력하고 가격 경로 반영을 누른다.</li>
+      <li>토스 시세 전략은 기존 토스 설정을 사용해 현재 시세로 모의 1회 실행한다.</li>
+      <li>차수 장부·실행 이력에서 청산·재진입 회차와 잔량·실현손익을 확인한다.</li>
+    </ol>
+    <p>
+      가격 원천은 생성 후 바꿀 수 없다. 입력 가격에서 전량 체결한다고 가정하며
+      토스 장부도 버튼을 누를 때만 진행한다. 토스는 최근 5분 이내 시세만 받아들인다.
+      수수료·세금은 사용자가 입력한 모의 비용이며 기본값은 0이다.
+    </p>
+    <table>
+      <thead><tr><th>검증</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr><td>앱 전체 테스트</td><td>49개 파일, 443개 테스트 통과. 신규 split 테스트 17개 포함.</td></tr>
+        <tr><td>정적 검사</td><td>앱 전체 타입 검사, 변경 TS/TSX 파일 lint, Prisma schema 검증, diff 공백 검사 통과.</td></tr>
+        <tr><td>DB 원자성</td><td>실행 이력 저장에 실패를 주입하고 잔액·차수·실행 이력이 함께 롤백됨을 확인.</td></tr>
+        <tr><td>재실행</td><td>같은 실행 키·시세의 중복 체결 방지, 과거 토스 관측과 일시정지 실행 거부 확인.</td></tr>
+        <tr><td>브라우저</td><td>전략 생성, 5개 가격 재생, 3차 청산 후 2회차 재진입, 새로고침 보존, 일시정지·재개 확인.</td></tr>
+        <tr><td>토스 조회</td><td>기존 getPrices 어댑터를 모킹하여 검증. 실제 토스 API 호출과 실주문은 실행하지 않음.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      예시 가격 10000 → 9000 → 8100 → 8910 → 8100을 모의 자금 300000,
+      차수당 100000, 최대 3차, 하락·익절 10%, 비용 0으로 실행하면 잔액 13520,
+      보유 33주, 실현손익 9720, 평가손익 -28900, 총자산 280820이 된다.
+      화면에 <strong>가격 경로 검증 예시</strong> 장부를 남겼다.
+    </p>
+    <h2>목표와 확정한 구현 규칙</h2>
+    <ul>
+      <li>
+        별도 화면에서 KRW/USD 전략을 만들고 정수주 차수 장부, 잔액,
+        실현·평가·총손익을 확인한다. 기본 수수료·세율은 0이며 사용자가 모의
+        비용을 지정한다.
+      </li>
+      <li>
+        가격 경로 직접 입력과 토스 현재가 반영을 전략 생성 시 구분한다. 서로
+        다른 가격 원천은 한 장부에서 섞지 않는다. 시세 반영은 화면에서
+        명시적으로 실행하며 배경 worker는 변경하지 않는다.
+      </li>
+      <li>
+        첫 가격에서 1차 진입. 후속 매수는 현재 보유한 직전 차수의 실제 매수가
+        대비 하락 간격을 사용한다. 한 가격 관측에는 추가 매수를 한 차수만
+        수행한다.
+      </li>
+      <li>
+        매도는 차수별 매수가 대비 목표 가격 수익률로 판단한다. 이미 보유한
+        차수만 전량 모의 체결한다. 매도가 있는 관측에는 매수하지 않는다.
+      </li>
+      <li>
+        청산된 하위 슬롯은 상위 슬롯이 보유 중이면 새 재진입 회차로 다시 살 수
+        있다. 모든 보유가 청산되면 종료하며 자동으로 1차를 재시작하지 않는다.
+      </li>
+      <li>
+        모의 체결가는 관측 가격, 정수주 전량 체결이다. 거래량·호가·부분체결·실제
+        수수료를 재현하는 백테스트가 아님을 화면에 표시한다.
+      </li>
+      <li>
+        예산은 매수비용까지 포함한다. 금액은 소수 넷째 자리로 반올림한다. 최초
+        예산은 차수별 배정 합계를 충족해야 한다.
+      </li>
+    </ul>
+    <h2>구현 순서와 검증</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>단위</th>
+          <th>구현</th>
+          <th>검증</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1. 순수 엔진</td>
+          <td>
+            설정·가격 입력 검증, 차수별 매수·매도·재매수, 비용과 총손익 계산
+          </td>
+          <td>
+            새 테스트 실패 확인 후 구현. 10000→9000→8100→8910→8100 경로,
+            비용·전량 청산·비정상 입력·예산 부족
+          </td>
+        </tr>
+        <tr>
+          <td>2. 영속 장부</td>
+          <td>
+            전용 Prisma 전략·차수·실행 기록, additive migration, 원자적 실행과
+            요청 키 중복 방지
+          </td>
+          <td>
+            임시 SQLite DB에서 재시작 복원, 중복 키, 다른 원천·일시정지 거부,
+            트랜잭션 롤백 검사
+          </td>
+        </tr>
+        <tr>
+          <td>3. 조회 어댑터·화면</td>
+          <td>
+            토스 getPrices만 사용하는 모의 입력, Server Actions, 관리 화면과
+            메뉴 링크
+          </td>
+          <td>
+            조회 어댑터 테스트에서 실제 주문 API 호출 불가 확인. 화면
+            생성·재생·잔량·손익·재조회 확인
+          </td>
+        </tr>
+        <tr>
+          <td>4. 통합 검증</td>
+          <td>앱 설명과 학습 기록 보완</td>
+          <td>
+            관련·전체 테스트, 변경 파일 lint, 앱 typecheck, 브라우저 검증 가능
+            여부 확인, 별도 리뷰
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <h2>파일 배치</h2>
+    <p>
+      루트:
+      <code
+        >/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map</code
+      >
+    </p>
+    <ul>
+      <li>순수 규칙: 해당 앱의 split 도메인(engine.ts, engine.test.ts)</li>
+      <li>
+        영속 실행: split/run.ts, run.test.ts, schema.prisma와 새 migration
+      </li>
+      <li>토스 조회: split/toss-source.ts와 전용 테스트</li>
+      <li>
+        화면·입력: actions/split.ts, app/stocks/split/page.tsx, SplitManager.tsx
+      </li>
+      <li>
+        메뉴·문서: stocks 페이지의 진입 링크, README의 해당 기능 항목만 변경
+      </li>
+    </ul>
+    <h2>완료 기준</h2>
+    <p>
+      토스 설정 없이도 수동 가격 경로로 전 과정을 실행하고 새로고침 후 차수
+      장부가 보존된다. 원금+총손익=잔액+평가액이 성립한다. 토스 경로는 조회만
+      사용하며 신규 경로에서 실주문을 호출할 수 없다. 기존 전략 동작은 바꾸지
+      않는다.
+    </p>
+    <h2>이번 범위에서 제외</h2>
+    <p>
+      실계좌 주문·조건주문·실계좌 잔고 가져오기, 자동 worker, LIVE 전환,
+      리스플릿, 청산 후 수익부스터, 소수점 주식, 일봉으로 장중 순서를 가정한
+      체결은 구현하지 않는다.
+    </p>
+  </body>
+</html>

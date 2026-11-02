@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>박성현의 매직스플릿 자동매매 프로그램 조사 | 2026-10-30</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        max-width: 880px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.6;
+        color: #1a202c;
+      }
+      h1 {
+        border-bottom: 2px solid #2c5282;
+        padding-bottom: 0.4rem;
+      }
+      h2 {
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 0.3rem;
+        margin-top: 2rem;
+        color: #2c5282;
+      }
+      h3 {
+        color: #2c5282;
+        margin-top: 1.5rem;
+      }
+      pre {
+        background: #f7fafc;
+        border: 1px solid #e2e8f0;
+        padding: 0.8rem;
+        overflow-x: auto;
+        border-radius: 4px;
+      }
+      code {
+        background: #f7fafc;
+        padding: 0.1rem 0.35rem;
+        border-radius: 3px;
+        font-size: 0.92em;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 0.6rem 0;
+      }
+      table th {
+        background: #edf2f7;
+        text-align: left;
+      }
+      table th,
+      table td {
+        border: 1px solid #cbd5e0;
+        padding: 0.4rem 0.6rem;
+        vertical-align: top;
+      }
+      ul,
+      ol {
+        padding-left: 1.5rem;
+      }
+      li {
+        margin: 0.2rem 0;
+      }
+      blockquote {
+        border-left: 3px solid #d69e2e;
+        background: #fffaf0;
+        padding: 0.5rem 0.9rem;
+        margin: 1rem 0;
+      }
+      a {
+        color: #2b6cb0;
+        text-underline-offset: 0.15em;
+        overflow-wrap: anywhere;
+      }
+      .meta,
+      .source {
+        color: #4a5568;
+        font-size: 0.9rem;
+      }
+      .lead {
+        background: #edf2f7;
+        border-radius: 6px;
+        padding: 1rem 1.2rem;
+      }
+      .lead p {
+        margin: 0.4rem 0;
+      }
+      .table-wrap {
+        overflow-x: auto;
+      }
+      .num {
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+      .gain {
+        color: #9b2c2c;
+        font-weight: 600;
+      }
+      .loss {
+        color: #2b6cb0;
+        font-weight: 600;
+      }
+      nav {
+        background: #f7fafc;
+        padding: 0.8rem 1rem;
+        border: 1px solid #e2e8f0;
+      }
+      nav a {
+        display: inline-block;
+        margin-right: 0.9rem;
+      }
+      footer {
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid #cbd5e0;
+      }
+      @media (max-width: 600px) {
+        body {
+          margin: 1rem auto;
+        }
+        h1 {
+          font-size: 1.6rem;
+        }
+        table {
+          font-size: 0.88rem;
+        }
+      }
+      @media print {
+        body {
+          max-width: none;
+          margin: 0;
+          font-size: 10pt;
+        }
+        nav {
+          display: none;
+        }
+        h2,
+        h3 {
+          break-after: avoid;
+        }
+        tr,
+        .lead {
+          break-inside: avoid;
+        }
+        a {
+          color: inherit;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <p class="meta">
+        조사 기준일 2026-10-30 · 한국 시간 · 공식 홈페이지·공식 매뉴얼·증권사
+        공지 중심
+      </p>
+      <h1>박성현의 매직스플릿<br />자동매매 프로그램 조사</h1>
+      <div class="lead">
+        <p>
+          <strong
+            >매직스플릿은 박성현의 세븐스플릿 투자법을 바탕으로, 주식을 차수별로
+            나눠 사고 각 차수의 조건에 따라 파는 자동매매 서비스다.</strong
+          >
+          반복 주문과 매수 내역 관리를 줄여주는 것이 핵심 가치다.
+          <a href="https://wikidocs.net/book/19377">공식 소개</a>
+        </p>
+        <p>
+          현재는 키움증권 PC 버전 외에
+          <strong>PC를 켜두지 않아도 되는 유진투자증권 모바일 웹 버전</strong>이
+          있다. 해외주식용 PC 버전도 별도로 운영된다.
+          <a href="https://wikidocs.net/348249">모바일 안내</a> ·
+          <a href="https://www.sevensplit.com/services/magicsplit"
+            >서비스 구분</a
+          >
+        </p>
+        <p>
+          <strong>조사 판단:</strong> 규칙을 지키고 매매를 자동 실행하는
+          편의성은 분명하다. 다만 수익 난 차수를 파는 동안 손실 난 차수가 남을
+          수 있으므로, 도입 판단은 실현이익보다 전체 계좌 수익률과 자금 소진
+          위험을 기준으로 해야 한다.
+        </p>
+      </div>
+    </header>
+    <nav aria-label="보고서 목차">
+      <a href="#identity">정체와 원리</a><a href="#versions">버전·증권사</a
+      ><a href="#pricing">비용</a><a href="#example">손익 예시</a
+      ><a href="#features">부가기능</a><a href="#risks">위험·운용 제약</a
+      ><a href="#assessment">판단</a><a href="#sources">자료와 한계</a>
+    </nav>
+
+    <section id="identity">
+      <h2>1. 어떤 프로그램인가</h2>
+      <p>
+        운영사는 스플릿인베스트이며 공식 연혁은 박성현을 매직스플릿 법인 설립
+        당시 대표로 명시한다. <em>세븐스플릿</em>은 투자법의 이름이면서 회사의
+        다른 서비스 브랜드로도 쓰인다. 매직스플릿은 그 분할매매 방식을 주식
+        거래에 적용하는 제품이다. 박성현의 동명 도서 <cite>매직 스플릿</cite>은
+        2024년 8월 20일 출간됐다.
+        <a href="https://www.magicsplit.com/">공식 연혁</a> ·
+        <a href="https://www.yes24.com/product/goods/130137454">도서 정보</a>
+      </p>
+      <h3>핵심은 차수별 관리와 주문 실행</h3>
+      <ol>
+        <li>
+          투자자가 종목, 종목당 투자 예산, 최대 차수, 추가 매수 간격, 차수별
+          목표 수익률을 정한다.
+        </li>
+        <li>
+          첫 매수 이후 가격이 설정한 구간에 도달하면 다음 차수를 매수한다.
+        </li>
+        <li>
+          각 차수는 자신의 매입가를 기준으로 관리되며 목표에 도달한 차수의
+          수량을 매도한다.
+        </li>
+        <li>
+          남은 차수는 계속 관리한다. 재진입과 청산 후 재매수는 설정과 부가기능에
+          따라 달라진다.
+        </li>
+      </ol>
+      <p class="source">
+        근거: <a href="https://wikidocs.net/338508">자동매매 설정</a>,
+        <a href="https://wikidocs.net/344507">모바일 일반주문</a>,
+        <a href="https://wikidocs.net/348247">청산 후 재매수</a>. 위 순서는 기능
+        설명이며 권장 매매조건이 아니다.
+      </p>
+      <p>
+        여러 증권계좌를 실제로 만들지 않아도 프로그램이 한 계좌의 거래를
+        차수별로 나누어 관리한다. 여기서 차수는
+        <strong>프로그램의 관리 단위</strong>다. 이를 별도 자산이나 손실이
+        격리된 계좌로 해석하면 안 된다.
+        <a
+          href="https://play.google.com/store/apps/details?hl=ko&amp;id=com.embarcadero.MagicSplit"
+          >공식 앱 설명</a
+        >
+      </p>
+      <p>
+        공식 홈페이지는 AI 스크리닝과 AI 전략 제안도 소개한다. 따라서 현재
+        제품에는 종목 탐색 보조 기능도 있다. 다만 자동 주문의 기본 동작은 설정한
+        조건에 따른 매수·매도이며, AI가 전체 투자성과를 보장한다는 근거는
+        확인하지 못했다.
+        <a href="https://www.sevensplit.com/services/magicsplit"
+          >공식 기능 소개</a
+        >
+      </p>
+    </section>
+
+    <section id="versions">
+      <h2>2. 현재 버전과 지원 증권사</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">구분</th>
+              <th scope="col">증권사·시장</th>
+              <th scope="col">이용 방식과 확인 사항</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">모바일 웹</th>
+              <td>유진투자증권 · 국내주식</td>
+              <td>
+                스마트폰·PC·태블릿 브라우저에서 접속. 증권사 서버에서 자동매매가
+                동작하므로 계속 로그인해 있을 필요가 없다.
+                <a href="https://wikidocs.net/355368">공식 FAQ</a>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">PC 국내</th>
+              <td>키움증권 · 국내주식</td>
+              <td>
+                Windows 설치 프로그램과 키움 REST API 사용. 자동매매 중
+                프로그램을 실행해야 하며 원격 클라우드 PC로 운영할 수도 있다.
+                <a href="https://wikidocs.net/333961">설치</a> ·
+                <a href="https://wikidocs.net/333968">실행 환경</a>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">PC 글로벌</th>
+              <td>하나증권 · 미국주식</td>
+              <td>
+                별도 PC 제품·API 설정 매뉴얼을 제공한다.
+                <a href="https://wikidocs.net/book/17050">하나증권판 매뉴얼</a>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">PC 글로벌</th>
+              <td>한국투자증권 · 미국주식</td>
+              <td>
+                별도 PC 제품·API 설정 매뉴얼을 제공한다.
+                <a href="https://wikidocs.net/book/15648"
+                  >한국투자증권판 매뉴얼</a
+                >
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        <strong>구형 모바일 보조 앱과 유진 모바일 웹은 구분해야 한다.</strong>
+        키움 PC판 설치 안내는 모바일 앱에 앞서 PC 설치·로그인을 요구한다. 반면
+        유진 모바일 웹은 PC 설치 없이 독립적으로 이용한다. “스마트폰으로 된다”는
+        옛 후기만으로 PC가 불필요하다고 판단하기 어렵다.
+        <a href="https://wikidocs.net/333961">PC판 설치 안내</a> ·
+        <a href="https://wikidocs.net/348249">유진판 장점</a>
+      </p>
+      <p class="source">
+        출시 날짜도 자료마다 다르다. 유진투자증권의 2026-05-20 공지는 서비스
+        오픈일을 <strong>2026-05-21</strong>로 명시한다. 7월 8일 기사들은 정식
+        오픈으로 보도한다. 두 자료만으로 베타·정식 단계의 관계를 확정하지 않고
+        구분해 기록했다.
+        <a
+          href="https://m.eugenefn.com/no20r.do?msgId=513164&amp;pageNo=&amp;topFlag=0"
+          >증권사 원문</a
+        >
+        ·
+        <a href="https://www.cstimes.com/news/articleView.html?idxno=712667"
+          >7월 보도</a
+        >
+      </p>
+    </section>
+
+    <section id="pricing">
+      <h2>3. 현재 비용: 모바일 요금과 PC 운영비를 구분</h2>
+      <p>
+        아래는 조사일에 <strong>유진 모바일 웹의 공개 멤버십 화면</strong>에서
+        직접 확인한 표시 가격과 한도다. 공식 홈페이지의 표와도 대조했다. 유료
+        금액은 <strong>연간 요금</strong>이며, 월 환산액은 월납 상품을 의미하지
+        않는다. PC판에도 같은 요금이 적용된다고 확인한 것은 아니다.
+        <a href="https://eugene.magicsplit.com/kr/"
+          >모바일 웹: 더보기 → 멤버십 구독</a
+        >
+        ·
+        <a href="https://www.sevensplit.com/services/magicsplit">공식 요금표</a>
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">등급</th>
+              <th scope="col">현재 표시 요금</th>
+              <th scope="col">설정 투자금 한도</th>
+              <th scope="col">종목 / 종목당 차수</th>
+              <th scope="col">예약주문 종목</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Free</th>
+              <td class="num">무료</td>
+              <td class="num">500만원</td>
+              <td>7개 / 7차수</td>
+              <td>없음</td>
+            </tr>
+            <tr>
+              <th scope="row">Pro</th>
+              <td class="num">
+                연 550,000원<br /><small>정가 750,000원</small>
+              </td>
+              <td class="num">3억원</td>
+              <td>150개 / 50차수</td>
+              <td>50개</td>
+            </tr>
+            <tr>
+              <th scope="row">Prime</th>
+              <td class="num">
+                연 880,000원<br /><small>정가 1,600,000원</small>
+              </td>
+              <td class="num">10억원</td>
+              <td>250개 / 100차수</td>
+              <td>100개</td>
+            </tr>
+            <tr>
+              <th scope="row">Ultimate</th>
+              <td class="num">
+                연 1,650,000원<br /><small>정가 3,000,000원</small>
+              </td>
+              <td>무제한</td>
+              <td>300개 / 100차수</td>
+              <td>200개</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Free에도 자동 분할매매와 NXT 자동매매가 포함된다. 리스플릿과
+        수익부스터는 유료 등급 기능이다. 프로모션 가격은 바뀔 수 있으며 최종
+        적용 기간·금액·갱신·환불 조건은 신청 화면에서 확인해야 한다. 이번
+        조사에서는 결제나 회원가입을 진행하지 않았다.
+      </p>
+      <blockquote>
+        <strong>500만원은 현재 매수잔고만의 한도가 아니다.</strong> 공식
+        매뉴얼은 총 투자금을 “설정된 전체 차수 금액”으로 계산한다. 예를 들어 첫
+        차수만 100만원 매수했더라도 100만원씩 7차수로 설정하면 한도 계산상
+        700만원이다. 한도 초과 시 자동매매가 전체 중지될 수 있다.
+        <a href="https://wikidocs.net/378191">한도 산정과 중지 조건</a>
+      </blockquote>
+      <h3>구독료 외에 드는 비용</h3>
+      <ul>
+        <li>
+          <strong>거래 수수료·세금:</strong> 유진판 공식 매뉴얼은 매직스플릿
+          국내주식 거래 수수료를 0.014%로 안내하며 구독료는 별도로 구분한다.
+          HTS/MTS 주문은 다른 수수료율이 적용될 수 있다. 실제 계좌와 상품의
+          조건을 확인해야 한다.
+          <a href="https://wikidocs.net/344510">공식 거래비용 안내</a>
+        </li>
+        <li>
+          <strong>PC 운영비:</strong> 자체 PC를 켜두거나 클라우드 PC 비용을
+          부담할 수 있다. 2024년 AWS 공식 매뉴얼의 월 1.4만~2.5만원 안내는
+          오래된 요금이며 현재 견적으로 사용하지 않았다. 유진 모바일 웹에는 이
+          PC 운영 구조가 필요하지 않다.
+          <a href="https://wikidocs.net/216194">과거 클라우드 안내</a> ·
+          <a href="https://wikidocs.net/348249">모바일 실행 구조</a>
+        </li>
+      </ul>
+      <h3>같은 구독료도 투자 규모에 따라 부담이 달라진다</h3>
+      <p>
+        Pro 연 55만원만 고려하면 운용금 1,000만원에서는 연
+        <strong>5.5%</strong>, 5,000만원에서는 <strong>1.1%</strong>,
+        1억원에서는 <strong>0.55%</strong>에 해당한다. 이는 단순 비용 비율이며
+        예상 수익률이 아니다. 유료화의 경제적 가치를 판단할 때 거래비용과 함께
+        반영할 항목이다.
+      </p>
+    </section>
+
+    <section id="example">
+      <h2>4. 실현이익이 있어도 계좌는 손실일 수 있다</h2>
+      <p>
+        <strong>직접 계산한 설명용 가정:</strong> 10,000원 → 9,000원 →
+        8,100원으로 하락할 때마다 10주씩 매수하고, 각 차수의 목표 수익률을 10%로
+        둔다. 이후 8,910원으로 반등하면 3차 물량만 매도한다고 가정한다.
+        수수료·세금·호가·체결 오차는 제외했다. 아래는 실제 상품의 성과나 권장
+        설정이 아니다.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">차수</th>
+              <th scope="col">매수 내역</th>
+              <th scope="col">8,910원 시점</th>
+              <th scope="col">차수 손익</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">1차</th>
+              <td>10,000원 × 10주</td>
+              <td>10주 보유</td>
+              <td class="num loss">평가손실 −10,900원</td>
+            </tr>
+            <tr>
+              <th scope="row">2차</th>
+              <td>9,000원 × 10주</td>
+              <td>10주 보유</td>
+              <td class="num loss">평가손실 −900원</td>
+            </tr>
+            <tr>
+              <th scope="row">3차</th>
+              <td>8,100원 × 10주</td>
+              <td>8,910원에 10주 매도</td>
+              <td class="num gain">실현이익 +8,100원</td>
+            </tr>
+            <tr>
+              <th scope="row">전체</th>
+              <td>투입원금 271,000원</td>
+              <td>현금 89,100원 + 주식 178,200원</td>
+              <td class="num loss">총손익 −3,700원<br />약 −1.37%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        하위 차수에서 이익을 실현한 것은 사실이지만, 남은 두 차수의 평가손실이
+        더 크다. 이 때문에
+        <strong
+          >매도 성공 횟수, 누적 실현이익, 거래금액 대비 수익률만으로 전체
+          투자성과를 판단하면 안 된다.</strong
+        >
+      </p>
+      <pre><code>입출금이 없는 단순 사례의 총손익
+= 현금 + 보유주식 평가액 − 초기 투자금
+= 누적 실현손익 + 현재 평가손익
+
+입출금이 있는 기간에는 현금 흐름을 반영한 수익률 계산이 필요하다.
+배당·이자·세금·거래비용·구독료도 실제 성과 평가에 반영한다.</code></pre>
+    </section>
+
+    <section id="features">
+      <h2>5. 주요 부가기능의 의미</h2>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">기능</th>
+            <th scope="col">확인한 동작</th>
+            <th scope="col">해석할 때 주의할 점</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">예약주문</th>
+            <td>
+              모바일판은 Pro 이상에서 신규 진입 예약주문을 제공한다.
+              <a href="https://wikidocs.net/book/19655">공식 목차</a>
+            </td>
+            <td>기본 분할매매 조건 설정과 첫 진입 주문을 구분해야 한다.</td>
+          </tr>
+          <tr>
+            <th scope="row">수익부스터</th>
+            <td>
+              전체 물량 청산 후 첫 차수 매도가를 기준으로 감시하여 조건에 맞으면
+              다시 진입한다. 하락값 0% 설정 시 즉시 재매수하도록 안내한다.
+              <a href="https://wikidocs.net/348247">공식 설명</a>
+            </td>
+            <td>
+              재진입 자동화 기능이다. 이름 자체가 추가 수익의 증거는 아니며,
+              노출 시간과 거래비용이 늘 수 있다.
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">리스플릿</th>
+            <td>
+              총 매입금액을 유지하면서 차수별 기준단가·수량·간격을 재배분한다.
+              실행 중 자동매매가 해제되고 원래 데이터로 복구할 수 없다고
+              안내한다. <a href="https://wikidocs.net/351083">공식 설명</a>
+            </td>
+            <td>
+              장부상의 차수 재구성으로 이해해야 한다. 이를 실행해도 주가와
+              자산의 시장가치는 그 자체로 회복되지 않는다.
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">AI 탐색·제안</th>
+            <td>
+              공식 홈페이지는 24가지 매수 기준의 스크리닝과 변동성을 분석한 전략
+              제안을 소개한다.
+              <a href="https://www.sevensplit.com/services/magicsplit"
+                >기능 소개</a
+              >
+            </td>
+            <td>
+              선별 기준의 성과, 학습·검증 구간, 비용 차감 후 우위는 별도 검증
+              대상이다.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="source">
+        문서 간 차이: Prime의 일반 차수 한도는 홈페이지와 실서비스에서 100차수로
+        확인했지만, 리스플릿 설명에는 Pro·Prime 최대 50차수라는 문구가 남아
+        있다. 일반 관리 한도와 리스플릿 한도가 같은지, 문서 갱신 차이인지는
+        확인되지 않았다. 해당 기능 사용 전 실제 미리보기·한도 표시를 확인할
+        필요가 있다.
+      </p>
+    </section>
+
+    <section id="risks">
+      <h2>6. 전략 위험과 실제 운용 제약</h2>
+      <h3>전략 구조에서 생기는 위험 — 조사자의 분석</h3>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">상황</th>
+            <th scope="col">발생 가능한 결과</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">장기 하락·기업가치 훼손</th>
+            <td>
+              추가 매수로 보유량이 늘고 최대 차수까지 자금이 투입된 뒤에도
+              가격이 계속 하락할 수 있다. 분할매수 간격과 최대 차수는 최대
+              손실을 보장하는 장치가 아니다.
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">강한 상승 추세</th>
+            <td>
+              목표 수익에 도달할 때 일찍 매도해 계속 보유한 경우보다 수익이 적을
+              수 있다. 대기 현금의 기회비용도 생긴다.
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">횡보와 반복 반등</th>
+            <td>
+              설정한 매수·매도 구간을 반복 통과하면 전략 의도와 맞는다. 그래도
+              변동 폭이 비용을 넘는지, 매도 후 재매수가 실제 체결되는지에 따라
+              결과가 달라진다.
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">여러 종목의 동반 급락</th>
+            <td>
+              종목 수가 많아도 같은 업종·시장 요인에 묶여 있으면 여러 종목의
+              추가 매수 조건이 동시에 충족돼 예수금이 빠르게 소진될 수 있다.
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">레버리지·변동성 상품</th>
+            <td>
+              동일한 간격을 적용해도 차수 소진 속도와 손실 특성이 달라질 수
+              있다. 차수를 늘리는 것만으로 상품 자체의 위험을 해결할 수 없다.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <h3>공식 문서에서 확인한 운용 제약</h3>
+      <ul>
+        <li>
+          <strong>한도 초과 중지:</strong> 유진 모바일판은 멤버십 사용 한도를
+          초과하면 전체 자동매매가 중지된다고 안내한다. 실제 보유금액과 설정
+          투자금의 차이를 관리해야 한다.
+          <a href="https://wikidocs.net/378191">한도 안내</a>
+        </li>
+        <li>
+          <strong>PC 오류와 중지:</strong> 키움판은 증거금 부족 등 주문 오류가
+          나면 전체 자동매매를 중지하도록 설계됐으며 운영 상태와 오류 로그
+          확인을 권한다. <a href="https://wikidocs.net/338509">PC 동작 체크</a>
+        </li>
+        <li>
+          <strong>직접 매도 후 기록 차이:</strong> 유진 HTS/MTS에서 직접
+          매도하면 매직스플릿 자산 탭과 차수 탭의 표시가 달라질 수 있어 매도
+          내역을 별도로 기록하는 절차가 있다.
+          <a href="https://wikidocs.net/376432">공식 조정 방법</a>
+        </li>
+        <li>
+          <strong>이전한 주식의 차수:</strong> 기존 유진 보유주식이나 타사에서
+          옮긴 종목은 과거 거래를 차수별로 복원하지 않고 1차수로 표시한다. 기존
+          차수 DB·전략이 함께 이전되는 것은 아니다. 법인계좌 인증도 현재
+          불가하다고 안내한다.
+          <a href="https://wikidocs.net/355368">모바일 FAQ</a>
+        </li>
+        <li>
+          <strong>모의투자:</strong> 키움 REST판은 모의투자를 지원하지 않는다고
+          명시한다. 유진판·해외판에도 동일하다고 확대 해석하지 않았다.
+          <a href="https://wikidocs.net/333976">키움판 모의투자 안내</a>
+        </li>
+      </ul>
+      <h3>유진판의 거래 시간과 자산 보관</h3>
+      <p>
+        공식 매뉴얼상 자동매매 구간은 NXT 프리마켓 08:00~08:50, 정규 구간
+        09:00~15:20, NXT 애프터마켓 15:40~20:00이다. NXT 자동매매는 기본값이
+        꺼짐이며 별도 설정이 필요하다. 모든 종목이 NXT 대상인 것은 아니고, 장외
+        구간은 불리한 가격 체결 가능성도 안내한다. 이 시간은
+        <strong>서비스의 자동매매 시간</strong>으로, 거래소 전체 거래시간과
+        구별해야 한다. <a href="https://wikidocs.net/344509">공식 시간표</a>
+      </p>
+      <p>
+        유진판 보안 안내는 증권사 내부 서버 동작, 입력 정보의 암호화 전송,
+        입출금·주식출고 기능 부재를 설명한다. 공식 홈페이지는 자산이 사용자 명의
+        증권계좌에 보관된다고 안내한다. 이는 사업자가 제시한 구조 설명이며 이번
+        조사에서 보안 감사를 수행한 것은 아니다.
+        <strong
+          >자산 이동 기능 제한과 자동 주문으로 생기는 투자손실 위험은 서로 다른
+          문제다.</strong
+        >
+        <a href="https://wikidocs.net/352539">보안 안내</a> ·
+        <a href="https://www.sevensplit.com/services/magicsplit"
+          >계좌 보관 안내</a
+        >
+      </p>
+    </section>
+
+    <section id="assessment">
+      <h2>7. 도입을 판단한다면</h2>
+      <p>
+        <strong>검토 가치가 있는 경우:</strong> 이미 종목 선정과 자금 배분
+        원칙이 있고, 차수별 분할매매를 직접 관리하는 데 시간이 많이 드는 경우다.
+        이때 프로그램의 가치는 주문·기록·규칙 준수에 드는 수고를 줄이는 데 있다.
+      </p>
+      <p>
+        <strong>기대 조정이 필요한 경우:</strong> 프로그램을 설치하면 종목
+        선정과 손실 관리까지 모두 해결된다고 기대하거나, 매월 실현이익을
+        안정적인 생활비처럼 인출하려는 경우다. 평가손실과 재매수 예산이 남아
+        있을 수 있어 실현이익 전부를 여유자금으로 볼 수 없다.
+      </p>
+      <p>
+        실무적으로는 다음 기준으로 비교하는 편이 낫다. 이는 공식 권장 설정이
+        아니라 조사자의 평가 기준이다.
+      </p>
+      <ol>
+        <li>
+          <strong>운영 방식:</strong> 기존 계좌를 유지할 필요와 PC 상시 실행
+          부담을 비교한다. 국내주식에서 설치·클라우드 부담을 줄이는 것이
+          목적이면 유진 웹판 구조가 유리할 수 있다.
+        </li>
+        <li>
+          <strong>비용:</strong> 무료 한도가 실제로 설정할 전체 차수 금액을
+          수용하는지 계산한다. 유료 등급은 구독료가 전체 자산에서 차지하는
+          비율까지 반영한다.
+        </li>
+        <li>
+          <strong>손실 한도:</strong> 종목별 최대 투입금, 전체 예수금, 동반
+          하락, 최대 차수 소진 후의 대응을 사전에 정한다. 자동매수 중지와 손절은
+          서로 다른 결정이다.
+        </li>
+        <li>
+          <strong>성과 비교:</strong> 동일한 종목·초기 자금·기간으로 단순 보유와
+          비교하되 양쪽 모두 남은 현금, 입출금, 비용, 평가손익을 포함한다.
+          연환산 수익률뿐 아니라 최대 낙폭, 자금이 묶인 기간, 최대 투입금도
+          본다.
+        </li>
+        <li>
+          <strong>운영 검증:</strong> 주문 로그, 미체결, 외부 직접 매도,
+          권리변동, 한도 초과 중지와 복구 절차를 확인한다. 자동매매 실행 여부를
+          주기적으로 점검할 책임은 남는다.
+        </li>
+      </ol>
+      <blockquote>
+        <strong>종합 판단:</strong> 매직스플릿은 세븐스플릿 방식의 거래를
+        실행하고 관리하는 도구로 평가하는 것이 타당하다. 장기 하락에서의
+        자금·손실 위험을 이해하고 쓸 때 의미가 있다. “거래에서 자주 이익을
+        실현한다”는 사실만으로 “전체 자산이 꾸준히 늘어난다”고 판단할 수는 없다.
+      </blockquote>
+    </section>
+
+    <section id="sources">
+      <h2>8. 근거의 범위와 아직 확인되지 않은 것</h2>
+      <p>
+        공식 홈페이지에서 해당 매뉴얼로 연결되는 것을 확인한 뒤, 각 문서의
+        수정일과 제품 구분을 대조했다. 모바일 웹의 공개 화면에서는
+        Free·Pro·Prime·Ultimate 가격, 연간 표시와 한도를 직접 읽었다.
+        회원가입·로그인·결제·실계좌 주문·프로그램 설치는 수행하지 않았다.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">구분</th>
+            <th scope="col">확인 결과</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">공식 제품·모바일 가격</th>
+            <td>
+              공식 서비스 페이지 및 유진 모바일 웹 공개 화면으로 확인. 조사일
+              이후 변경 가능.
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">PC 유료 요금·클라우드 견적</th>
+            <td>
+              이번 조사에서 현재 PC판 구매 조건을 확정하지 못함. 과거 클라우드
+              요금을 현재 요금으로 쓰지 않음.
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">장기 투자성과</th>
+            <td>
+              이번에 확인한 공개 자료에서 전체 이용자를 대표하는,
+              평가손익·입출금·모든 비용을 반영한 독립 검증 장기 성과는 찾지
+              못함. 그러한 자료가 존재하지 않는다는 단정은 아님.
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">홍보와 후기</th>
+            <td>
+              공식 페이지의 수익 후기와 운영 지표는 사업자 제시 정보다. 사용자
+              평균 수익률, 미래 수익률, 최대 손실의 증거로 채택하지 않음.
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">환불·갱신·통합 이용권</th>
+            <td>
+              실제 신청을 진행하지 않아 확정하지 않음. 모바일 멤버십으로 다른 PC
+              제품까지 사용할 수 있다고 가정하지 않음.
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">재현 검증</th>
+            <td>
+              실거래·과거 시세 백테스트는 수행하지 않음. 4절의 숫자는 동작
+              원리를 보여주는 직접 계산 사례.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <h3>우선 확인할 원문</h3>
+      <ol>
+        <li>
+          <a href="https://www.sevensplit.com/services/magicsplit"
+            >스플릿인베스트 공식 서비스 소개·요금표</a
+          >
+          — 현재 제품 구성과 기능.
+        </li>
+        <li>
+          <a href="https://eugene.magicsplit.com/kr/"
+            >매직스플릿 유진 모바일 웹</a
+          >
+          — 더보기 → 멤버십 구독의 현재 연간 표시 가격.
+        </li>
+        <li>
+          <a href="https://wikidocs.net/book/19655">공식 유진 모바일 매뉴얼</a>
+          — 책 표시 최종 수정 2026-10-21. 장별 수정일은 서로 다름.
+        </li>
+        <li>
+          <a href="https://wikidocs.net/book/19377">공식 키움 REST 매뉴얼</a> —
+          책 표시 최종 수정 2026-09-21. 구 OCX 안내와 구분.
+        </li>
+        <li>
+          <a
+            href="https://m.eugenefn.com/no20r.do?msgId=513164&amp;pageNo=&amp;topFlag=0"
+            >유진투자증권 서비스 오픈 공지</a
+          >
+          — 게시 2026-05-20, 개시일 2026-05-21.
+        </li>
+        <li>
+          <a href="https://wikidocs.net/378191"
+            >사용 한도와 전체 자동매매 중지 조건</a
+          >
+          — 수정 2026-10-21.
+        </li>
+        <li>
+          <a href="https://wikidocs.net/344510">유진판 수수료 안내</a> — 수정
+          2026-08-26.
+        </li>
+        <li>
+          <a href="https://wikidocs.net/351083">리스플릿 공식 설명</a> ·
+          <a href="https://wikidocs.net/348247">수익부스터 공식 설명</a> — 기능
+          동작 확인.
+        </li>
+      </ol>
+    </section>
+    <footer class="meta">
+      가격·기능·제약은 조사일의 공개 자료 기준. 사실 확인, 사업자 설명, 조사자의
+      분석과 계산을 본문에서 구분했다.
+    </footer>
+  </body>
+</html>

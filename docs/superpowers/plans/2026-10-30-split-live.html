@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>분할매매 실거래 구현 계획</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        max-width: 880px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.6;
+        color: #1a202c;
+      }
+      h1 {
+        border-bottom: 2px solid #2c5282;
+        padding-bottom: 0.4rem;
+      }
+      h2 {
+        color: #2c5282;
+        border-bottom: 1px solid #e2e8f0;
+        margin-top: 2rem;
+      }
+      code,
+      pre {
+        background: #f7fafc;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      th,
+      td {
+        border: 1px solid #cbd5e0;
+        padding: 0.5rem;
+        text-align: left;
+      }
+      th {
+        background: #edf2f7;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>분할매매 자동 실거래 구현 계획</h1>
+    <p>
+      2026-10-30 · 승인된
+      <a href="../specs/2026-10-30-split-live-design.html">실거래 설계</a>를
+      구현한다. 기존 feature 브랜치에서 순차 구현한다. 사용자 지침에 따라
+      커밋하지 않고, 실제 주문·전략 시작·운영 worker 재시작은 하지 않는다.
+    </p>
+    <p>
+      <strong>목표:</strong> 국내·미국 정수주 지정가 DAY 자동매매, 실제 부분
+      체결 기반 차수 장부, 중복 주문 방지와 재기동 복구. 기존 Next.js/Prisma
+      SQLite/Vitest/토스 클라이언트를 재사용하고 의존성은 추가하지 않는다.
+    </p>
+    <h2>공통 제약과 검토 초점</h2>
+    <p>
+      정규장·30초 감시, 시세 60초, 별도 LIVE 장부, 신규 전략 정지 상태, 미해결
+      주문 한 건, 실거래 배정 한도와 실제 주문 가능 금액 동시 검사, 일시정지는
+      신규 주문만 차단, 취소·정정은 토스 앱. 알 수 없는 접수 결과·누적 체결
+      감소·null 비용·소유권 충돌·호가 판별 불가에 신규 주문을 막는다.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>작업</th>
+          <th>파일·인터페이스</th>
+          <th>증거</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1. 장부·순수 규칙</td>
+          <td>
+            schema.prisma, 새 migration; split/live-rules.ts:
+            planLiveOrder(config,lots,price,cash), cumulative 체결 검증·손익. 새
+            live-rules.test.ts.
+          </td>
+          <td>
+            실패 테스트 먼저: 매도 우선, 재진입, US 자릿수, 부분 매수·매도 원가,
+            비용 수정과 감소 거부. 새 테이블과 클라이언트 생성 검증.
+          </td>
+        </tr>
+        <tr>
+          <td>2. 원자적 실행·정산</td>
+          <td>
+            split/live-run.ts: runLiveStrategy(db,deps,id), syncLiveOrder,
+            계좌·종목 소유권, lease와 영구 주문 키. live-run.test.ts는 임시 DB와
+            가짜 브로커 사용.
+          </td>
+          <td>
+            접수 전 의도 저장, 재진입·전량 청산, 부분 체결 차이만 반영,
+            post-write rollback, 두 클라이언트 동시 실행, 전송
+            타임아웃·재기동·pause/kill/장 마감 후 동기화.
+          </td>
+        </tr>
+        <tr>
+          <td>3. 토스·충돌 방지</td>
+          <td>
+            toss/client.ts에 getOrder 상세·필수 메타데이터 추가;
+            split/live-toss.ts의 계좌/정규장/시세/보유/주문 가능/미체결/지정가
+            제출 어댑터. 다른 매매 경로와 공유하는 symbol 소유권 검사.
+          </td>
+          <td>
+            기존 클라이언트 경계 테스트 확인, 실제 HTTP 모킹으로 주문 모양·가격
+            자릿수·계좌 일치·다른 소유자 차단. 실제 API 주문 호출 없음.
+          </td>
+        </tr>
+        <tr>
+          <td>4. 화면·worker</td>
+          <td>
+            actions/split-live.ts와 app/stocks/split/LiveManager.tsx, 기존
+            page·메뉴·README; worker/split-live-loop.ts를 worker/index.ts에
+            연결.
+          </td>
+          <td>
+            신규 정지 전략·시작 확인·pause·동기화·주문 ID 복구, 최근 감시·보류
+            사유·실체결 장부. 30초 loop 테스트, 브라우저에서 실제 시작 없이
+            생성과 표시 확인.
+          </td>
+        </tr>
+        <tr>
+          <td>5. 통합 검증·독립 리뷰</td>
+          <td>
+            전체 Vitest, 타입 검사, 변경 파일 lint, Prisma 검증·migration, HTML
+            기록. 기존 unrelated lint 오류는 기준선과 비교한다.
+          </td>
+          <td>
+            순수 규칙과 runner의 실패→통과 증거, 전체 테스트 회귀,
+            desktop/mobile 브라우저, 독립 코드 리뷰 후 결함 수정. 실거래 시작과
+            주문은 사용자에게 남긴다.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <h2>구현 선택</h2>
+    <p>
+      실거래 전략·차수·주문 및 계좌/종목 소유권 테이블을 추가한다. 모의 테이블을
+      변경해 LIVE로 전환하지 않는다. 누적 체결 금액·비용은 소수 넷째 자리로
+      반올림하며 안전 정수 범위의 1/10000 단위 계산을 사용한다. 주문 상세가 최종
+      권위이고 주문 목록 첫 페이지로 체결을 추정하지 않는다. 주문 결과 미확인은
+      재전송하지 않고 수동 대조로 복구한다.
+    </p>
+    <p>
+      루트:
+      <code
+        >/Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/company-map</code
+      >. 변경 중인 모의 구현을 포함한 현 세션 작업은 보존한다. 공유 schema·생성
+      클라이언트·DB에 의존하고 작업 트리가 미커밋 상태이므로 구현은 순차로
+      진행하고 마지막 검토만 별도 에이전트에 맡긴다.
+    </p>
+  </body>
+</html>

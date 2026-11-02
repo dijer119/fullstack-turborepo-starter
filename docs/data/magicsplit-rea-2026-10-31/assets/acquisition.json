@@ -1,0 +1,44 @@
+[
+  {
+    "url": "https://eugene.magicsplit.com/kr/main.dart.js?v=1.4.14",
+    "file": "/private/tmp/magicsplit-rea-assets/main.dart.js",
+    "bytes": 7206676,
+    "sha256": "827d37d4c25185a317f5c25ee960e0409e80e9890ec81e76c0677abef9503562"
+  },
+  {
+    "url": "https://eugene.magicsplit.com/kr/",
+    "file": "/private/tmp/magicsplit-rea-assets/index.html",
+    "bytes": 12649,
+    "sha256": "1c1b8117aa5ab75a05f6d6b94fadcd2182bca9ea1afa8629ae1ff3098f988cd8"
+  },
+  {
+    "url": "https://eugene.magicsplit.com/kr/custom_chart_markers.js",
+    "file": "/private/tmp/magicsplit-rea-assets/custom_chart_markers.js",
+    "bytes": 6667,
+    "sha256": "d27bcc63e1b00ca6545b4d3bdba19bda3399abd767ed64a14b8085b47e6578b2"
+  },
+  {
+    "url": "https://eugene.magicsplit.com/kr/custom_rounded_volume.js?v=3",
+    "file": "/private/tmp/magicsplit-rea-assets/custom_rounded_volume.js",
+    "bytes": 6361,
+    "sha256": "cbab1ffddcd4b829f12e5da63930b7ed1b547afc93d64a74083be391c2cfe6d1"
+  },
+  {
+    "url": "https://eugene.magicsplit.com/kr/custom_chart_panes.js?v=1",
+    "file": "/private/tmp/magicsplit-rea-assets/custom_chart_panes.js",
+    "bytes": 8658,
+    "sha256": "15f8e1d4b91ce26eab0a49e8cf7abcb21680c7382fad4b718e271b9035beacd3"
+  },
+  {
+    "url": "https://eugene.magicsplit.com/kr/maintenance_config.js",
+    "file": "/private/tmp/magicsplit-rea-assets/maintenance_config.js",
+    "bytes": 5698,
+    "sha256": "3810d65eb8d050636bbc0074bb4ec60ff613c8bbb3fae6c52aa83afd0d2ac8f6"
+  },
+  {
+    "url": "https://eugene.magicsplit.com/kr/flutter_bootstrap.js?v=1.4.14",
+    "file": "/private/tmp/magicsplit-rea-assets/flutter_bootstrap.js",
+    "bytes": 13020,
+    "sha256": "ce95f430e12bf3c383e5140bfd857f97f4a13a7ac7775bb02765792f64f899bf"
+  }
+]

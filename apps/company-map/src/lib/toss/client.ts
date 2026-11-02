@@ -109,9 +109,51 @@ interface CallOpts {
   accountSeq?: number;
   method?: "GET" | "POST";
   body?: unknown;
+  splitStrategyId?: string;
+  validUntil?: number;
 }
 
 async function callOnce(path: string, token: string, opts?: CallOpts) {
+  if (
+    path === "/api/v1/orders" &&
+    opts?.method === "POST" &&
+    opts.accountSeq !== undefined
+  ) {
+    const { checkBrokerOwnership } = await import("./order-ownership");
+    try {
+      await checkBrokerOwnership(
+        opts.accountSeq,
+        (opts.body as { symbol: string }).symbol,
+        opts.splitStrategyId,
+      );
+    } catch (error) {
+      throw new TossApiError(
+        422,
+        JSON.stringify({
+          error: {
+            code: "strategy-ownership-blocked",
+            message:
+              error instanceof Error ? error.message : "계좌·종목 확인 실패",
+          },
+        }),
+      );
+    }
+  }
+  if (
+    opts?.validUntil !== undefined &&
+    (!Number.isFinite(opts.validUntil) || Date.now() >= opts.validUntil)
+  ) {
+    throw new TossApiError(
+      422,
+      JSON.stringify({
+        error: {
+          code: "split-order-window-expired",
+          message:
+            "정규장·시세·실행 잠금의 유효시간이 지나 주문하지 않았습니다.",
+        },
+      }),
+    );
+  }
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
   };
@@ -253,6 +295,11 @@ export interface TossStockInfo {
   market: string; // KOSPI/KOSDAQ/NASDAQ/NYSE 등
   currency: "KRW" | "USD";
   status: string; // ACTIVE 등
+  securityType?: string;
+  koreanMarketDetail?: {
+    nxtSupported: boolean;
+    nxtTradingSuspended?: boolean | null;
+  } | null;
 }
 
 // 종목 기본정보 조회(배치). 존재하지 않는 심볼은 결과에서 빠진다(에러 아님).
@@ -291,7 +338,9 @@ interface KRCalDay {
   integrated: {
     preMarket: CalSession;
     regularMarket: CalSession;
-    afterMarket: CalSession;
+    afterMarket: CalSession & {
+      singlePriceAuctionEndTime?: string | null;
+    };
   };
 }
 interface USCalDay {
@@ -487,7 +536,39 @@ export interface CreateOrderResult {
 export async function createOrder(
   accountSeq: number,
   input: CreateOrderInput,
+  splitStrategyId?: string,
+  validUntil?: Date,
 ): Promise<CreateOrderResult> {
+  if (
+    splitStrategyId &&
+    (!validUntil || !Number.isFinite(validUntil.getTime()))
+  )
+    throw new TossApiError(
+      422,
+      JSON.stringify({
+        error: {
+          code: "split-session-required",
+          message: "정규장 종료 시각 확인이 필요합니다.",
+        },
+      }),
+    );
+  const { checkBrokerOwnership } = await import("./order-ownership");
+  try {
+    await checkBrokerOwnership(accountSeq, input.symbol, splitStrategyId);
+  } catch (error) {
+    throw new TossApiError(
+      422,
+      JSON.stringify({
+        error: {
+          code: "strategy-ownership-blocked",
+          message:
+            error instanceof Error
+              ? error.message
+              : "계좌·종목 소유권 확인 실패",
+        },
+      }),
+    );
+  }
   let body: Record<string, unknown>;
   if (input.orderAmount !== undefined) {
     // quantity/price/timeInForce는 넣지 않는다 — 넣으면 다른 oneOf 분기로 오인돼 거절될 수 있음.
@@ -510,11 +591,16 @@ export async function createOrder(
   if (input.clientOrderId) body.clientOrderId = input.clientOrderId;
   if (input.confirmHighValueOrder) body.confirmHighValueOrder = true;
 
-  const json = await tossFetch<{ result: CreateOrderResult }>("/api/v1/orders", {
-    accountSeq,
-    method: "POST",
-    body,
-  });
+  const json = await tossFetch<{ result: CreateOrderResult }>(
+    "/api/v1/orders",
+    {
+      accountSeq,
+      method: "POST",
+      body,
+      splitStrategyId,
+      validUntil: validUntil?.getTime(),
+    },
+  );
   return json.result;
 }
 
@@ -595,4 +681,41 @@ export async function getOrders(accountSeq: number, opts: OrderQuery): Promise<T
     first = false;
     return fetchOrdersWindow(accountSeq, { ...opts, from, to });
   });
+}
+
+export interface TossOrderDetail {
+  orderId: string; symbol: string; side: OrderSide; quantity: number;
+  price: number | null; currency: string; orderedAt: string; status: string;
+  filledQty: number; filledAmount: number | null; commission: number | null; tax: number | null;
+}
+
+/** 체결 정산은 주문번호의 상세 누적값을 사용한다. 잘못된 숫자는 0으로 숨기지 않는다. */
+export async function getOrder(
+  accountSeq: number,
+  orderId: string,
+): Promise<TossOrderDetail> {
+  const { result: o } = await tossFetch<{
+    result: RawOrder & {
+      quantity: string;
+      price: string | null;
+      currency: string;
+      orderedAt: string;
+    };
+  }>(`/api/v1/orders/${encodeURIComponent(orderId)}`, { accountSeq });
+  const decimal = (value: string | null | undefined) =>
+    value == null ? null : value.trim() === "" ? NaN : Number(value);
+  return {
+    orderId: o.orderId,
+    symbol: o.symbol,
+    side: o.side,
+    quantity: Number(o.quantity),
+    price: decimal(o.price),
+    currency: o.currency,
+    orderedAt: o.orderedAt,
+    status: o.status,
+    filledQty: Number(o.execution?.filledQuantity),
+    filledAmount: decimal(o.execution?.filledAmount),
+    commission: decimal(o.execution?.commission),
+    tax: decimal(o.execution?.tax),
+  };
 }

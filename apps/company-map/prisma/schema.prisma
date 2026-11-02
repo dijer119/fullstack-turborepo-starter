@@ -341,9 +341,38 @@ model StockWatch {
   purchasePrice Float?   @map("purchase_price") // 사용자 입력 구매가(종목 통화 기준). 미입력 시 null
   sortOrder     Int      @default(0) @map("sort_order")
   createdAt     DateTime @default(now()) @map("created_at")
+  memberships   StockWatchMembership[]
 
   @@index([sortOrder])
   @@map("stock_watches")
+}
+
+model StockWatchGroup {
+  id        String @id @default(uuid())
+  name      String @unique
+  createdAt DateTime @default(now())
+  members   StockWatchMembership[]
+  @@map("stock_watch_groups")
+}
+
+model StockWatchMembership {
+  groupId String
+  symbol  String
+  group   StockWatchGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  watch   StockWatch @relation(fields: [symbol], references: [symbol], onDelete: Cascade)
+  @@id([groupId, symbol])
+  @@index([symbol])
+  @@map("stock_watch_memberships")
+}
+
+model RecentStockView {
+  symbol   String @id
+  name     String
+  market   String?
+  currency String?
+  viewedAt DateTime @default(now())
+  @@index([viewedAt])
+  @@map("recent_stock_views")
 }
 
 model EtfPdfSnapshot {
@@ -638,4 +667,193 @@ model DcaOrder {
 
   @@index([accountId, tradeDate])
   @@map("dca_orders")
+}
+
+// 독립 차수 장부. 실계좌·실주문과 연결하지 않는 정수주 모의 실행 전용.
+model SplitSimulation {
+  id             String   @id @default(uuid())
+  symbol         String
+  name           String
+  market         String // KR | US
+  source         String // manual | toss (가격 원천 혼합 금지)
+  initialCash    Float    @map("initial_cash")
+  cash           Float
+  trancheBudget  Float    @map("tranche_budget")
+  maxTranches    Int      @map("max_tranches")
+  buyDropPct     Float    @map("buy_drop_pct")
+  takeProfitPct  Float    @map("take_profit_pct")
+  feePct         Float    @default(0) @map("fee_pct")
+  sellTaxPct     Float    @default(0) @map("sell_tax_pct")
+  dryRun         Boolean  @default(true) @map("dry_run")
+  status         String   @default("active") // active | paused | completed
+  revision       Int      @default(0)
+  stepCount      Int      @default(0) @map("step_count")
+  lastPrice      Float?   @map("last_price")
+  lastObservedAt DateTime? @map("last_observed_at")
+  note           String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  lots SplitLot[]
+  runs SplitRun[]
+
+  @@map("split_simulations")
+}
+
+model SplitLot {
+  id           String   @id @default(uuid())
+  simulationId String   @map("simulation_id")
+  slot         Int
+  generation   Int
+  anchorPrice  Float    @map("anchor_price")
+  buyPrice     Float    @map("buy_price")
+  quantity     Int
+  remainingQty Int      @map("remaining_qty")
+  buyCost      Float    @map("buy_cost")
+  buyFee       Float    @map("buy_fee")
+  sellPrice    Float?   @map("sell_price")
+  sellFee      Float    @default(0) @map("sell_fee")
+  sellTax      Float    @default(0) @map("sell_tax")
+  realizedPnl  Float    @default(0) @map("realized_pnl")
+  openedStep   Int      @map("opened_step")
+  closedStep   Int?     @map("closed_step")
+
+  simulation SplitSimulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+
+  @@unique([simulationId, slot, generation])
+  @@map("split_lots")
+}
+
+model SplitRun {
+  id           String   @id @default(uuid())
+  simulationId String   @map("simulation_id")
+  requestKey   String   @map("request_key")
+  source       String
+  inputJson    String   @map("input_json")
+  fillCount    Int      @map("fill_count")
+  observedAt   DateTime @map("observed_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  simulation SplitSimulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+
+  @@unique([simulationId, requestKey])
+  @@index([simulationId, createdAt])
+  @@map("split_runs")
+}
+
+// 실거래 장부는 모의 장부와 분리한다. 금액은 원화/달러 원통화 기준.
+model SplitLiveStrategy {
+  id String @id @default(uuid())
+  accountSeq Int
+  symbol String
+  name String
+  market String
+  initialCash Float
+  cash Float
+  trancheBudget Float
+  budgetMode String @default("fixed")
+  budgetMultiplier Float @default(1)
+  maxTranches Int
+  buyDropPct Float
+  takeProfitPct Float
+  firstTakeProfitPct Float @default(10)
+  trancheSettingsJson String?
+  feeBufferPct Float @default(1)
+  status String @default("paused")
+  note String?
+  revision Int @default(0)
+  leaseToken String?
+  leaseUntil DateTime?
+  lastCheckedAt DateTime?
+  lastPrice Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lots SplitLiveLot[]
+  orders SplitLiveOrder[]
+  reservation SplitBuyReservation?
+  @@map("split_live_strategies")
+}
+
+model SplitBuyReservation {
+  strategyId String @id
+  watchPrice Float
+  expiresAt DateTime
+  status String @default("waiting")
+  orderId String?
+  note String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  strategy SplitLiveStrategy @relation(fields: [strategyId], references: [id])
+  events SplitReservationEvent[]
+  @@index([status, expiresAt])
+  @@map("split_buy_reservations")
+}
+
+model SplitReservationEvent {
+  id String @id @default(uuid())
+  strategyId String
+  type String
+  message String
+  watchPrice Float
+  expiresAt DateTime
+  orderId String?
+  createdAt DateTime @default(now())
+  reservation SplitBuyReservation @relation(fields: [strategyId], references: [strategyId])
+  @@index([strategyId, createdAt])
+  @@map("split_reservation_events")
+}
+
+model SplitLiveLot {
+  id String @id @default(uuid())
+  strategyId String
+  slot Int
+  generation Int
+  boughtQty Int @default(0)
+  boughtAmount Float @default(0)
+  buyFees Float @default(0)
+  buyTax Float @default(0)
+  soldQty Int @default(0)
+  soldAmount Float @default(0)
+  sellFees Float @default(0)
+  sellTax Float @default(0)
+  strategy SplitLiveStrategy @relation(fields: [strategyId], references: [id])
+  orders SplitLiveOrder[]
+  @@unique([strategyId, slot, generation])
+  @@map("split_live_lots")
+}
+
+model SplitLiveOrder {
+  id String @id @default(uuid())
+  strategyId String
+  lotId String
+  sequence Int
+  clientOrderId String @unique
+  tossOrderId String? @unique
+  side String
+  quantity Int
+  price Float
+  status String @default("submitting")
+  brokerStatus String?
+  lastSyncedAt DateTime?
+  filledQty Int @default(0)
+  filledAmount Float @default(0)
+  commission Float @default(0)
+  tax Float @default(0)
+  error String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  strategy SplitLiveStrategy @relation(fields: [strategyId], references: [id])
+  lot SplitLiveLot @relation(fields: [lotId], references: [id])
+  @@unique([strategyId, sequence])
+  @@index([strategyId, status])
+  @@map("split_live_orders")
+}
+
+// 소유권은 일시정지 중에도 유지한다. 전량 청산한 전략만 반납할 수 있다.
+model SplitSymbolOwner {
+  accountSeq Int
+  symbol String
+  strategyId String @unique
+  @@id([accountSeq, symbol])
+  @@map("split_symbol_owners")
 }

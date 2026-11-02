@@ -160,6 +160,27 @@ const TOOLS: Tool[] = [
     icon: Repeat,
   },
   {
+    key: "split",
+    name: "매직스플릿",
+    description: "차수별 자동 실거래·모의 장부",
+    path: "/stocks/split",
+    icon: Layers,
+  },
+  {
+    key: "split-reservations",
+    name: "매직스플릿 예약 매수",
+    description: "종목별 가격 감시·실행·실패 내역",
+    path: "/stocks/split/reservations",
+    icon: Layers,
+  },
+  {
+    key: "split-performance",
+    name: "매직스플릿 수익 현황",
+    description: "월별·일별 실현손익과 수익률",
+    path: "/stocks/split/performance",
+    icon: TrendingUp,
+  },
+  {
     key: "vr",
     name: "밸류리밸런싱 VR",
     description: "라오어 VR 5.0 — 2주 사이클 목표가치 리밸런싱 (dryRun)",

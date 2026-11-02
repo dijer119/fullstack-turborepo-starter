@@ -4,18 +4,58 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #dce6ee;
+  --foreground: #203449;
+  --surface: #f0f4f7;
+  --surface-muted: #e3ecf3;
+  --surface-inset: #cfdeea;
+  --line: #b4c7d7;
+  --muted: #4b6176;
+  --subtle: #4d6276;
+  --accent: #245779;
+  --on-accent: #f5f8fb;
+  --red-ink: #ac3047;
+  --blue-ink: #205c9b;
+  --chart-buy: #b83b53;
+  --chart-sell: #2c64a4;
+  --chart-marker-text: #ffffff;
+  --chart-line: #c44f62;
+  color-scheme: light;
 }
 
 :root.dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  --background: #101c2a;
+  --foreground: #e3edf5;
+  --surface: #192b3d;
+  --surface-muted: #22394e;
+  --surface-inset: #2d465e;
+  --line: #49647c;
+  --muted: #bbcbda;
+  --subtle: #aabfd1;
+  --accent: #a4d1ec;
+  --on-accent: #142c40;
+  --red-ink: #ffacba;
+  --blue-ink: #a1caff;
+  --chart-buy: #f59aae;
+  --chart-sell: #9fc7ff;
+  --chart-marker-text: #152638;
+  --chart-line: #f59aae;
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-inset: var(--surface-inset);
+  --color-line: var(--line);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-red-ink: var(--red-ink);
+  --color-blue-ink: var(--blue-ink);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -24,4 +64,12 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  input::placeholder, textarea::placeholder { color: var(--subtle); }
 }

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>매직 스플릿 — 수익에 유리한 종목의 조건</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+    h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+    h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+    h3 { color: #2c5282; margin-top: 1.5rem; }
+    pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+    table th { background: #edf2f7; text-align: left; }
+    table th, table td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; vertical-align: top; }
+    ul, ol { padding-left: 1.5rem; }
+    li { margin: 0.2rem 0; }
+    blockquote { border-left: 3px solid #d69e2e; background: #fffaf0; padding: 0.5rem 0.9rem; margin: 1rem 0; }
+    a { color: #225ea8; overflow-wrap: anywhere; }
+    .lead { background: #edf5fc; border-radius: 6px; padding: 1rem 1.2rem; }
+    .meta { color: #5b6777; font-size: 0.9rem; }
+    .table-wrap { overflow-x: auto; }
+    @media print { body { max-width: none; margin: 0; } h2, h3 { break-after: avoid; } tr { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <h1>매직 스플릿: 수익에 유리한 종목의 조건</h1>
+  <p class="meta">2026-10-30 · company-map의 현재 실거래 구현과 공개 투자자 교육자료 기준</p>
+  <p class="lead"><strong>핵심은 반복 반등을 기대할 근거가 있고, 기다리는 동안 기업가치가 훼손될 위험과 거래비용이 낮은 종목이다.</strong> 여기에 종목의 하락 폭을 감당할 차수·자금 설계가 맞아야 한다. 이 조건은 후보를 거르는 기준이며 수익을 보장하는 조건은 아니다.</p>
+
+  <h2>1. 현재 기능에서 수익이 생기는 방식</h2>
+  <p>현재 주문 판단은 보유 차수의 실제 평균 매수가보다 설정 익절률 이상 높아지면 해당 차수를 매도하고, 직전 차수 매수가보다 설정 간격 이상 낮아지면 다음 차수를 매수한다. 전량 매도 정산이 끝나면 활성 전략은 다음 감시에서 다시 1차 매수를 시도한다. 종목의 재무상태·적정가치를 판단하는 필터와 가격 하락에 따른 자동 손절 조건은 이 주문 판단 함수에 없다. <a href="../apps/company-map/src/lib/split/live-rules.ts">주문 판단 코드</a>, <a href="../apps/company-map/src/lib/split/live-run.ts">반복 실행 코드</a></p>
+  <p>따라서 이 전략에 유리한 움직임은 <strong>매수 이후 목표 익절 가격까지 돌아오는 움직임이 반복되는 것</strong>이다. 크게 흔들리더라도 계속 저점을 낮추고 반등이 부족하면 차수와 자금만 소진될 수 있다. 이 판단은 전략 구조에서 도출한 분석이며, 특정 종목의 수익성을 검증한 결과는 아니다.</p>
+
+  <h2>2. 종목을 고를 때 보는 여섯 가지</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th scope="col">조건</th><th scope="col">확인할 내용</th><th scope="col">탈락 또는 재검토 신호</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">① 장기 보유의 근거</th><td>개별 기업은 최근 수년의 영업현금흐름, 부채 만기, 이자 부담, 경쟁력, 희석 가능성을 함께 확인한다. 경기민감주는 호황기 이익만으로 평가하지 않는다.</td><td>사업 경쟁력의 구조적 약화, 현금 고갈, 반복적인 자금 조달, 회계·감사 문제. 규모가 큰 기업도 자동 통과시키지 않는다.</td></tr>
+        <tr><th scope="row">② 실제로 반복되는 반등</th><td>내 매수 간격으로 진입했을 때 목표 익절 가격에 도달한 비율과 걸린 시간을 확인한다. 아직 회복하지 못한 진입도 포함한다.</td><td>하락 폭은 크지만 반등은 목표에 못 미치는 흐름. 성공한 거래만 보면 좋아 보이고 미매도 물량이 계속 쌓이는 경우.</td></tr>
+        <tr><th scope="row">③ 설정과 맞는 변동 폭</th><td>한 번의 반등이 익절률과 비용을 감당할 만큼 크고, 급락 시에도 차수가 너무 빨리 소진되지 않아야 한다. 일중 변동률 하나보다 실제 가격 경로를 본다.</td><td>움직임이 작아 매매가 거의 없거나, 잦은 갭 하락으로 여러 매수 구간을 한꺼번에 통과하는 경우.</td></tr>
+        <tr><th scope="row">④ 충분한 거래 유동성</th><td>평균 거래대금과 함께 내 주문 규모에 대응하는 호가 잔량, 매수·매도 호가 차이, 실제 체결 지연을 본다. ETF는 괴리율도 확인한다.</td><td>거래량이 특정 이벤트에만 몰리거나 호가가 비어 있음. 목표 수익에 비해 왕복 비용과 슬리피지가 큼.</td></tr>
+        <tr><th scope="row">⑤ 설명 가능한 매수 가격</th><td>기업의 정상 이익·현금흐름과 현재 가격을 비교한다. 성장 기대가 낮아져도 감당할 가격인지 본다. ETF는 추종 자산의 평가 수준과 집중도를 본다.</td><td>호재로 급등한 가격을 단지 과거 변동성이 크다는 이유로 추격. 낮은 PER·PBR 하나만으로 장기 하락 종목을 선택.</td></tr>
+        <tr><th scope="row">⑥ 내 자금으로 버틸 수 있는 하락</th><td>최대 차수까지의 총예산, 이후 추가 하락의 평가손실, 자금이 묶이는 기간을 계산한다. 여러 종목이 동시에 하락하는 경우도 합산한다.</td><td>추가 매수에 생활비·차입금이 필요함. 마지막 차수 이후 더 하락하면 대응 계획이 없음. 같은 업종 종목들에 예산이 몰림.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>위 항목은 분석자가 제안하는 선별 기준이다. “거래대금 몇 억 이상”, “변동성 몇 % 이상” 같은 보편적 합격선을 입증한 것은 아니다. 필요한 유동성과 적정 간격은 주문 크기·보유 기간·상품 구조에 따라 달라진다.</p>
+  <p>ETF도 거래비용이 있다. 매수·매도 호가 차이와 순자산가치 대비 할증·할인이 성과에 영향을 줄 수 있다는 점은 SEC 자료에서 확인된다. 따라서 수수료가 낮다는 이유만으로 반복 거래에 적합하다고 볼 수 없다. <a href="https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins/investor-bulletins-24">SEC의 ETF 투자자 안내</a></p>
+
+  <h2>3. 어떤 유형부터 검토할까?</h2>
+  <p><strong>비교의 출발점으로는 거래가 원활한 비레버리지 광범위 주가지수 ETF를 먼저 검토하는 편이 합리적이다.</strong> 여러 기업에 분산된 구조를 이용할 수 있기 때문이다. 다만 시장 전체의 장기 하락과 고평가 위험은 남고, 변동 폭에 비해 익절률이 높으면 거래가 드물 수 있다. ETF의 분산투자 구조는 <a href="https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins/investor-bulletins-24">SEC 자료</a>에 근거하며, 검토 순서는 전략 위험을 고려한 분석자의 판단이다.</p>
+  <p>개별주는 현금창출력과 재무 여력이 확인되고, 지금 가격에서 장기 보유할 이유를 설명할 수 있는 기업을 다음 후보로 본다. 업종 ETF는 개별 기업 위험을 줄일 수 있어도 업황·정책 위험이 집중된다. 기업이 좋다는 판단과 매직 스플릿에 맞는 가격 움직임인지는 각각 검증해야 한다.</p>
+  <p><strong>초기 운용 후보에서는 레버리지·인버스·단일종목 레버리지 상품, 거래가 얇은 테마주, 존속이나 자금 조달이 불확실한 기업을 제외하는 쪽을 권한다.</strong> 특히 레버리지·인버스 ETF는 대개 일일 목표를 추구하므로 오래 보유한 수익률이 기초자산의 단순 배수와 달라질 수 있다. 하락 시 장기 보유로 전환될 수 있는 이 전략에서는 상품 구조가 부담이 된다. <a href="https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins/investor-alerts/sec">SEC의 레버리지·인버스 ETF 안내</a></p>
+
+  <h2>4. 종목만큼 중요한 간격·자금 설계</h2>
+  <h3>매수 간격은 최대 손실 한도가 아니다</h3>
+  <p>가격이 연속적으로 하락하고 각 차수가 정확한 기준 가격에 체결된다는 단순 가정에서, 하락 간격이 <code>d</code>, 총 차수가 <code>N</code>이면 마지막 매수가의 첫 매수가 대비 비율은 <code>(1−d)^(N−1)</code>이다. 예를 들어 간격 5%, 총 5차이면 마지막 매수는 첫 가격 대비 약 <strong>18.55% 하락</strong> 지점이다. 그 뒤 40%·50% 더 하락하는 것을 막아 주지는 않는다. 실제로는 갭과 체결 시점 때문에 매수가 경로도 달라진다.</p>
+  <h3>배수를 키우면 필요한 자금이 급증한다</h3>
+  <p>1차 예산 10만원, 총 10차, 2차÷1차 배수 2를 적용한 예산 합계다. 앱의 예산 계산식에 따른 예시이며 수익률 비교가 아니다. <a href="../apps/company-map/src/lib/split/budget.ts">공통 예산 계산 코드</a></p>
+  <table>
+    <thead><tr><th scope="col">방식</th><th scope="col">차수별 예산</th><th scope="col">총 필요 예산</th></tr></thead>
+    <tbody>
+      <tr><td>동일 금액</td><td>10만, 10만, 10만…</td><td>100만원</td></tr>
+      <tr><td>일정 금액 증가</td><td>10만, 20만, 30만…100만원</td><td>550만원</td></tr>
+      <tr><td>누적 배수</td><td>10만, 20만, 40만…5,120만원</td><td>1억 230만원</td></tr>
+    </tbody>
+  </table>
+  <p>예산 증가가 수익성을 만들어 주지는 않는다. 더 낮은 가격에서 보유 노출을 크게 늘리는 선택이다. 검증 초기에는 동일 금액을 기준으로 결과를 비교하고, 증가 방식은 전체 손실과 자금 소요가 감당 가능한지 별도로 확인하는 편을 권한다.</p>
+  <p>익절률은 왕복 수수료·해당 세금·호가 차이·슬리피지를 차감하고도 이익이 남아야 한다. 현재 앱의 익절 조건은 <strong>차수별 평균 매수가 대비 가격 상승률</strong>이며, 비용 차감 후 순수익률을 보장하는 조건이 아니다. 매수 비용 여유율도 순이익 보장 장치가 아니다. 정확한 비용은 시장·상품·계좌 조건에 맞춰 적용해야 한다.</p>
+
+  <h2>5. “익절을 자주 한다”와 “전체로 돈을 번다”는 다르다</h2>
+  <blockquote>비용을 반영한 실현손익이 +10만원이고 남은 물량의 평가손익이 −30만원이면, 둘의 합은 −20만원이다. 작은 익절 횟수가 많아도 전체 계좌는 손실일 수 있다.</blockquote>
+  <p>현재 누적 수익금 집계는 실현손익을 합산한다. 평가손익까지 포함한 전체 성과로 해석하면 안 된다. <a href="../apps/company-map/src/lib/split/profit-summary.ts">실현손익 집계 코드</a></p>
+  <p>전략 성과는 <strong>남은 현금 + 보유주식 평가액 + 외부로 받은 분배금 − 초기 자금 − 순추가입금</strong>을 기준으로 확인한다. 이 식에서 현금은 거래비용과 매매대금이 이미 반영된 잔액이며, 계좌 현금에 들어온 분배금이나 실현손익을 다시 더하지 않는다. 평가액에서 빠지지 않은 청산 예상 비용과 계좌 밖에서 낼 세금은 비교 목적에 맞게 별도 반영한다. 해외 자산의 원화 성과는 환율도 반영하고, 중간 입출금이 있으면 수익률 계산에서 그 시점을 고려한다.</p>
+  <p>강하게 오르기만 하는 종목에서는 일찍 익절하고 현금을 대기시키는 동안 단순 보유보다 수익이 작을 수 있다. “좋은 상승 종목”과 “반복 매매로 더 좋은 결과를 낼 종목”은 같은 질문이 아니다.</p>
+
+  <h2>6. 후보를 채택하기 전 검증 순서</h2>
+  <ol>
+    <li><strong>존속·가치 근거를 먼저 확인한다.</strong> 최신 공시와 상품 설명서로 재무위험·희석·상품 구조를 점검한다. 과거 가격 차트만으로 후보를 정하지 않는다.</li>
+    <li><strong>상승·횡보·하락 구간을 포함해 같은 규칙을 적용한다.</strong> 수익이 잘 나온 기간만 고르지 않고, 과거에 거래 가능했던 종목과 상장폐지 사례도 고려한다. 액면분할·배당·권리변동을 가격·보유수량·현금에 일관되게 반영한다.</li>
+    <li><strong>전체 성과와 묶인 시간을 본다.</strong> 비용 후 총손익, 최대낙폭, 최대 차수 도달 빈도, 최대 투입금, 목표가 미도달 비율, 보유·회복 대기기간을 함께 확인한다. 미회복 거래를 통계에서 빼지 않는다.</li>
+    <li><strong>단순 보유와 동일 조건으로 비교한다.</strong> 같은 종목·초기 자금·기간·현금 수익 가정으로 비교한다. 일봉에서 매수선과 매도선을 모두 지난 날은 체결 순서를 알 수 없으므로 더 세밀한 데이터나 보수적인 체결 가정을 사용한다. 현재 앱의 순차 주문·미체결 처리도 반영한다.</li>
+    <li><strong>설정 선택에 쓰지 않은 기간과 소액 모의 운용으로 확인한다.</strong> 한 설정에서만 좋아지는 결과인지 살핀다. 재무 악화·자금 한도·허용 손실·장기 미회복 시에는 새 매수를 언제 멈출지, 기존 물량은 어떻게 처리할지 미리 정한다. 자동매수 중지는 보유 물량의 매도를 뜻하지 않는다.</li>
+  </ol>
+  <p><strong>채택할 후보는 비용 후 전체 성과가 납득되고, 최악의 자금 소요와 손실·대기기간을 감당할 수 있는 종목이다.</strong> 낮은 PER, 큰 변동성, 높은 익절 승률 중 어느 하나로 대신할 수 없다. 이 문서에서는 개별 종목 데이터에 대한 백테스트나 수익성 검증을 실행하지 않았다.</p>
+</body>
+</html>
