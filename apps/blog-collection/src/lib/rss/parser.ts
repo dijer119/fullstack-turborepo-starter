@@ -36,12 +36,64 @@ export function extractFirstImage(html?: string | null): string | undefined {
   return match ? match[1] : undefined;
 }
 
+function extractAtomLink(value: unknown): string {
+  const links = normalizeItems(value).filter(
+    (link) => !link["@_rel"] || link["@_rel"] === "alternate"
+  );
+  const link = links.find((link) => link["@_type"] === "text/html") || links[0];
+  return extractCDATA(link?.["@_href"]);
+}
+
+function extractAtomAuthor(value: unknown): string {
+  return extractCDATA(normalizeItems(value)[0]?.name);
+}
+
+function parseAtomFeed(feed: Record<string, unknown>): {
+  channel: RssChannel;
+  items: RssItem[];
+} {
+  const image = extractCDATA(feed.logo) || extractCDATA(feed.icon);
+
+  return {
+    channel: {
+      title: extractCDATA(feed.title),
+      link: extractAtomLink(feed.link),
+      description: extractCDATA(feed.subtitle),
+      image: image ? { url: image } : undefined,
+      language: extractCDATA(feed["@_xml:lang"]) || undefined,
+    },
+    items: normalizeItems(feed.entry).map((entry) => {
+      const link = extractAtomLink(entry.link);
+      const description = extractCDATA(entry.content) || extractCDATA(entry.summary);
+      const tags = [...new Set(normalizeItems(entry.category)
+        .map((category) => extractCDATA(category["@_term"]))
+        .filter(Boolean))];
+
+      return {
+        guid: extractCDATA(entry.id) || link,
+        title: extractCDATA(entry.title),
+        link,
+        description: description || undefined,
+        author: extractAtomAuthor(entry.author) || extractAtomAuthor(feed.author) || undefined,
+        category: tags[0],
+        pubDate: extractCDATA(entry.published) || extractCDATA(entry.updated),
+        tags,
+        thumbnail: extractFirstImage(description),
+      };
+    }),
+  };
+}
+
 export function parseRssFeed(xmlString: string): {
   channel: RssChannel;
   items: RssItem[];
 } {
   const result = parser.parse(xmlString);
   const channel = result?.rss?.channel;
+
+  if (!channel && result?.feed) {
+    return parseAtomFeed(result.feed);
+  }
 
   if (!channel) {
     throw new Error("Invalid RSS feed: no channel found");

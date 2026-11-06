@@ -10,6 +10,7 @@ import { getBudgetSchedule, type BudgetSettings, type TrancheSetting } from "./b
 import { parseTranches, validateTranches } from "./tranche-settings";
 import {
   lotTotals,
+  firstBuyReentryPrice,
   planLiveOrder,
   validateExecution,
   validateFirstTakeProfitPct,
@@ -61,7 +62,7 @@ export type CreateLiveInput = Pick<
   | "buyDropPct"
   | "takeProfitPct"
   | "feeBufferPct"
-> & BudgetSettings & { firstTakeProfitPct?: number; reservation?: ReservationInput };
+> & BudgetSettings & { firstTakeProfitPct?: number; reentryDropPct?: number | null; reservation?: ReservationInput };
 const unresolved = [
   "submitting",
   "submit_unknown",
@@ -87,11 +88,17 @@ const orderPrevious = (o: SplitLiveOrder): Execution => ({
   tax: o.tax,
 });
 
+function validateReentryDrop(value: number | null) {
+  if (value !== null && (!Number.isFinite(value) || value <= 0 || value >= 100 || Number(value.toFixed(2)) !== value))
+    throw new Error("재매수 하락률은 0.01~99.99% 범위에서 소수 둘째 자리까지 입력하세요.");
+}
+
 export async function createLiveStrategy(
   db: PrismaClient,
   input: CreateLiveInput,
   now = new Date(),
 ) {
+  validateReentryDrop(input.reentryDropPct ?? null);
   const reservation = input.reservation === undefined ? undefined : validateReservation(input.reservation, input.market, now);
   const symbol =
     typeof input.symbol === "string" ? input.symbol.trim().toUpperCase() : "";
@@ -130,6 +137,7 @@ export async function createLiveStrategy(
       buyDropPct: input.buyDropPct,
       takeProfitPct: input.takeProfitPct,
       firstTakeProfitPct,
+      reentryDropPct: input.reentryDropPct,
       trancheSettingsJson: input.tranches === undefined ? null : JSON.stringify(input.tranches),
       feeBufferPct: input.feeBufferPct,
       status: "paused",
@@ -199,6 +207,45 @@ export async function updateLiveReservation(db: PrismaClient, id: string, input:
       await tx.splitBuyReservation.update({ where: { strategyId: id }, data: { ...values, status: "waiting", orderId: null, note: "예약 조건 변경 · 감시 시작 전" } });
       await tx.splitReservationEvent.create({ data: { strategyId: id, ...values, type: "updated", message: "예약 조건 변경 · 감시 시작 전", createdAt: now } });
     });
+  } finally { await release(db, id, token); }
+}
+
+export async function updateReentryDrop(db: PrismaClient, id: string, value: number | null, now = new Date()) {
+  validateReentryDrop(value);
+  const token = await acquire(db, id, now);
+  try {
+    const s = await db.splitLiveStrategy.findUniqueOrThrow({ where: { id } });
+    if (!["active", "paused", "reserved"].includes(s.status)) throw new Error("종료한 전략은 수정할 수 없습니다.");
+    const saved = await db.splitLiveStrategy.updateMany({
+      where: { id, status: s.status, revision: s.revision, leaseToken: token },
+      data: { reentryDropPct: value, revision: { increment: 1 } },
+    });
+    if (!saved.count) throw new Error("전략 상태가 변경됐습니다. 새로고침 후 다시 시도하세요.");
+  } finally { await release(db, id, token); }
+}
+
+export async function updateLiveCapital(db: PrismaClient, id: string, value: number, expectedCapital: number, now = new Date()) {
+  const token = await acquire(db, id, now);
+  try {
+    const s = await db.splitLiveStrategy.findUniqueOrThrow({ where: { id } });
+    if (!["active", "reserved", "paused"].includes(s.status)) throw new Error("종료된 전략의 배정 자금은 수정할 수 없습니다.");
+    if (s.initialCash !== expectedCapital) throw new Error("배정 자금이 이미 변경됐습니다. 현재 금액을 확인하고 다시 입력하세요.");
+    const scale = s.market === "KR" ? 1 : 100;
+    if (!Number.isFinite(value) || value < 1 / scale || value > 1e10 || Math.round(value * scale) / scale !== value)
+      throw new Error(s.market === "KR" ? "배정 자금은 1원~100억원 사이의 정수로 입력하세요." : "배정 자금은 0.01~100억 사이에서 소수 둘째 자리까지 입력하세요.");
+    const tranches = parseTranches(s.trancheSettingsJson, s.maxTranches, s.market);
+    if (value < getBudgetSchedule({ ...s, tranches }).total)
+      throw new Error("배정 자금은 저장된 차수별 매수금액 합계 이상이어야 합니다. 감액하려면 차수별 금액을 먼저 줄여 저장하세요.");
+    if (await db.splitLiveOrder.count({ where: { strategyId: id, status: { in: unresolved } } }))
+      throw new Error("미체결·미확정 주문을 먼저 정리하고 동기화한 뒤 배정 자금을 변경하세요.");
+    const cash = roundMoney(s.cash + roundMoney(value - s.initialCash));
+    if (cash < 0) throw new Error("감액할 금액이 전략의 사용 가능한 잔액을 초과합니다.");
+    // Move capital and cash together so deposits/withdrawals never become P&L.
+    const saved = await db.splitLiveStrategy.updateMany({
+      where: { id, status: s.status, revision: s.revision, leaseToken: token, leaseUntil: { gt: now } },
+      data: { initialCash: value, cash, revision: { increment: 1 } },
+    });
+    if (!saved.count) throw new Error("전략 상태가 변경됐습니다. 새로고침 후 다시 시도하세요.");
   } finally { await release(db, id, token); }
 }
 
@@ -417,6 +464,12 @@ async function applyOrder(
         filledAmount: b.filledAmount ?? 0,
         commission: b.commission ?? 0,
         tax: b.tax ?? 0,
+        // A sell limit is a lower bound for every fill. When the batch total
+        // equals that bound all shares filled there, even between two polls.
+        ...(lot.slot === 1 && o.side === "SELL" && (delta.qty > 0 || delta.amount > 0) ? {
+          lastSellFillPrice: delta.qty === 1 ? delta.amount
+            : delta.qty > 0 && delta.amount === roundMoney(o.price * delta.qty) ? o.price : null,
+        } : {}),
         brokerStatus: b.status,
         status: closed ? "closed" : "submitted",
         error: null,
@@ -526,7 +579,9 @@ export async function runLiveStrategy(
     ) {
       // Keep cash, historical lots and ownership. The next poll creates a new
       // slot-1 generation after the usual quote/account/order checks.
-      const note = "전량 익절 정산 완료 — 다음 감시에 같은 설정으로 1차 재매수";
+      const note = current.reentryDropPct == null
+        ? "전량 익절 정산 완료 — 직전 회차 1차 매수가 이하 재매수 대기"
+        : `전량 익절 정산 완료 — 1차 마지막 매도 체결가 대비 ${current.reentryDropPct}% 하락 감시`;
       await db.splitLiveStrategy.updateMany({
         where: { id, status: "active", revision: current.revision, leaseToken: token },
         data: { note },
@@ -588,6 +643,41 @@ export async function runLiveStrategy(
       if (snap.price > reservation.watchPrice) {
         await db.splitLiveStrategy.update({ where: { id }, data: { lastPrice: snap.price, note: `예약 매수 감시 중 — ${reservation.watchPrice} 이하 대기` } });
         return { placed: 0, note: "예약 가격 미도달" };
+      }
+    }
+    let reentryTarget: number | null = null;
+    if (current.lots.every(l => lotTotals(l).remainingQty === 0)) {
+      const lastFirstLot = current.lots.filter(l => l.slot === 1 && l.boughtQty > 0)
+        .sort((a, b) => b.generation - a.generation)[0];
+      if (lastFirstLot) {
+        let reference: number | null;
+        if (current.reentryDropPct === null) {
+          reference = firstBuyReentryPrice(lastFirstLot, current.market);
+          reentryTarget = reference;
+        } else {
+          validateReentryDrop(current.reentryDropPct);
+          const sale = await db.splitLiveOrder.findFirst({
+            where: { lotId: lastFirstLot.id, side: "SELL", filledQty: { gt: 0 } },
+            orderBy: { sequence: "desc" },
+          });
+          // Recover an older sell's final price only when cumulative figures prove it.
+          reference = sale?.lastSellFillPrice ?? (sale && sale.filledQty === 1 ? sale.filledAmount
+            : sale && sale.filledAmount === roundMoney(sale.price * sale.filledQty) ? sale.price : null);
+          if (reference && reference > 0) {
+            const scale = current.market === "KR" ? 1 : 10000;
+            const basisPoints = Math.round(current.reentryDropPct * 100);
+            reentryTarget = Number(BigInt(Math.round(reference * scale)) * BigInt(10000 - basisPoints) / BigInt(10000)) / scale;
+          }
+        }
+        if (reentryTarget === null || snap.price > reentryTarget) {
+          const note = reentryTarget === null
+            ? "1차 재매수 대기 — 기준 체결가 확인 필요"
+            : current.reentryDropPct === null
+              ? `1차 재매수 대기 — 직전 회차 1차 매수가 ${reentryTarget} 이하`
+              : `1차 재매수 대기 — 기준가 ${reference} 대비 ${current.reentryDropPct}% 하락 · ${reentryTarget} 이하`;
+          await db.splitLiveStrategy.update({ where: { id }, data: { lastPrice: snap.price, note } });
+          return { placed: 0, note };
+        }
       }
     }
     const config = {
@@ -657,6 +747,7 @@ export async function runLiveStrategy(
           lotId,
           sequence: (last?.sequence ?? 0) + 1,
           clientOrderId: randomUUID().replaceAll("-", ""),
+          reentryTarget,
           side: plan.side,
           quantity: plan.quantity,
           price: plan.price,

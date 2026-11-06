@@ -3,7 +3,7 @@ import { koreanDate } from "./performance";
 
 export interface ChartTrade {
   id: string; x: number; side: "BUY" | "SELL"; slot: number; generation: number;
-  price: number; quantity: number; label: string;
+  price: number; quantity: number; label: string; orderDate?: string;
 }
 export interface SplitChartData {
   trades: ChartTrade[];
@@ -18,7 +18,7 @@ export function liveChart(orders: LiveChartOrder[]): SplitChartData {
   return {
     trades: orders.filter(o => o.filledQty > 0 && validPrice(o.filledAmount / o.filledQty) && ["BUY", "SELL"].includes(o.side))
       .map(o => ({ id: o.id, x: Date.parse(`${koreanDate(o.createdAt)}T00:00:00Z`), side: o.side as "BUY" | "SELL", ...o.lot,
-        price: o.filledAmount / o.filledQty, quantity: o.filledQty,
+        price: o.filledAmount / o.filledQty, quantity: o.filledQty, orderDate: koreanDate(o.createdAt),
         label: o.createdAt.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) })),
   };
 }

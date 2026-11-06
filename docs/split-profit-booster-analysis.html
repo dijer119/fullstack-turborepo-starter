@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>수익부스터와 현재 매직스플릿의 재매수 방식</title>
+  <style>
+    body { font: 16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; background: #eff4f7; color: #203449 }
+    h1,h2 { line-height: 1.35; color: #194861 } h2 { margin-top: 2rem } a { color: #165980 }
+    .example { padding: 1rem; background: #dcebf1; border-left: 4px solid #36708a } table { width: 100%; border-collapse: collapse }
+    th,td { padding: .65rem; border: 1px solid #b4c7d7; text-align: left; vertical-align: top } th { background: #dde8ef } td { background: #f8fafb }
+  </style>
+</head>
+<body>
+  <h1>1차 익절 후, 어떤 가격에서 다시 살까?</h1>
+  <p>키움증권용 매직스플릿 설명서에서 수익부스터는 1차 익절로 종목 잔고가 없어졌을 때 재매수 감시를 자동 등록하는 기능이다. 2차·3차만 매도하고 종목을 계속 보유하는 상황은 등록 계기로 설명하지 않는다.</p>
+  <h2>원문의 예시</h2>
+  <p class="example">LG에너지솔루션의 1차 마지막 매도 체결가가 393,500원이라면, 재매수 하락률 10%를 적용한 감시가는 <strong>354,150원</strong>이다. 가격이 이 수준에 도달하면 설정한 100만 원으로 새 1차 매수 주문을 낸다.</p>
+  <p>1차 익절률과 재매수 하락률은 서로 다른 설정이다. 위 감시가는 원래 매수가나 매도 목표가가 아니라 마지막 매도 체결가에서 계산한다. 가격이 계속 상승해 감시가에 닿지 않으면 재진입 기회가 오지 않을 수 있다.</p>
+  <p>재매수 후에는 종전에 쓰던 자동매매 설정을 기본으로 이어가며, 프로그램의 기본 매매 설정을 적용하는 옵션도 있다. 원문 프로그램에서 <strong>−0.01%</strong>는 하락을 기다리지 않고 현재가로 주문을 보내는 특수 입력값이다. 사용자는 자동 실행 내역, 매매 로그, 모바일 앱에서 주문 발생을 확인할 수 있다. <a href="https://wikidocs.net/230581">위키독스 원문과 설정 예시</a></p>
+  <h2>현재 실거래 앱과의 차이</h2>
+  <table>
+    <thead><tr><th>기능</th><th>감시 시작 시점</th><th>1차 주문 조건</th></tr></thead>
+    <tbody>
+      <tr><td>현재 앱의 예약 매수</td><td>사용자가 신규 전략에 감시가와 유효일을 지정</td><td>유효기간 안에 감시가 이하 도달</td></tr>
+      <tr><td>현재 앱의 반복 매수</td><td>활성 전략의 전량 익절 정산이 끝난 다음 감시</td><td>거래 시간·시세·잔액 등 주문 조건 충족</td></tr>
+      <tr><td>원문의 수익부스터</td><td>기능을 켠 종목의 1차 익절로 잔고가 없어질 때</td><td>마지막 매도 체결가에서 설정한 비율만큼 하락하거나 즉시 주문 옵션 적용</td></tr>
+    </tbody>
+  </table>
+  <p>현재 실거래 코드는 <code>live-run.ts</code>에서 전량 익절 후 다음 감시로 넘기며, 신규 예약 매수는 이미 매수 이력이 있는 전략을 차단한다. 수익부스터를 도입한다면 새 회차에 재진입 감시를 한 번만 등록하고, 그 감시가 끝날 때까지 기존 반복 매수 경로로 먼저 주문이 나가지 않게 해야 한다.</p>
+  <p>부분 체결도 구분해야 한다. 현재 장부의 누적 체결금액과 수량으로 계산한 평균가는 여러 가격에 나뉘어 매도됐을 때 마지막 체결가와 다를 수 있다. 원문 규칙을 정확히 재현하려면 증권사에서 마지막 개별 체결가를 확인할 수 있는지 검증해야 한다.</p>
+</body>
+</html>

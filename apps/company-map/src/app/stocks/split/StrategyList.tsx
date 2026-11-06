@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { NaverFinanceLink } from "@/components/stocks/NaverFinanceLink";
 import { filterStrategyRows, monitoringWarning, type StrategyListRow } from "@/lib/split/strategy-list";
 import { matchesPositionFilter, type PositionFilter } from "@/lib/split/strategy-tranches";
 import { TrancheMatrix } from "./TrancheMatrix";
@@ -73,11 +74,11 @@ export function StrategyList({ live, simulations, mode, asOf }: { live: Strategy
       </div>
       {view === "tranches" && visibleRows.length > 0 ? <TrancheMatrix rows={visibleRows} mode={mode} asOf={asOf} /> : <div className="overflow-hidden rounded-xl border border-line bg-surface ">
         <div className="hidden grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_1fr_7rem] gap-3 bg-surface-muted px-4 py-3 text-right text-xs text-muted md:grid "><span className="text-left">종목 · 계좌</span><span>상태</span><span>보유</span><span>누적 수익금</span><span>총손익</span><span>관리</span></div>
-        {visibleRows.map(row => <article key={row.id} aria-label={`${row.name} 전략`} className="border-t border-line px-4 py-4 first:border-t-0 ">
-          <div className="grid items-center gap-3 md:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_1fr_7rem]">
-            <div className="min-w-0"><Link className="font-semibold hover:text-blue-ink hover:underline" href={`/stocks/split/${mode}/${row.id}`}>{row.name}</Link><p className="mt-1 text-xs text-muted">{row.symbol} · {row.accountLabel} · {row.market === "KR" ? "KRW" : "USD"}</p></div>
+        {visibleRows.map(row => <article key={row.id} aria-label={`${row.name} 전략`} className="border-t border-line px-4 py-2 first:border-t-0 ">
+          <div className="grid items-center gap-2 md:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_1fr_7rem]">
+            <div className="min-w-0"><div className="flex flex-wrap items-center gap-x-2"><Link className="font-semibold hover:text-blue-ink hover:underline" href={`/stocks/split/${mode}/${row.id}`}>{row.name}</Link>{row.market === "KR" && <NaverFinanceLink code={row.symbol} name="네이버 금융" className="text-[10px] text-blue-ink" />}</div><p className="mt-0.5 text-sm font-semibold tabular-nums"><span className="mr-1 text-xs font-normal text-muted">{mode === "live" ? "현재가" : "관측가"}</span>{row.lastPrice === null ? "미수신" : money(row, row.lastPrice)}<span className="ml-1 text-[10px] font-normal text-muted">{mode === "live" ? "최근 판단" : "최근 관측"}</span></p><p className="mt-1 text-xs text-muted">{row.symbol} · {row.accountLabel} · {row.market === "KR" ? "KRW" : "USD"}</p></div>
             <div className="flex justify-between gap-2 md:block md:text-right"><span className="text-xs text-muted md:hidden">상태</span><span className={`rounded-full px-2 py-1 text-xs ${["active", "reserved"].includes(row.status) ? "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300" : "bg-surface-inset text-muted  "}`}>{statuses[row.status] ?? row.status}</span></div>
-            <div className="flex justify-between text-sm tabular-nums md:block md:text-right"><span className="text-xs text-muted md:hidden">보유</span>{row.holdingQty.toLocaleString("ko-KR")}주</div>
+            <div className="flex justify-between text-sm tabular-nums md:block md:text-right"><span className="text-xs text-muted md:hidden">보유</span><span>{row.holdingQty.toLocaleString("ko-KR")}주 <span className="whitespace-nowrap text-xs text-muted" title={mode === "live" ? "실제 매도 체결이 있는 주문 수 · 부분 체결도 주문당 1회 · 전체 이력 기준" : "모의 매도 완료 횟수 · 전체 이력 기준"}>· 매도 {row.sellCount.toLocaleString("ko-KR")}회</span></span></div>
             <div className="flex justify-between text-sm tabular-nums md:block md:text-right"><span className="text-xs text-muted md:hidden">누적 수익금</span><span className="font-medium">{money(row, row.realizedPnl)}</span></div>
             <div className="flex justify-between text-sm tabular-nums md:block md:text-right"><span className="text-xs text-muted md:hidden">총손익</span><span className={row.totalPnl !== null && row.totalPnl < 0 ? "text-blue-ink " : row.totalPnl !== null && row.totalPnl > 0 ? "text-red-ink " : ""}>{money(row, row.totalPnl)}</span></div>
             <Link href={`/stocks/split/${mode}/${row.id}`} className={`${control} text-center text-blue-ink hover:bg-blue-50 dark:hover:bg-blue-950`}>설정·장부</Link>

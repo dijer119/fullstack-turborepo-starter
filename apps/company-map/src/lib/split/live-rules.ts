@@ -68,6 +68,14 @@ export function lotTotals(lot: LiveLot) {
   };
 }
 
+/** Executed buy price, excluding costs, floored to the supported currency precision. */
+export function firstBuyReentryPrice(lot: Pick<LiveLot, "boughtQty" | "boughtAmount">, market: string): number | null {
+  if (!Number.isSafeInteger(lot.boughtQty) || lot.boughtQty <= 0 || !Number.isFinite(lot.boughtAmount) || lot.boughtAmount <= 0) return null;
+  const units = BigInt(Math.round(lot.boughtAmount * 10000));
+  const precision = market === "KR" ? 1 : 10000;
+  return Number(units / (BigInt(lot.boughtQty) * BigInt(10000 / precision))) / precision;
+}
+
 export function planLiveOrder(
   config: LiveConfig,
   lots: LiveLot[],

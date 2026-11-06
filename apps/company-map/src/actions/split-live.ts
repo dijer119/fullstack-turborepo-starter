@@ -11,6 +11,8 @@ import {
   finishEmptyLiveStrategy,
   updateFirstTakeProfitPct,
   updateLiveTranches,
+  updateLiveCapital,
+  updateReentryDrop,
   updateLiveReservation,
   type CreateLiveInput,
 } from "@/lib/split/live-run";
@@ -47,6 +49,7 @@ export async function listSplitLive(id?: string, includeOrders = true) {
     orderBy: { createdAt: "desc" },
     include: {
       reservation: true,
+      _count: { select: { orders: { where: { side: "SELL", filledQty: { gt: 0 } } } } },
       lots: { orderBy: [{ slot: "asc" }, { generation: "asc" }], include: { _count: { select: { orders: { where: { status: { in: pendingOrderStatuses } } } } } } },
       orders: includeOrders
         ? { orderBy: { sequence: "desc" }, take: 20 }
@@ -85,7 +88,9 @@ export async function listSplitLive(id?: string, includeOrders = true) {
         note: s.note,
         lastCheckedAt: s.lastCheckedAt?.toISOString() ?? null,
         lastPrice: s.lastPrice,
+        reentryDropPct: s.reentryDropPct,
         holdingQty,
+        sellCount: s._count.orders,
         marketValue,
         equity,
         totalPnl: equity === null ? null : roundMoney(equity - s.initialCash),
@@ -128,6 +133,12 @@ export async function updateSplitFirstTakeProfit(id: string, value: number) {
 }
 export async function updateSplitTranches(id: string, tranches: TrancheSetting[]) {
   return action(() => updateLiveTranches(db, id, tranches), "차수별 설정을 저장했습니다. 다음 신규 주문 판단부터 적용됩니다. 일시정지 상태라면 재개 후 적용됩니다.");
+}
+export async function updateSplitCapital(id: string, value: number, expectedCapital: number) {
+  return action(() => updateLiveCapital(db, id, value, expectedCapital), "배정 자금과 전략 잔액을 변경했습니다. 차수별 설정도 확인한 뒤 저장하세요.");
+}
+export async function updateSplitReentry(id: string, value: number | null) {
+  return action(() => updateReentryDrop(db, id, value), "1차 재매수 조건을 저장했습니다.");
 }
 export async function updateSplitReservation(id: string, input: ReservationInput) {
   return action(() => updateLiveReservation(db, id, input), "예약 조건을 저장했습니다. 설정을 확인한 뒤 감시를 시작하세요.");

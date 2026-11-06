@@ -11,12 +11,15 @@ import {
   recoverSplitLive,
   finishSplitLive,
   updateSplitTranches,
+  updateSplitCapital,
+  updateSplitReentry,
   type listSplitLive,
 } from "@/actions/split-live";
 import type { CreateLiveInput } from "@/lib/split/live-run";
 import { lookupSplitStockName } from "@/actions/split-stock";
 import { resolveTranches, validateTranches } from "@/lib/split/tranche-settings";
 import { strategyProgress } from "@/lib/split/progress";
+import { roundMoney } from "@/lib/split/engine";
 import { DetailTabs, type DetailTab } from "./DetailTabs";
 import { StrategyProgress } from "./StrategyProgress";
 import { SplitPriceChart } from "./SplitPriceChart";
@@ -68,6 +71,23 @@ const defaults: CreateLiveInput & Required<Pick<BudgetSettings, "budgetMode" | "
   firstTakeProfitPct: 10,
   feeBufferPct: 1,
 };
+
+function ReentryFields({ value, change }: { value: number | null; change: (value: number | null) => void }) {
+  return <div className="space-y-2 text-sm">
+    <label className="block">전량 익절 후 1차 재매수
+      <select className={inputClass} value={value === null ? "buy_price" : "drop"}
+        onChange={e => change(e.target.value === "drop" ? 5 : null)}>
+        <option value="buy_price">직전 회차 1차 매수가 이하에서 재매수 (기본)</option>
+        <option value="drop">마지막 1차 매도 체결가 대비 N% 하락 시 재매수</option>
+      </select>
+    </label>
+    {value === null && <p className="text-xs text-muted">전량 익절 후 직전 회차의 실제 1차 평균 매수 체결가 이하까지 기다립니다. 기준가는 수수료·세금을 제외하며, 새 회차가 체결되면 그 회차의 매수가가 다음 기준이 됩니다.</p>}
+    {value !== null && <>
+      <RateInput label="재매수 하락률 (%)" value={value} increment={0.5} min={0.01} max={99.99} onChange={change} className={inputClass} />
+      <p className="text-xs text-muted">전량 익절 후 기준 가격 이하에서 새 1차 매수를 주문합니다. 마지막 개별 체결가를 확인할 수 없으면 주문을 대기합니다.</p>
+    </>}
+  </div>;
+}
 
 export function LiveManager({ data, mode, reservationMode = false }: { data: Data; mode: "create" | "detail"; reservationMode?: boolean }) {
   const router = useRouter();
@@ -123,7 +143,9 @@ export function LiveManager({ data, mode, reservationMode = false }: { data: Dat
   const [arming, setArming] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [tab, setTab] = useState<DetailTab>("progress");
+  const [reentryEdits, setReentryEdits] = useState<Record<string, number | null | undefined>>({});
   const [trancheEdits, setTrancheEdits] = useState<Record<string, TrancheSetting[]>>({});
+  const [capitalEdits, setCapitalEdits] = useState<Record<string, { value: number; expected: number } | undefined>>({});
   useEffect(() => {
     const id = setInterval(() => router.refresh(), 30000);
     return () => clearInterval(id);
@@ -149,7 +171,7 @@ export function LiveManager({ data, mode, reservationMode = false }: { data: Dat
       <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
         실제 토스 계좌로 주문하는 자동매매입니다. 새 전략은 정지 상태로
         생성됩니다. 예약 매수는 감시 가격 이하에 도달하면, 일반 전략은 거래 가능 시간의 첫 유효 시세에서 1차 매수를 주문합니다.
-        전량 익절 정산 후에는 다음 감시에서 같은 설정으로 1차 매수를 다시 시작합니다.
+        전량 익절 정산 후에는 종목별 1차 재매수 조건에 따라 새 회차를 시작합니다.
         일시정지는 신규 주문만 멈추며, 이미 제출한 주문의 취소·정정은 토스
         앱에서 처리하세요.
       </div>
@@ -316,6 +338,7 @@ export function LiveManager({ data, mode, reservationMode = false }: { data: Dat
               allowCountChange disabled={pending}
               onChange={(tranches) => setConfig((current) => ({ ...current, tranches, maxTranches: tranches.length,
                 trancheBudget: tranches[0].budget, firstTakeProfitPct: tranches[0].takeProfitPct }))} />
+            <ReentryFields value={config.reentryDropPct ?? null} change={value => setConfig(c => ({ ...c, reentryDropPct: value }))} />
             {budgetPreview.error && <p role="alert" className="mt-2 text-sm text-red-ink ">{budgetPreview.error}</p>}
           </div>
           <p className="my-3 text-xs text-muted">
@@ -345,6 +368,9 @@ export function LiveManager({ data, mode, reservationMode = false }: { data: Dat
             ? "—"
             : `${s.market === "KR" ? "₩" : "$"}${number(value)}`;
         const progress = strategyProgress(s.maxTranches, s.lots);
+        const capitalDraft = capitalEdits[s.id];
+        const capitalValue = capitalDraft?.value ?? s.initialCash;
+        const capitalDelta = roundMoney(capitalValue - s.initialCash);
         const recent = s.orders.map(o => {
           const lot = s.lots.find(l => l.id === o.lotId);
           return { id: o.id, side: o.side === "BUY" ? "BUY" as const : "SELL" as const,
@@ -434,7 +460,7 @@ export function LiveManager({ data, mode, reservationMode = false }: { data: Dat
                   {!s.tranches && s.budgetMode !== "fixed" && ` ${number(s.budgetMultiplier)}배`}
                    · {s.tranches ? "차수별 설정대로 매매" : `1차 익절 ${s.firstTakeProfitPct}%, 2차 이후 ${s.takeProfitPct}%`}. 시작 후 워커가 자동으로 실제 매수·매도 주문을 제출합니다. 첫
                   진입은 {s.reservation && s.reservation.status !== "executed" ? `${reservationDate(s.reservation.expiresAt)}까지 감시 가격 ${money(s.reservation.watchPrice)} 이하에 도달한 거래 가능 시간의 유효 시세입니다.` : "정규장 또는 국내 NXT 애프터마켓의 첫 유효 시세입니다."}
-                  전량 익절 후에도 같은 설정으로 반복하며, 멈추려면 일시정지하세요.
+                  전량 익절 후에는 {s.reentryDropPct == null ? "직전 회차 1차 매수가 이하가 되면" : `1차 마지막 매도 체결가 대비 ${s.reentryDropPct}% 하락하면`} 1차 재매수를 시도합니다.
                 </p>
                 <label className="my-3 flex items-center gap-2">
                   <input
@@ -469,6 +495,44 @@ export function LiveManager({ data, mode, reservationMode = false }: { data: Dat
               </StrategyProgress>
             </div>}
             <div hidden={tab !== "settings"} role="tabpanel" id={`${s.id}-settings-panel`} aria-labelledby={`${s.id}-settings-tab`}>
+            <form aria-label="배정 자금 변경" className="mt-3 space-y-3 rounded-xl border border-line p-3" onSubmit={event => {
+              event.preventDefault();
+              if (!capitalDraft) return;
+              execute(async () => {
+                const result = await updateSplitCapital(s.id, capitalDraft.value, capitalDraft.expected);
+                if (result.ok) setCapitalEdits(prev => ({ ...prev, [s.id]: undefined }));
+                return result;
+              });
+            }}>
+              <h4 className="font-semibold">배정 자금 변경</h4>
+              <p className="text-xs text-muted">현재 배정 {money(s.initialCash)} · 전략 잔액 {money(s.cash)}</p>
+              <fieldset disabled={pending || s.status === "completed"}>
+                <MoneyInput label="변경할 배정 자금" value={capitalValue} market={s.market} className={inputClass}
+                  onChange={value => setCapitalEdits(prev => ({ ...prev, [s.id]: { value, expected: prev[s.id]?.expected ?? s.initialCash } }))} />
+              </fieldset>
+              {Number.isFinite(capitalDelta) && <p className="text-sm">증감 {capitalDelta > 0 ? "+" : ""}{money(capitalDelta)} · 변경 후 전략 잔액 {money(roundMoney(s.cash + capitalDelta))}</p>}
+              <p className="text-xs leading-5 text-muted">전략의 운용 한도를 변경합니다. 증감액은 전략 잔액에 함께 반영되며 실제 주문은 계좌의 주문 가능 금액 안에서 실행됩니다. 미체결·미확정 주문이 모두 정리된 후 실행 중에도 변경할 수 있습니다. 증액한 뒤 아래 차수별 설정을 저장하세요. 감액은 저장된 차수별 필요 자금과 사용 가능한 잔액 범위에서 가능합니다.</p>
+              {s.status !== "completed" && <div className="flex gap-2">
+                <button type="submit" className={buttonClass} disabled={pending || !Number.isFinite(capitalValue) || capitalDelta === 0 || !capitalDraft}>배정 자금 저장</button>
+                {capitalDraft && <button type="button" className={buttonClass} disabled={pending} onClick={() => setCapitalEdits(prev => ({ ...prev, [s.id]: undefined }))}>입력 취소</button>}
+              </div>}
+            </form>
+            <form className="mt-3 space-y-3 rounded-xl border border-line p-3" onSubmit={event => {
+              event.preventDefault();
+              const draft = reentryEdits[s.id];
+              if (draft === undefined) return;
+              execute(async () => {
+                const result = await updateSplitReentry(s.id, draft);
+                if (result.ok) setReentryEdits(prev => ({ ...prev, [s.id]: undefined }));
+                return result;
+              });
+            }}>
+              <fieldset disabled={pending || s.status === "completed"}>
+                <ReentryFields value={reentryEdits[s.id] === undefined ? s.reentryDropPct : reentryEdits[s.id]!}
+                  change={value => setReentryEdits(prev => ({ ...prev, [s.id]: value }))} />
+              </fieldset>
+              {s.status !== "completed" && <button type="submit" className={buttonClass} disabled={pending || reentryEdits[s.id] === undefined}>재매수 조건 저장</button>}
+            </form>
             {s.reservation && <ReservationEditor id={s.id} market={s.market} strategyStatus={s.status} reservation={s.reservation} />}
             <details open className="mt-3 rounded-xl border border-line p-3 ">
               <summary className="cursor-pointer text-sm font-medium">차수별 설정 {["active", "reserved", "paused"].includes(s.status) ? "수정" : "보기"}</summary>
@@ -504,7 +568,7 @@ export function LiveManager({ data, mode, reservationMode = false }: { data: Dat
                   ["보유 평가액", s.marketValue],
                   ["총자산", s.equity],
                   ["총손익", s.totalPnl],
-                  ["최초 배정", s.initialCash],
+                  ["배정 자금", s.initialCash],
                 ] as const
               ).map(([label, value]) => (
                 <div key={label}>

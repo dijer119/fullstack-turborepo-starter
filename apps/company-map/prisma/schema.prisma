@@ -758,6 +758,8 @@ model SplitLiveStrategy {
   takeProfitPct Float
   firstTakeProfitPct Float @default(10)
   trancheSettingsJson String?
+  // NULL waits for the previous cycle's executed slot-1 buy price.
+  reentryDropPct Float?
   feeBufferPct Float @default(1)
   status String @default("paused")
   note String?
@@ -834,6 +836,8 @@ model SplitLiveOrder {
   price Float
   status String @default("submitting")
   brokerStatus String?
+  lastSellFillPrice Float?
+  reentryTarget Float?
   lastSyncedAt DateTime?
   filledQty Int @default(0)
   filledAmount Float @default(0)

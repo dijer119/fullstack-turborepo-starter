@@ -11,8 +11,10 @@ interface SearchableStrategy {
 export interface StrategyListRow extends SearchableStrategy {
   id: string;
   holdingQty: number;
+  sellCount: number;
   realizedPnl: number;
   totalPnl: number | null;
+  lastPrice: number | null;
   lastCheckedAt: string | null;
   note: string | null;
   cells: TrancheCell[];

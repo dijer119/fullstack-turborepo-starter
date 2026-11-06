@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>blog-collection Atom 피드 인식 수정</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a202c; }
+    h1 { border-bottom: 2px solid #2c5282; padding-bottom: 0.4rem; }
+    h2 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3rem; margin-top: 2rem; color: #2c5282; }
+    pre { background: #f7fafc; border: 1px solid #e2e8f0; padding: 0.8rem; overflow-x: auto; border-radius: 4px; }
+    code { background: #f7fafc; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.92em; }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; }
+    th { background: #edf2f7; text-align: left; }
+    th, td { border: 1px solid #cbd5e0; padding: 0.4rem 0.6rem; }
+  </style>
+</head>
+<body>
+  <h1>blog-collection Atom 피드 인식 수정</h1>
+  <p>검증일: 2026-11-04 (한국시간). <a href="https://hoch.io/feed.xml">hoch.io 피드</a>를 실행 중인 앱에서 조회해 HTTP 200과 글 17개 반환을 확인했다.</p>
+  <h2>원인과 수정</h2>
+  <p>외부 서버는 정상 XML을 반환했지만 문서가 Atom의 <code>&lt;feed&gt;</code> 형식이었다. 기존 <code>src/lib/rss/parser.ts</code>의 <code>parseRssFeed</code>는 <code>rss.channel</code>만 찾고, 없으면 <code>Invalid RSS feed: no channel found</code>를 던졌다. 등록 API가 이 예외를 HTTP 400으로 반환해 구독 저장 전에 실패했다.</p>
+  <p>공통 파서에 Atom 변환 분기를 추가했다. HTML 페이지 링크, 글 ID, 본문, 작성자, 발행일 또는 수정일, 분류와 썸네일을 기존 데이터 형식으로 변환한다. 등록 API와 수집 코드가 같은 파서를 사용하며 기존 RSS 분기는 유지했다. 링크 관계와 날짜 구분은 <a href="https://www.rfc-editor.org/rfc/rfc4287">Atom 표준 RFC 4287</a>을 참고했다.</p>
+  <h2>검증</h2>
+  <table>
+    <thead><tr><th>검사</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td>수정 전 실제 XML 및 테스트</td><td>동일한 no channel found 오류 재현. Atom 테스트 3개 실패, 기존 RSS·잘못된 문서 테스트 2개 통과.</td></tr>
+      <tr><td>수정 후 회귀 테스트</td><td>5개 통과. 단일·복수·빈 Atom, RSS 유지, 비피드 거부 확인.</td></tr>
+      <tr><td>실제 XML 파싱</td><td>17개 글의 ID·URL·본문·작성자·날짜 확인. 첫 글: 냅킨에서 악기까지.</td></tr>
+      <tr><td>실행 중 API</td><td>localhost:3002/api/rss/fetch에 해당 URL 전달 → HTTP 200, itemCount 17.</td></tr>
+      <tr><td>TypeScript</td><td>앱 전체 tsc --noEmit --incremental false 통과.</td></tr>
+      <tr><td>변경 파일 lint</td><td>parser.ts, parser.test.mjs 통과.</td></tr>
+      <tr><td>앱 전체 lint</td><td>기존 오류 4개: AppMenu.tsx:75, PostDetailModal.tsx:41의 effect 내부 setState, TagFilter.tsx:27의 내부 a 링크, scrape/article.ts:85의 prefer-const. 기존 경고 2개도 남아 있음.</td></tr>
+    </tbody>
+  </table>
+  <h2>범위와 재실행</h2>
+  <p>구현 변경은 공통 파서 한 파일이다. 기존 테스트가 없어 Node 내장 테스트로 회귀 검사를 추가했으며 별도 의존성은 추가하지 않았다. 이 테스트는 파싱 계약을 검사하며 네트워크와 DB 저장을 검사하지 않는다. 실제 구독 추가·DB 저장·Telegram 알림은 실행하지 않았다. 모든 Atom 변형의 지원을 보장하는 변경은 아니며 해당 피드의 기본 네임스페이스와 HTML 본문 형식을 검증했다.</p>
+  <pre><code>node --experimental-strip-types --test /Users/dijer/dev/workspace/fullstack-turborepo-starter/apps/blog-collection/src/lib/rss/parser.test.mjs</code></pre>
+  <p>테스트 명령은 TypeScript 제거 실행을 지원하는 Node가 필요하며 이번 검증은 Node v26.8.2에서 수행했다. 기존의 다른 작업을 보존하고 수정 범위만 수동 검토했다. 관련 없는 리팩터링·자동 커밋·배포는 수행하지 않았다.</p>
+</body>
+</html>

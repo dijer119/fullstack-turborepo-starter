@@ -20,7 +20,8 @@ describe("진행 현황 차트", () => {
     const order = { id: "buy", side: "BUY", createdAt: new Date("2026-10-30T16:00:00Z"), filledQty: 2, filledAmount: 202, lot: { slot: 2, generation: 3 } };
     const result = liveChart([order, { ...order, id: "empty", filledQty: 0, filledAmount: 0 }, { ...order, id: "sell", side: "SELL", filledQty: 1, filledAmount: 110 }]);
     expect(result.trades).toHaveLength(2);
-    expect(result.trades[0]).toMatchObject({ x: Date.UTC(2026, 9, 31), price: 101, quantity: 2, slot: 2, generation: 3 });
+    expect(result.trades[0]).toMatchObject({ x: Date.UTC(2026, 9, 31), orderDate: "2026-10-31", price: 101, quantity: 2, slot: 2, generation: 3 });
+    expect(result.trades[1].orderDate).toBe("2026-10-31");
   });
   it("모의 경로는 재진입과 같은 관측에서의 복수 매도를 각각 보존한다", () => {
     const prices = [10000, 9000, 8100, 8910, 8100, 11000, 9999];
@@ -35,6 +36,7 @@ describe("진행 현황 차트", () => {
     const result = tradeChartPoints(simulationChart(state.lots).trades);
     expect(result.map(p => [p.x, p.price])).toEqual([[1, 10000], [2, 9000]]);
     expect(result[1].trades[0].label).toBe("관측 #5");
+    expect(result[1].trades[0].orderDate).toBeUndefined();
   });
   it("같은 날 같은 가격의 매수·매도·재매수도 순서대로 별도 표시한다", () => {
     const order = { id: "b", side: "BUY", createdAt: new Date("2026-10-30T00:00:00Z"), filledQty: 2, filledAmount: 200, lot: { slot: 1, generation: 1 } };

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { assertSymbolOwnership } from "@/lib/toss/order-ownership";
 import { splitLiveTick } from "./live-tick";
-import { lotTotals } from "./live-rules";
+import { firstBuyReentryPrice, lotTotals } from "./live-rules";
 import {
   createLiveStrategy,
   startLiveStrategy,
@@ -14,6 +14,8 @@ import {
   finishEmptyLiveStrategy,
   updateFirstTakeProfitPct,
   updateLiveTranches,
+  updateLiveCapital,
+  updateReentryDrop,
   updateLiveReservation,
   type LiveDeps,
   type BrokerOrder,
@@ -52,11 +54,11 @@ beforeEach(async () => {
   db = new PrismaClient({
     datasources: { db: { url: `file:${path.join(folder, "test.db")}` } },
   });
-  const sql = ["20261030010000_add_split_live", "20261030020000_add_split_budget_modes", "20261031000000_add_split_first_take_profit", "20261031010000_add_split_tranche_settings", "20261101000000_add_split_reservations"]
+  const sql = ["20261030010000_add_split_live", "20261030020000_add_split_budget_modes", "20261031000000_add_split_first_take_profit", "20261031010000_add_split_tranche_settings", "20261101000000_add_split_reservations", "20261104000000_add_split_reentry", "20261105000000_split_reentry_buy_price"]
     .map((migration) => readFileSync(path.resolve(__dirname, `../../../prisma/migrations/${migration}/migration.sql`), "utf8"))
     .join("\n");
   for (const statement of sql
-    .split(";")
+    .split(/;(?!\s*END\b)/i)
     .map((s) => s.trim())
     .filter(Boolean))
     await db.$executeRawUnsafe(statement);
@@ -81,6 +83,76 @@ beforeEach(async () => {
       orderId: `broker-${order.sequence}`,
     })),
   };
+});
+
+it("1차 실제 평균 체결가는 통화 정밀도로 내림하며 비용을 포함하지 않는다", () => {
+  expect(firstBuyReentryPrice({ boughtQty: 3, boughtAmount: 100001 }, "KR")).toBe(33333);
+  expect(firstBuyReentryPrice({ boughtQty: 3, boughtAmount: 1 }, "US")).toBe(0.3333);
+  expect(firstBuyReentryPrice({ boughtQty: 0, boughtAmount: 0 }, "KR")).toBeNull();
+});
+
+describe("배정 자금 변경", () => {
+  it("보유와 손익을 보존하면서 증액·감액하고 재요청으로 잔액을 중복 증액하지 않는다", async () => {
+    const id = await started();
+    await runLiveStrategy(db, deps, id);
+    details["broker-1"] = filled("broker-1");
+    snapshot.holdingQty = 10;
+    await runLiveStrategy(db, deps, id);
+    const lots = await db.splitLiveLot.findMany();
+    const orders = await db.splitLiveOrder.findMany();
+    const before = await db.splitLiveStrategy.findUniqueOrThrow({ where: { id } });
+    await updateLiveCapital(db, id, 550, 300, now);
+    const increased = await db.splitLiveStrategy.findUniqueOrThrow({ where: { id } });
+    expect(increased).toMatchObject({ initialCash: 550, cash: 450, status: "active", leaseToken: null });
+    expect(increased.cash - increased.initialCash).toBe(before.cash - before.initialCash);
+    await expect(updateLiveCapital(db, id, 550, 300, now)).rejects.toThrow(/이미 변경/);
+    await updateLiveCapital(db, id, 300, 550, now);
+    expect(await db.splitLiveStrategy.findUniqueOrThrow({ where: { id } })).toMatchObject({ cash: 200, initialCash: 300 });
+    expect(await db.splitLiveLot.findMany()).toEqual(lots);
+    expect(await db.splitLiveOrder.findMany()).toEqual(orders);
+  });
+  it("증액 후 550만원 차수별 예산을 저장하고 일시정지 상태를 보존한다", async () => {
+    const s = await createLiveStrategy(db, { ...cfg, market: "KR", symbol: "005930", initialCash: 1000000, trancheBudget: 100000 });
+    await updateLiveCapital(db, s.id, 5500000, 1000000, now);
+    const tranches = [1000000, 1500000, 3000000].map((budget, i) => ({ budget, buyDropPct: i ? 5 : null, takeProfitPct: 5 }));
+    await updateLiveTranches(db, s.id, tranches, now);
+    expect(await db.splitLiveStrategy.findUniqueOrThrow({ where: { id: s.id } })).toMatchObject({ initialCash: 5500000, cash: 5500000, status: "paused" });
+    await expect(updateLiveCapital(db, s.id, 1000000, 5500000, now)).rejects.toThrow(/차수별/);
+    await expect(updateLiveCapital(db, s.id, 5500000.5, 5500000, now)).rejects.toThrow(/정수/);
+  });
+  it("잘못된 금액·잔액 부족·종료 전략·다른 실행 중에는 변경하지 않는다", async () => {
+    const s = await createLiveStrategy(db, { ...cfg, initialCash: 500 });
+    for (const value of [NaN, Infinity, 0, -1, 1e10 + 1, 500.001])
+      await expect(updateLiveCapital(db, s.id, value, 500, now)).rejects.toThrow(/배정 자금/);
+    await db.splitLiveStrategy.update({ where: { id: s.id }, data: { cash: 100 } });
+    await expect(updateLiveCapital(db, s.id, 300, 500, now)).rejects.toThrow(/잔액/);
+    await db.splitLiveStrategy.update({ where: { id: s.id }, data: { status: "completed" } });
+    await expect(updateLiveCapital(db, s.id, 600, 500, now)).rejects.toThrow(/종료/);
+    await db.splitLiveStrategy.update({ where: { id: s.id }, data: { status: "paused", leaseToken: "worker", leaseUntil: new Date(now.getTime() + 10000) } });
+    await expect(updateLiveCapital(db, s.id, 600, 500, now)).rejects.toThrow(/다른 실행/);
+    expect(await db.splitLiveStrategy.findUniqueOrThrow({ where: { id: s.id } })).toMatchObject({ initialCash: 500, cash: 100 });
+  });
+  it("미해결 주문은 증감액과 관계없이 변경을 막는다", async () => {
+    const id = await started();
+    await runLiveStrategy(db, deps, id);
+    for (const status of ["submitting", "submitted", "submit_unknown", "cost_pending", "blocked"]) {
+      await db.splitLiveOrder.updateMany({ data: { status } });
+      await expect(updateLiveCapital(db, id, 500, 300, now)).rejects.toThrow(/미체결/);
+    }
+    expect(await db.splitLiveStrategy.findUniqueOrThrow({ where: { id } })).toMatchObject({ initialCash: 300, cash: 300 });
+  });
+  it("읽은 뒤 일시정지·revision 변경이 발생하면 자금을 덮어쓰지 않는다", async () => {
+    const s = await createLiveStrategy(db, cfg);
+    const concurrentDb = db.$extends({ query: { splitLiveStrategy: {
+      async findUniqueOrThrow({ args, query }) {
+        const result = await query(args);
+        await db.splitLiveStrategy.update({ where: { id: s.id }, data: { status: "paused", revision: { increment: 1 } } });
+        return result;
+      },
+    } } });
+    await expect(updateLiveCapital(concurrentDb as unknown as PrismaClient, s.id, 500, 300, now)).rejects.toThrow(/상태가 변경/);
+    expect(await db.splitLiveStrategy.findUniqueOrThrow({ where: { id: s.id } })).toMatchObject({ initialCash: 300, cash: 300, leaseToken: null });
+  });
 });
 
 describe("예약 매수", () => {
@@ -779,7 +851,55 @@ describe("실거래 영속 실행", () => {
     snapshot.holdingQty = 0;
     return s.id;
   }
-  it("전량 익절 정산 다음 감시에 같은 설정으로 재시작하고 장부·수익·소유권을 보존한다", async () => {
+  it("마지막 한 주가 더 높은 가격에 체결되면 그 가격 기준으로 대기하고 경계에서 한 번만 주문한다", async () => {
+    const id = await firstSalePlaced();
+    await updateReentryDrop(db, id, 10, now);
+    Object.assign(details["broker-2"], { status: "PARTIAL_FILLED", filledQty: 9, filledAmount: 99 });
+    await runLiveStrategy(db, deps, id);
+    Object.assign(details["broker-2"], { status: "FILLED", filledQty: 10, filledAmount: 111 });
+    await runLiveStrategy(db, deps, id);
+    snapshot.price = 10.81;
+    await runLiveStrategy(db, deps, id);
+    expect(deps.submit).toHaveBeenCalledTimes(2);
+    await db.$disconnect();
+    snapshot.price = 10.8;
+    await runLiveStrategy(db, deps, id);
+    expect(await db.splitLiveOrder.findFirstOrThrow({ where: { sequence: 3 } })).toMatchObject({ reentryTarget: 10.8, side: "BUY" });
+    expect(deps.submit).toHaveBeenCalledTimes(3);
+  });
+
+  it("다중 가격 체결의 마지막 가격이 불명확하면 평균가로 매수하지 않는다", async () => {
+    const id = await firstSalePlaced();
+    await updateReentryDrop(db, id, 5, now);
+    details["broker-2"].filledAmount = 115;
+    await runLiveStrategy(db, deps, id);
+    snapshot.price = 9;
+    expect((await runLiveStrategy(db, deps, id)).note).toContain("체결가 확인 필요");
+    expect(deps.submit).toHaveBeenCalledTimes(2);
+    await updateReentryDrop(db, id, null, now);
+    await runLiveStrategy(db, deps, id);
+    expect(deps.submit).toHaveBeenCalledTimes(3);
+  });
+
+  it("구버전 워커가 재매수 기준 없이 1차 주문을 생성하면 DB가 차단한다", async () => {
+    const id = await firstSalePlaced();
+    await runLiveStrategy(db, deps, id);
+    const lot = await db.splitLiveLot.create({ data: { strategyId: id, slot: 1, generation: 2 } });
+    await expect(db.splitLiveOrder.create({ data: {
+      strategyId: id, lotId: lot.id, sequence: 3, clientOrderId: "old-worker",
+      side: "BUY", price: 11, quantity: 1,
+    } })).rejects.toThrow();
+    expect(await db.splitLiveOrder.count()).toBe(2);
+  });
+  it("하락 조건으로 등록해도 최초 진입은 정상 실행되며 잘못된 비율은 거절한다", async () => {
+    const s = await createLiveStrategy(db, { ...cfg, reentryDropPct: 5 });
+    for (const value of [0, 100, NaN, 0.001]) await expect(updateReentryDrop(db, s.id, value, now)).rejects.toThrow(/하락률/);
+    await startLiveStrategy(db, deps, s.id);
+    await runLiveStrategy(db, deps, s.id);
+    expect(deps.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it("기본 재매수는 직전 1차 매수가까지 기다리고 재시작·동시 감시에도 한 번만 주문한다", async () => {
     const id = await firstSalePlaced();
     await runLiveStrategy(db, deps, id);
     expect(deps.submit).toHaveBeenCalledTimes(2);
@@ -789,14 +909,21 @@ describe("실거래 영속 실행", () => {
     });
     expect(await db.splitSymbolOwner.count()).toBe(1);
     details["broker-3"] = {
-      ...filled("broker-3"), quantity: 9, price: 11, status: "PENDING",
+      ...filled("broker-3"), quantity: 10, price: 10, status: "PENDING",
       filledQty: 0, filledAmount: 0,
     };
+    snapshot.price = 11;
+    await runLiveStrategy(db, deps, id);
+    expect(deps.submit).toHaveBeenCalledTimes(2);
+    snapshot.price = 10.01;
+    await runLiveStrategy(db, deps, id);
+    expect(deps.submit).toHaveBeenCalledTimes(2);
+    snapshot.price = 10;
     await db.$disconnect();
     await Promise.all([runLiveStrategy(db, deps, id), runLiveStrategy(db, deps, id)]);
     expect(deps.submit).toHaveBeenCalledTimes(3);
     expect(await db.splitLiveOrder.findFirstOrThrow({ where: { sequence: 3 } })).toMatchObject({
-      side: "BUY", quantity: 9, price: 11, status: "submitted",
+      side: "BUY", quantity: 10, price: 10, status: "submitted", reentryTarget: 10,
     });
     const lots = await db.splitLiveLot.findMany({ orderBy: { generation: "asc" } });
     expect(lots).toHaveLength(2);
@@ -807,24 +934,28 @@ describe("실거래 영속 실행", () => {
   it("두 번 전량 익절해도 회차와 누적 수익을 이어가며 수동 종료 후에는 재시작하지 않는다", async () => {
     const id = await firstSalePlaced();
     await runLiveStrategy(db, deps, id);
+    snapshot.price = 9;
     await runLiveStrategy(db, deps, id);
     details["broker-3"] = {
-      ...filled("broker-3"), quantity: 9, price: 11, filledQty: 9, filledAmount: 99,
+      ...filled("broker-3"), quantity: 11, price: 9, filledQty: 11, filledAmount: 99,
     };
-    snapshot.holdingQty = 9;
-    snapshot.sellableQty = 9;
+    snapshot.holdingQty = 11;
+    snapshot.sellableQty = 11;
     snapshot.price = 12.1;
     await runLiveStrategy(db, deps, id);
     details["broker-4"] = {
-      ...filled("broker-4"), side: "SELL", quantity: 9, price: 12.1,
-      filledQty: 9, filledAmount: 108.9,
+      ...filled("broker-4"), side: "SELL", quantity: 11, price: 12.1,
+      filledQty: 11, filledAmount: 133.1,
     };
     snapshot.holdingQty = 0;
     await runLiveStrategy(db, deps, id);
     const lots = await db.splitLiveLot.findMany();
-    expect(lots.reduce((sum, l) => sum + lotTotals(l).realizedPnl, 0)).toBe(19.6);
-    expect((await db.splitLiveStrategy.findUniqueOrThrow({ where: { id } })).cash).toBe(319.6);
+    expect(lots.reduce((sum, l) => sum + lotTotals(l).realizedPnl, 0)).toBe(43.8);
+    expect((await db.splitLiveStrategy.findUniqueOrThrow({ where: { id } })).cash).toBe(343.8);
     expect(deps.submit).toHaveBeenCalledTimes(4);
+    snapshot.price = 9.01;
+    await runLiveStrategy(db, deps, id);
+    expect(deps.submit).toHaveBeenCalledTimes(4); // latest filled generation uses 9, not the original 10
     await db.splitLiveStrategy.update({ where: { id }, data: { status: "paused" } });
     await finishEmptyLiveStrategy(db, deps, id);
     await runLiveStrategy(db, deps, id);
@@ -836,6 +967,7 @@ describe("실거래 영속 실행", () => {
     "익절 후 %s 조건에서는 재매수하지 않는다", async (mode) => {
       const id = await firstSalePlaced();
       await runLiveStrategy(db, deps, id);
+      snapshot.price = 10;
       if (mode === "paused") await db.splitLiveStrategy.update({ where: { id }, data: { status: "paused" } });
       if (mode === "killed") deps.killed = () => true;
       if (mode === "closed") snapshot.isOpen = false;
@@ -855,6 +987,7 @@ describe("실거래 영속 실행", () => {
     expect((await db.splitLiveStrategy.findUniqueOrThrow({ where: { id } })).status).toBe("paused");
     expect(await db.splitSymbolOwner.count()).toBe(1);
     expect(deps.submit).toHaveBeenCalledTimes(2);
+    snapshot.price = 10;
     await startLiveStrategy(db, deps, id);
     await runLiveStrategy(db, deps, id);
     expect(deps.submit).toHaveBeenCalledTimes(3);
