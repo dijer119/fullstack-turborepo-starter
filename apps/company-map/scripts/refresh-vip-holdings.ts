@@ -1,7 +1,6 @@
 import { config } from "dotenv";
 import path from "node:path";
 config({ path: path.resolve(__dirname, "..", ".env.local") });
-config({ path: path.resolve(__dirname, "..", ".env") });
 
 import { refreshVipHoldings } from "@/lib/dart/vip-holdings";
 
