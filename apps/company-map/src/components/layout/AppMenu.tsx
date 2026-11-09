@@ -12,9 +12,7 @@ import {
   Calculator,
   TrendingUp,
   Filter,
-  Building2,
   Layers,
-  Upload,
   Cpu,
   Search,
   Wallet,
@@ -40,14 +38,6 @@ type Service = {
 // 새 서비스 추가 시 양쪽 AppMenu.tsx에 동일하게 한 줄 추가.
 const SERVICES: Service[] = [
   {
-    key: "company-map",
-    name: "Company Map",
-    description: "산업·기업 N:M 매핑 시각화",
-    href: "http://localhost:3004/map",
-    icon: MapIcon,
-    enabled: true,
-  },
-  {
     key: "covered-call",
     name: "커버드콜 ETF",
     description: "국내 상장 커버드콜 ETF 배당·수익률 조회",
@@ -63,20 +53,6 @@ const SERVICES: Service[] = [
     icon: Rss,
     enabled: true,
   },
-];
-
-// Company Map 서비스 내부 sub-menu — 햄버거 패널의 Company Map 항목 아래에
-// 들여쓰기로 노출. 같은 origin이라 next/link 사용.
-const COMPANY_MAP_SUB_ITEMS: Array<{
-  key: string;
-  name: string;
-  path: string;
-  icon: typeof MapIcon;
-}> = [
-  { key: "map", name: "Map", path: "/map", icon: MapIcon },
-  { key: "companies", name: "Companies", path: "/companies", icon: Building2 },
-  { key: "industries", name: "Industries", path: "/industries", icon: Layers },
-  { key: "import", name: "Import", path: "/import", icon: Upload },
 ];
 
 // 같은 앱 내부 도구 — 햄버거 메뉴의 별도 섹션으로 노출.
@@ -350,38 +326,6 @@ export function AppMenu() {
                     {inner}
                   </a>
                 );
-
-                // Company Map 서비스 항목 바로 아래 sub-items 들여쓰기 노출
-                if (s.key === "company-map" && internal && s.enabled) {
-                  return (
-                    <div key={s.key}>
-                      {link}
-                      <div className="ml-7 mt-1 space-y-0.5">
-                        {COMPANY_MAP_SUB_ITEMS.map((sub) => {
-                          const SubIcon = sub.icon;
-                          const subActive =
-                            pathname === sub.path ||
-                            (sub.path !== "/" && pathname.startsWith(sub.path));
-                          return (
-                            <Link
-                              key={sub.key}
-                              href={sub.path}
-                              onClick={() => setOpen(false)}
-                              className={`flex items-center gap-2 rounded px-2 py-1 text-sm transition ${
-                                subActive
-                                  ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                                  : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-                              }`}
-                            >
-                              <SubIcon size={14} className="opacity-70" />
-                              {sub.name}
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                }
 
                 return link;
               })}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StrategyStatusBadge, pausedRowAccent } from "./StrategyStatusBadge";
 import { NaverFinanceLink } from "@/components/stocks/NaverFinanceLink";
 import { monitoringWarning, type StrategyListRow } from "@/lib/split/strategy-list";
 import type { TrancheState } from "@/lib/split/strategy-tranches";
@@ -23,13 +24,13 @@ export function TrancheMatrix({ rows, mode, asOf }: { rows: StrategyListRow[]; m
         </tr></thead>
         <tbody>{rows.map(row => {
           const href = `/stocks/split/${mode}/${row.id}`;
-          const state = row.status === "active" ? "실행 중" : row.status === "reserved" ? "예약 감시 중" : row.status === "paused" ? "일시정지" : "종료";
-          return <tr key={row.id} aria-label={`${row.name} 차수별 전략`}>
-            <th scope="row" className="sticky left-0 z-10 border-b border-r border-line bg-surface px-3 py-2 text-left font-normal">
+          const paused = row.status === "paused";
+          return <tr key={row.id} aria-label={`${row.name} 차수별 전략`} className={paused ? "[&>td:not([data-pending])]:bg-violet-50 dark:[&>td:not([data-pending])]:bg-violet-950" : undefined}>
+            <th scope="row" className={`sticky left-0 z-10 border-b border-r border-line px-3 py-2 text-left font-normal ${paused ? pausedRowAccent : "bg-surface"}`}>
               <Link href={href} className="block space-y-0.5 rounded focus-visible:outline-2 focus-visible:outline-blue-500" title={row.note ?? undefined}>
                 <span className="flex items-center justify-between gap-2">
                   <span className="max-w-36 truncate font-semibold hover:text-blue-ink" title={row.name}>{row.name}</span>
-                  <span className="flex shrink-0 items-center gap-1 text-[10px] text-muted"><span aria-hidden className={`h-1.5 w-1.5 rounded-full ${["active", "reserved"].includes(row.status) ? "bg-emerald-500" : "bg-gray-400"}`} />{state}</span>
+                  <StrategyStatusBadge status={row.status} />
                 </span>
                 <span className="flex items-center justify-between gap-2 tabular-nums">
                   <span className="font-semibold" title={mode === "live" ? "최근 매매 판단 가격" : "최근 관측 가격"}><span className="mr-1 text-[10px] font-normal text-muted">{mode === "live" ? "현재가" : "관측가"}</span>{row.lastPrice === null ? "미수신" : `${row.market === "KR" ? "₩" : "$"}${row.lastPrice.toLocaleString("ko-KR", { maximumFractionDigits: row.market === "KR" ? 0 : 2 })}`}</span>
@@ -47,7 +48,7 @@ export function TrancheMatrix({ rows, mode, asOf }: { rows: StrategyListRow[]; m
               const cell = row.cells[index];
               if (!cell) return <td key={index + 1} className="border-b border-r border-line bg-surface-muted px-3 text-center text-subtle  " aria-label={`${index + 1}차 미설정`}>—</td>;
               const pending = ["buy_pending", "sell_pending", "review"].includes(cell.state);
-              return <td key={cell.slot} className={`border-b border-r border-line text-center  ${pending ? "bg-amber-50 dark:bg-amber-950/30" : cell.quantity > 0 ? "bg-rose-50/60 dark:bg-rose-950/15" : cell.state === "buy_wait" ? "bg-cyan-50/60 dark:bg-cyan-950/20" : "bg-surface-muted "}`}>
+              return <td key={cell.slot} data-pending={pending || undefined} className={`border-b border-r border-line text-center  ${pending ? "bg-amber-50 dark:bg-amber-950/30" : cell.quantity > 0 ? "bg-rose-50/60 dark:bg-rose-950/15" : cell.state === "buy_wait" ? "bg-cyan-50/60 dark:bg-cyan-950/20" : "bg-surface-muted "}`}>
                 <Link href={href} aria-label={`${row.name} ${cell.slot}차 ${labels[cell.state]}${cell.quantity > 0 ? ` ${percent(cell.profitPct)}` : ""} 설정·장부`} className="flex min-h-20 flex-col items-center justify-center gap-0.5 px-3 py-2 hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-blue-500 dark:hover:bg-white/5">
                   {cell.quantity > 0 && <><span className={`text-base font-semibold tabular-nums ${profitColor(cell.profitPct)}`}>{percent(cell.profitPct)}</span><span className="text-xs text-muted">{cell.quantity.toLocaleString("ko-KR")}주 보유</span></>}
                   {cell.state !== "held" && <span className={`whitespace-nowrap rounded-lg px-2 py-1 text-xs ${pending ? "border border-amber-200 bg-surface text-amber-800 dark:border-amber-800  dark:text-amber-400" : cell.state === "buy_wait" ? "border border-red-200 bg-surface text-red-ink dark:border-red-900 " : "text-subtle"}`}>{labels[cell.state]}</span>}

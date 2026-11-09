@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listSplitSimulations } from "@/actions/split";
 import { listSplitLive } from "@/actions/split-live";
+import { LiveHoldingsSummary } from "./LiveHoldingsSummary";
 import { StrategyList } from "./StrategyList";
 import { summarizeTranches } from "@/lib/split/strategy-tranches";
 import { SplitNavigation } from "./SplitNavigation";
@@ -20,6 +21,8 @@ export default async function SplitPage({ searchParams }: { searchParams: Promis
     <SplitNavigation />
     <StrategyList key={mode} mode={mode} asOf={live.loadedAt}
       live={live.strategies.map(s => ({ id: s.id, name: s.name, symbol: s.symbol, market: s.market, status: s.status, accountLabel: `계좌 ${s.accountSeq}`, holdingQty: s.holdingQty, sellCount: s.sellCount, realizedPnl: s.realizedPnl, totalPnl: s.totalPnl, lastPrice: s.lastPrice, lastCheckedAt: s.lastCheckedAt, note: s.note, ...summarizeTranches(s.maxTranches, s.status, s.lastPrice, s.lots, s.orders.map(o => ({ ...o, slot: s.lots.find(l => l.id === o.lotId)!.slot }))) }))}
-      simulations={simulations.map(s => ({ id: s.id, name: s.config.name || s.config.symbol, symbol: s.config.symbol, market: s.config.market, status: s.state.status, accountLabel: s.config.source === "manual" ? "가격 경로" : "토스 시세", holdingQty: s.summary.holdingQty, sellCount: s.state.lots.filter(l => l.closedStep !== null).length, realizedPnl: s.summary.realizedPnl, totalPnl: s.summary.totalPnl, lastPrice: s.state.lastPrice, lastCheckedAt: s.lastObservedAt, note: s.state.note, ...summarizeTranches(s.config.maxTranches, s.state.status, s.state.lastPrice, s.state.lots, []) }))} />
+      simulations={simulations.map(s => ({ id: s.id, name: s.config.name || s.config.symbol, symbol: s.config.symbol, market: s.config.market, status: s.state.status, accountLabel: s.config.source === "manual" ? "가격 경로" : "토스 시세", holdingQty: s.summary.holdingQty, sellCount: s.state.lots.filter(l => l.closedStep !== null).length, realizedPnl: s.summary.realizedPnl, totalPnl: s.summary.totalPnl, lastPrice: s.state.lastPrice, lastCheckedAt: s.lastObservedAt, note: s.state.note, ...summarizeTranches(s.config.maxTranches, s.state.status, s.state.lastPrice, s.state.lots, []) }))}>
+      {mode === "live" && <LiveHoldingsSummary strategies={live.strategies} />}
+    </StrategyList>
   </main>;
 }

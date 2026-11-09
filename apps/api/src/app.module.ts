@@ -21,6 +21,7 @@ import { TodosModule } from './todos/todos.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['.env.local', '.env'],
       validationSchema: validationSchemaForEnv,
     }),
     GraphQLModule.forRoot<ApolloDriverConfig>({
@@ -43,4 +44,4 @@ import { TodosModule } from './todos/todos.module';
   controllers: [AppController],
   providers: [AppService, AppResolver],
 })
-export class AppModule { }
+export class AppModule {}

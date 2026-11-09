@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { NaverFinanceLink } from "@/components/stocks/NaverFinanceLink";
 import { filterStrategyRows, monitoringWarning, type StrategyListRow } from "@/lib/split/strategy-list";
 import { matchesPositionFilter, type PositionFilter } from "@/lib/split/strategy-tranches";
 import { TrancheMatrix } from "./TrancheMatrix";
+import { StrategyStatusBadge, pausedRowAccent } from "./StrategyStatusBadge";
 import { ProfitSummary } from "./ProfitSummary";
 
-const statuses: Record<string, string> = { active: "실행 중", reserved: "예약 감시 중", paused: "일시정지", completed: "종료" };
 const control = "min-w-0 rounded-lg border border-line bg-surface px-3 py-2 text-sm  ";
 const money = (row: StrategyListRow, value: number | null) => value === null ? "—" : `${row.market === "KR" ? "₩" : "$"}${value.toLocaleString("ko-KR", { maximumFractionDigits: row.market === "KR" ? 0 : 2 })}`;
 
-export function StrategyList({ live, simulations, mode, asOf }: { live: StrategyListRow[]; simulations: StrategyListRow[]; mode: "live" | "simulation"; asOf: number }) {
+export function StrategyList({ live, simulations, mode, asOf, children }: { live: StrategyListRow[]; simulations: StrategyListRow[]; mode: "live" | "simulation"; asOf: number; children?: ReactNode }) {
   const router = useRouter();
   const [view, setView] = useState<"tranches" | "summary">("tranches");
   const [position, setPosition] = useState<PositionFilter>("all");
@@ -49,6 +49,7 @@ export function StrategyList({ live, simulations, mode, asOf }: { live: Strategy
       </div>
       <Link className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700" href={`/stocks/split/new?mode=${mode}`}>+ {mode === "live" ? "실거래" : "모의"} 전략 등록</Link>
     </div>
+    {children}
     <ProfitSummary entries={rows} mode={mode === "live" ? "실거래" : "모의"} />
     <aside aria-label="가격 갱신 안내" className="space-y-2 rounded-xl border border-line bg-surface-muted px-4 py-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2"><strong>화면 30초마다 갱신</strong><span className="text-xs text-muted">화면 조회 {new Date(asOf).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })} (한국시간)</span></div>
@@ -74,10 +75,10 @@ export function StrategyList({ live, simulations, mode, asOf }: { live: Strategy
       </div>
       {view === "tranches" && visibleRows.length > 0 ? <TrancheMatrix rows={visibleRows} mode={mode} asOf={asOf} /> : <div className="overflow-hidden rounded-xl border border-line bg-surface ">
         <div className="hidden grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_1fr_7rem] gap-3 bg-surface-muted px-4 py-3 text-right text-xs text-muted md:grid "><span className="text-left">종목 · 계좌</span><span>상태</span><span>보유</span><span>누적 수익금</span><span>총손익</span><span>관리</span></div>
-        {visibleRows.map(row => <article key={row.id} aria-label={`${row.name} 전략`} className="border-t border-line px-4 py-2 first:border-t-0 ">
+        {visibleRows.map(row => <article key={row.id} aria-label={`${row.name} 전략`} className={`border-t border-line px-4 py-2 first:border-t-0 ${row.status === "paused" ? pausedRowAccent : ""}`}>
           <div className="grid items-center gap-2 md:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_1fr_7rem]">
             <div className="min-w-0"><div className="flex flex-wrap items-center gap-x-2"><Link className="font-semibold hover:text-blue-ink hover:underline" href={`/stocks/split/${mode}/${row.id}`}>{row.name}</Link>{row.market === "KR" && <NaverFinanceLink code={row.symbol} name="네이버 금융" className="text-[10px] text-blue-ink" />}</div><p className="mt-0.5 text-sm font-semibold tabular-nums"><span className="mr-1 text-xs font-normal text-muted">{mode === "live" ? "현재가" : "관측가"}</span>{row.lastPrice === null ? "미수신" : money(row, row.lastPrice)}<span className="ml-1 text-[10px] font-normal text-muted">{mode === "live" ? "최근 판단" : "최근 관측"}</span></p><p className="mt-1 text-xs text-muted">{row.symbol} · {row.accountLabel} · {row.market === "KR" ? "KRW" : "USD"}</p></div>
-            <div className="flex justify-between gap-2 md:block md:text-right"><span className="text-xs text-muted md:hidden">상태</span><span className={`rounded-full px-2 py-1 text-xs ${["active", "reserved"].includes(row.status) ? "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300" : "bg-surface-inset text-muted  "}`}>{statuses[row.status] ?? row.status}</span></div>
+            <div className="flex justify-between gap-2 md:block md:text-right"><span className="text-xs text-muted md:hidden">상태</span><StrategyStatusBadge status={row.status} /></div>
             <div className="flex justify-between text-sm tabular-nums md:block md:text-right"><span className="text-xs text-muted md:hidden">보유</span><span>{row.holdingQty.toLocaleString("ko-KR")}주 <span className="whitespace-nowrap text-xs text-muted" title={mode === "live" ? "실제 매도 체결이 있는 주문 수 · 부분 체결도 주문당 1회 · 전체 이력 기준" : "모의 매도 완료 횟수 · 전체 이력 기준"}>· 매도 {row.sellCount.toLocaleString("ko-KR")}회</span></span></div>
             <div className="flex justify-between text-sm tabular-nums md:block md:text-right"><span className="text-xs text-muted md:hidden">누적 수익금</span><span className="font-medium">{money(row, row.realizedPnl)}</span></div>
             <div className="flex justify-between text-sm tabular-nums md:block md:text-right"><span className="text-xs text-muted md:hidden">총손익</span><span className={row.totalPnl !== null && row.totalPnl < 0 ? "text-blue-ink " : row.totalPnl !== null && row.totalPnl > 0 ? "text-red-ink " : ""}>{money(row, row.totalPnl)}</span></div>
